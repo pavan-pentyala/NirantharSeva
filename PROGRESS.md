@@ -12,10 +12,10 @@
 
 ## Current phase
 
-Phase 0 — code is built, committed, pushed, and verified locally. **Not yet
-marked complete** — GitHub Actions has not been confirmed green by the user
-(no `gh` CLI in this environment to check it directly). Next phase is P1.1
-(server sync core) per the approved plan, on the user's go-ahead.
+Phase 1.1 (server sync core) — built, committed, pushed, verified. **Not yet
+marked complete** — same reason as Phase 0: no `gh` CLI in this environment,
+so GitHub Actions has not been confirmed green on either push. Next is
+**Phase 1.2 — client sync engine**, on the user's go-ahead.
 
 ## Done
 
@@ -24,132 +24,154 @@ marked complete** — GitHub Actions has not been confirmed green by the user
 - Phase 0 + Phase 1 build plan approved by the user; saved at
   `C:\Users\pavan\.claude\plans\kind-spinning-fountain.md`. P1 split into
   P1.1 (server) and P1.2 (client) at the user's direction.
-- **Phase 0 built, commit `3e73369`, pushed to `origin/main`.**
+- **Phase 0 built, commit `3e73369`.** PROGRESS/decision updates in
+  `6064dea`, `2cb34b4`.
+- **Phase 1.1 built, commit `982f203`, pushed to `origin/main`.**
 
-## Phase 0 — what was built
+## Phase 1.1 — what was built
 
-- Full repository layout per plan §2.2. Empty dirs (`docs/mom`,
-  `docs/screenshots`, `experiments`, `generator`, `results`,
-  `server/app/linkage`) carry `.gitkeep`.
-- `docker-compose.yml` — four services: `db` (Postgres 16, healthcheck),
-  `api`, `scheduler` (separate service from `api`, per plan — needed for E4),
-  `client`. Named volume `server_venv` at `/app/.venv` so the bind-mounted
-  `./server:/app` (for live reload) does not shadow the venv baked into the
-  image — same trick already used for `client`'s `node_modules`. This bug
-  was caught and fixed during verification, not assumed away.
-- `db/init/01-create-test-db.sh` — creates `nirantharseva_test` alongside
-  `nirantharseva` on first container start, so `make test` / CI never touch
-  dev data.
-- `server/app/clock.py` — `Clock` protocol, `RealClock`, `SimulatedClock`,
-  `CLOCK_MODE` env switch, FastAPI dependency. Exactly ADR-001.
-- `server/app/db.py` — async engine/session factory, `acquire_seq_lock()`
-  wrapping `pg_advisory_xact_lock(4711)`. Exactly ADR-002. Not yet called by
-  anything — P1.1 is the first caller.
-- `server/app/api/auth.py` — JWT (PyJWT) + argon2id login against
-  `DEV_USERS` env var. `get_current_user` dependency. No user table (P0
-  decision, see below).
-- `server/app/instrumentation/logging.py` — stdlib JSON formatter,
-  `op_id`/`referral_id`/`device_id`/`run_id` as fields.
-- Alembic wired async (`alembic/env.py`), baseline revision `0001` is empty.
-- `server/app/scheduler/run.py` — stub entrypoint, takes the clock, sleeps.
-  Real escalation sweep is Phase 5.
-- Client: Vite + React 18 + TS, one screen (`App.tsx`) that fetches
-  `/api/health` through the dev proxy and shows the result.
-- `.github/workflows/ci.yml` — three jobs: **clock-discipline** (greps
-  `server/app` for `datetime.now(`/`datetime.utcnow(`/`time.time(` outside
-  `clock.py`, fails the build if found — this is ADR-001's rule enforced,
-  not just documented, and was added beyond what the plan asked for);
-  **server** (uv sync, ruff check + format check, alembic upgrade, pytest,
-  against a real `postgres:16` service container); **client** (npm ci,
-  typecheck, build).
-- Tests: `tests/unit/test_clock.py`, `tests/unit/test_auth.py` (login,
-  wrong password, unknown user, token roundtrip, tampered token — all
-  hermetic, cache-cleared between runs), `tests/integration/test_health.py`
-  (real Postgres round trip). **11/11 passing.**
+- Alembic `0002`: `toy`, `toy_event`, `sync_receipt`, `request_timing`. No
+  DB-side `now()` default on any timestamp column — every one is written
+  from the injected Clock (ADR-001), so `CLOCK_MODE=simulated` runs stay
+  internally coherent.
+- `server/app/sync/push.py` — `handle_push()` follows plan §5.3 exactly:
+  claim the `op_id` via `INSERT ... ON CONFLICT DO NOTHING RETURNING`
+  first; a second submission of the same `op_id` replays the stored
+  receipt and touches nothing else. One transaction per op.
+  `apply_operation()` resolves concurrent writes to the same entity as a
+  Lamport-clock **last-writer-wins register**: after appending the event,
+  whichever event has the highest `(lamport, device_id)` for that entity
+  wins, independent of arrival order. This was a real design decision, not
+  in the plan's bare `CREATE TABLE toy(...)` — see "Decisions" below for
+  why it does not need a schema change and why it makes `accepted_stale`
+  mean something concrete (recorded per I2, but not the current winner).
+- `server/app/sync/pull.py` — `seq > since`, ordered, fetches `limit+1` to
+  compute `has_more` precisely without an extra count query.
+- `server/app/schemas/sync.py` — the push/pull contract from plan §5.2/5.4.
+  **Frozen — do not change without asking the user.**
+- `server/app/instrumentation/timing.py` — every request now lands in
+  `request_timing` (middleware was wired in Phase 0, unused until now).
+- `server/app/sync/lamport.py` — `merge_lamport()`, the same max-merge
+  formula the client uses after a pull (plan §5.4), used server-side to
+  compute the push response's `server_lamport`.
+- `server/app/sync/conflicts.py` — stub; real decision table is Phase 2
+  §6.3.
+- Tests (25 total, all new since Phase 0's 11): idempotent-replay
+  (`test_push_idempotent.py`), concurrent-write cursor-gap check
+  (`test_pull_cursor.py` — 20 concurrent pushes through the real ASGI app,
+  asserts the pull afterwards has no missing `seq`), `request_timing`
+  coverage, and two Hypothesis property tests in `test_permutation.py`:
+  permutation invariance (three orderings of the same op set converge to
+  the same final value) and retry-order idempotence (a shuffled retry
+  batch produces byte-identical per-op results). Plan §5.6 calls the
+  permutation test out as worth a paragraph in Chapter 4.
+
+## Two real bugs found and fixed while making this pass
+
+- **Windows `ProactorEventLoop` + asyncpg across pytest-asyncio's
+  function-scoped event loop.** The module-level `app.db.engine`'s
+  connection pool got bound to whichever event loop first used it; the
+  next test's fresh loop then broke it (`AttributeError: 'NoneType' object
+  has no attribute 'send'`). Fixed with
+  `asyncio_default_fixture_loop_scope = "session"` and
+  `asyncio_default_test_loop_scope = "session"` in `pyproject.toml`, so the
+  whole test session shares one loop. Confirmed the same fix holds inside
+  the Linux container too, not just on the Windows host.
+- **SQLAlchemy's `text()` will not treat `:name::type` as a bind
+  parameter** — it deliberately backs off to avoid clashing with
+  Postgres's `::` cast syntax, so `detail=:d::jsonb` silently left `:d`
+  unsubstituted and Postgres saw a syntax error. Fixed with
+  `CAST(:d AS jsonb)`. Separately, raw `text()` queries get no help from
+  SQLAlchemy's JSONB type layer for encoding/decoding — the dict is
+  hand-`json.dumps`ed going in and `json.loads`ed coming back out
+  (`_decode_detail()` in `push.py`) at that boundary.
 
 ## Verified, by running it, not by inspection
 
-- `docker compose down -v` then `docker compose up -d --build` from a fully
-  clean state (no volumes) — all four containers reach a healthy/running
-  state.
-- `curl localhost:8000/health` returns `{"status":"ok",...}`.
-- `curl -X POST localhost:8000/auth/login ...` returns a valid JWT, HTTP 200.
-- `curl localhost:5173/` serves the Vite app; `curl localhost:5173/api/health`
-  proxies through to the API correctly.
-- The exact containerized command the Makefile's `test` target runs
-  (`docker compose run --rm ... api sh -c "alembic upgrade head && pytest"`)
-  — 11/11 pass.
-- `ruff check` and `ruff format --check` — clean, run inside the container.
-- Client `npm run typecheck` and `npm run build` — clean.
-- The ADR-001 CI grep was tested against a deliberately introduced violation
-  (a throwaway file calling `datetime.datetime.now()`) — it caught it, then
-  the clean tree was reconfirmed to pass.
-- `.env` confirmed never committed (`git ls-files` and `git log` both clean).
+- Full suite green (25/25) via `uv run pytest` locally against the real
+  `nirantharseva_test` database.
+- Same 25/25 green via the exact containerized CI-equivalent command:
+  `docker compose run --rm ... api sh -c "alembic upgrade head && ruff
+  check . && ruff format --check . && pytest -v"`.
+- Cold start (`docker compose down -v` then `up -d --build`) applies both
+  migrations (`0001` then `0002`) cleanly and all four services reach a
+  healthy state.
+- Manual push → replay (identical response, event count still 1) → pull,
+  against the live dev database via curl.
+- The concurrency test (`test_pull_cursor.py`) and both property tests run
+  clean across multiple repeated runs (not just once) — checked for
+  flakiness deliberately given they exercise timing-sensitive paths.
+- ADR-001's clock-discipline grep still passes with the new code.
+- `ruff check` / `ruff format --check` clean; no new dependencies added
+  (`uv.lock` untouched by this phase — confirmed via diff before
+  committing).
 
 ## NOT verified
 
-- **GitHub Actions itself has not been confirmed green.** The push happened
-  (`3e73369` is on `origin/main`), but there is no `gh` CLI in this
-  environment and no way to poll the Actions API without one. **The user
-  needs to check the Actions tab.** Everything the CI job does was run
-  locally in the identical containerized form, so it should pass, but "should
-  pass locally" is not the same claim as "passed in CI".
-- Stack is still running (`docker compose ps` shows all four up) so the user
-  can poke at it immediately without a rebuild.
+- **GitHub Actions has still not been confirmed green** — on Phase 0
+  (`3e73369`) or Phase 1.1 (`982f203`). Same reason as before: no `gh` CLI
+  here. Everything CI does was run locally in the identical containerized
+  form and passed, but that is not the same claim as "CI passed." **User:
+  please check the Actions tab for both.**
+- Stack is running (`docker compose ps` — all four up) so it can be poked
+  at directly without a rebuild.
 
-## Settled decisions (from kickoff)
+## Settled decisions (carried forward)
 
-- **Name:** NirantharSeva everywhere. `setucare` in the plan is the old name.
+- **Name:** NirantharSeva everywhere.
 - **Python tooling:** `uv`. `uv.lock` committed.
 - **UI design brief:** not ready, not needed until Phase 4.
 - **Git hosting:** GitHub, private repo, GitHub Actions for CI.
-- **Schedule:** plan §4 dates are tentative; no revised calendar needed —
-  phase order is what matters.
-- **`make` will not be installed.** The Makefile stays in the repo (its
-  targets are documented in CLAUDE.md and used by the plan), but on this
-  Windows host the user runs the equivalent `docker compose` commands
-  directly instead. See each target's `docker compose` equivalent in the
-  Makefile itself.
-- **Screenshots are not required.** Handoff §9's "screenshot every screen
-  that works for the first time" rule is waived by the user. Not doing this
-  going forward; do not raise it again as an open item.
+- **Schedule:** plan §4 dates are tentative; phase order is what matters.
+- **`make` will not be installed** — use the equivalent `docker compose`
+  command from the Makefile directly.
+- **Screenshots are not required** — do not raise this again.
 
-## Exit criteria status — Phase 0 (Week 1)
+## Exit criteria status — Phase 1.1
 
-- [x] `docker compose up` starts db, api, scheduler, client — verified cold
-- [x] API health check returns 200
-- [ ] GitHub Actions workflow green on push — **user must confirm**
-- [x] `Clock` protocol with `RealClock` and `SimulatedClock`, wired as a
-      dependency, `CLOCK_MODE` env var working — unit tested
-- [x] `pg_advisory_xact_lock(4711)` helper in place (`acquire_seq_lock` in
-      `app/db.py`) — not yet called by anything; P1.1 is the first caller
-- [x] ADR-001 and ADR-002 written
-- [ ] Review-0 submitted ← the user's task, not Claude's
+- [x] POST the same batch five times → row created once, five identical
+      responses
+- [x] Hypothesis permutation test passes
+- [x] Pull returns a gap-free ordered scan under concurrent writers
+- [x] Every request appears in `request_timing`
+- [ ] CI green — **user must confirm** (see NOT verified)
 
-**Phase 0 is not marked complete** until GitHub Actions is confirmed green.
-Verify yourself:
+**Phase 1.1 is not marked complete** until GitHub Actions is confirmed
+green. Verify yourself:
 
 ```bash
-git log --oneline -1                 # should show 3e73369 or later
-# open the Actions tab on GitHub, or:
+git log --oneline -1                 # should show 982f203 or later
 docker compose up -d                 # if stack isn't already running
-curl -s localhost:8000/health
-curl -s -X POST localhost:8000/auth/login -H 'content-type: application/json' \
-  -d '{"username":"asha1","password":"dev"}'
-# open http://localhost:5173 — should show status/clock_mode/server_time
+docker compose run --rm \
+  -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
+  api sh -c "alembic upgrade head && pytest -v"
 ```
+
+## Exit criteria status — Phase 0 (Week 1), for reference
+
+- [x] `docker compose up` starts db, api, scheduler, client
+- [x] API health check returns 200
+- [ ] GitHub Actions workflow green on push — user must confirm
+- [x] `Clock` protocol wired, `CLOCK_MODE` working
+- [x] `pg_advisory_xact_lock(4711)` helper in place — now actually called,
+      by `handle_push()` in Phase 1.1
+- [x] ADR-001 and ADR-002 written
+- [ ] Review-0 submitted — the user's task, not Claude's
 
 ## Next concrete step
 
-1. **User confirms GitHub Actions is green** on commit `3e73369`.
-2. On the user's go-ahead, start **Phase 1.1 — server sync core**, per the
-   approved plan: alembic revision 0002 (toy/toy_event/sync_receipt/
-   request_timing tables), `app/sync/push.py` (the four-step algorithm —
-   claim receipt, acquire_seq_lock, apply, finalize, all one transaction),
-   `app/sync/pull.py`, `app/schemas/sync.py` (frozen API contract — do not
-   alter without asking), timing middleware, and the integration/property/
-   unit tests listed in the plan. Stop after P1.1, verify, report, wait —
-   do not roll into P1.2.
+1. **User confirms GitHub Actions is green** on `3e73369` and `982f203`.
+2. On the user's go-ahead, start **Phase 1.2 — client sync engine**, per
+   the approved plan: Dexie schema (`outbox`, `toy_cache`, `sync_meta`),
+   the `flush()` single-flight loop with the four triggers (`online`
+   event, 15s timer, after every local mutation, `visibilitychange`),
+   `applyResults()` (accepted/accepted_stale → synced; conflict/rejected →
+   re-pull and overwrite, never hand-written inverse ops), the minimal
+   `ToyPage.tsx` harness (number input, Save button, online/pending/last-
+   sync status line — no PWA, no service worker, those are Phase 4), and
+   the three fault tests from plan §5.6 (50 ops offline → reconnect;
+   `docker kill` the API mid-batch; kill the client mid-push). These three
+   become experiment E4. Stop after P1.2, verify, report, wait.
 
 ## Decisions taken by Claude Code without asking
 
@@ -157,27 +179,29 @@ _(one line each, so the user can overrule)_
 
 - Renamed the implementation plan file to `docs/IMPLEMENTATION_PLAN.md`.
 - Postgres database name is lowercase `nirantharseva`.
-- `PyJWT` + `argon2-cffi` for the "JWT + argon2id" the plan names without
-  specifying libraries.
-- `ruff` for lint and format.
-- Stdlib JSON log formatter rather than `structlog`.
-- No `app_user` table in P0 — dev users come from `DEV_USERS` env var.
-- Timing middleware and `request_timing` land in P1.1, not P0.
-- **ADR-001's CI grep** — enforces the no-direct-clock rule at build time,
-  beyond what the plan explicitly asked for.
-- **`server_venv` named volume** in Compose — without it the bind mount for
-  live-reload silently wipes the built virtualenv on every container start.
-  Found this by actually running the stack, not by inspection.
-- **Separate `nirantharseva_test` database**, created by
-  `db/init/01-create-test-db.sh`, so tests never run against dev data. The
-  plan did not specify this; it is the obvious safe default.
-- Client `npm audit` flags a moderate vulnerability in `esbuild` (via Vite's
-  dev server accepting requests from any origin — dev-server-only, not a
-  production build issue). Fixing requires Vite 6 to 8, a breaking change the
-  plan does not call for. Left as-is; documented here rather than silently
-  ignored. Low real-world risk for a solo local-dev project.
-- `client/tsconfig.tsbuildinfo` added to `.gitignore` — build artifact,
-  should never have been staged.
+- `PyJWT` + `argon2-cffi`, `ruff` for lint/format, stdlib JSON log
+  formatter, no `app_user` table in P0 — dev users come from `DEV_USERS`.
+- **ADR-001's CI grep** — enforces the no-direct-clock rule at build time.
+- **`server_venv` named volume** in Compose — the bind mount for live
+  reload otherwise wipes the built virtualenv.
+- **Separate `nirantharseva_test` database** — tests never touch dev data.
+- **The LWW-register conflict resolution in `apply_operation()`** — the
+  plan's toy schema (`toy(id, value, updated_at)`) has no lamport column,
+  and the plan does not spell out how "final state" should converge under
+  permuted delivery order. Rather than add a `lamport` column to `toy`
+  (a schema change beyond what was approved) I compute the winner by
+  re-querying `toy_event` for the highest `(lamport, device_id)` after
+  every append, and write only *that* event's value into the `toy.value`
+  cache. No schema change; the property test needs this to hold, and it
+  is what gives `accepted_stale` a real meaning. Flagging this because
+  it is a real design decision, not a formatting choice.
+- **`asyncio_default_fixture_loop_scope`/`asyncio_default_test_loop_scope
+  = "session"`** in `pyproject.toml` — required for asyncpg to work
+  correctly across the whole pytest session; see "bugs found" above.
+- Client `npm audit` flags a moderate `esbuild`/Vite dev-server-only
+  vulnerability; fixing needs a Vite 6→8 breaking bump. Left as-is,
+  documented, low real-world risk for solo local dev.
+- `client/tsconfig.tsbuildinfo` added to `.gitignore`.
 
 ## Open questions for the user
 
@@ -190,6 +214,7 @@ _(one line each, so the user can overrule)_
   `python:3.12-slim`. Do not build against 3.14.
 - `uv` is installed via winget; if a fresh shell can not find it, use the
   full path `C:\Users\pavan\AppData\Local\Microsoft\WinGet\Links\uv.exe`.
-- `run_id` shows as `""` rather than `null` in `/health` when `RUN_ID` is set
-  to an empty string in `.env` — cosmetic, not a correctness issue. P1.1 sets
-  it per-experiment-run explicitly.
+- `run_id` shows as `""` rather than `null` in `/health` and in
+  `toy`/`toy_event` rows when `RUN_ID` is set to an empty string in
+  `.env` — cosmetic, not a correctness issue. Real experiment runs (P8)
+  set it explicitly per run.
