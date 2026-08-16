@@ -16,11 +16,17 @@
 criteria from plan §5.6 are met and verified by running them, not by
 inspection. **Not yet marked "done"** in the strict sense used elsewhere in
 this file — GitHub Actions has still not been confirmed green by the user on
-any of the pushes so far (no `gh` CLI in this environment). Next is
-**Phase 2 — domain, state machine, RBAC** (plan §6), on the user's go-ahead.
-Phase 2 is design-and-schema work first — read plan §6 in full before writing
-any code, and the schema/state-machine decisions there are squarely "ask the
-user" territory per handoff §2, not "decide yourself."
+any of the pushes so far (no `gh` CLI in this environment).
+
+**Phase 2 is planned and approved, not started.** The plan is
+`docs/PHASE2_PLAN.md` — read it in full alongside plan §6. It is split into
+**P2.1** (schema, state machine, conflict policy) and **P2.2** (auth on the
+real user table, RBAC, org scoping). The four open questions in plan §6 were
+put to the user and answered before planning; they are recorded as D1–D4 in
+that file. **Do not re-litigate D1–D4** — they are settled.
+
+Phase 2 will be implemented in a **new session**. Step 0 of that session is
+ADR-003 and ADR-004, which are Opus work; the code is Sonnet work.
 
 ## Done
 
@@ -154,6 +160,33 @@ questions).
 - **Screenshots are not required** — do not raise this again.
 - **Playwright installed now, not deferred to Phase 4** (see above).
 
+### Phase 2 decisions (D1–D4) — settled, do not re-litigate
+
+Full reasoning in `docs/PHASE2_PLAN.md`. Summarised here because this file
+is what a new session reads first.
+
+- **D1 — the toy model survives until Phase 4.** Plan §6 says "throw away
+  `toy`", but the toy is what Phase 1's three fault tests (= experiment E4)
+  drive, and two of them are Playwright tests needing a screen that will not
+  exist for referrals until P4. Toy tables and `ToyPage` stay **frozen** (no
+  new work) through P2 and P3. `kill_api.sh` ports to referrals in P2.1. The
+  two Playwright tests port at P4, and the toy is dropped then, in its own
+  migration.
+- **D2 — `user_role` has five values**, adding `SYSTEM`. Plan §6.1 defines
+  four but §6.2 assigns `ESCALATED`/`LOST` to `Role.SYSTEM`; the P5 scheduler
+  writes exactly those. `actor_role` is therefore never null;
+  `actor_user_id` is null for system events. `app_user.role` is never
+  `SYSTEM`, by convention not constraint.
+- **D3 — `/sync/pull` becomes a generic envelope with a typed `payload`.**
+  Sync-level fields stay flat, type-specific fields move into `payload`,
+  mirroring the push `Op` contract. **This is a deliberate breaking change
+  to a frozen contract**, made once at the last cheap moment; it avoids
+  re-cutting again when P6 adds patient events. The client and both
+  Playwright fault tests must be updated in the same commit.
+- **D4 — seed data is a small hand-written fixture** (one PHC → one
+  sub-centre → two villages, one user per role, ~4 patients, 2 referrals).
+  Enough to prove scoping. Replaced wholesale by the P7 generator.
+
 ## Exit criteria status — Phase 1 (plan §5.6, all five)
 
 - [x] 50 ops created offline → reconnect → all 50 land exactly once
@@ -177,15 +210,22 @@ the full checklist here to keep this file from growing without bound.
 1. **User confirms GitHub Actions is green** on `3e73369`, `982f203`, and
    `5038708` — especially the new `e2e` job, which has never run on
    GitHub's infrastructure.
-2. On the user's go-ahead, start **Phase 2 — domain, state machine, RBAC**
-   (plan §6, week 3). This is a bigger phase than P0/P1.1/P1.2: it
-   introduces the real schema (patients, referrals, org units, roles),
-   throws away the toy model, builds the state machine as pure functions
-   (plan §6.2), the conflict decision table (§6.3, replacing the P1.1 stub
-   in `app/sync/conflicts.py`), and RBAC scoping by org subtree (§6.4).
-   **Read plan §6 in full before starting, and expect to stop and ask the
-   user about the schema** — handoff §2 requires it, and P2 is where the
-   schema stops being a throwaway toy and becomes the real one.
+2. In a **new session**, start **P2.1** per `docs/PHASE2_PLAN.md`:
+   - **Step 0, on Opus:** write ADR-003 (conflict resolution policy) and
+     ADR-004 (the generic sync envelope). ADR-005 (org-subtree visibility)
+     comes later, in P2.2, next to the code it governs.
+   - **Then switch to Sonnet** for the code: migration `0003`,
+     `app/domain/states.py`, `app/sync/conflicts.py`, the referral dispatch
+     in `apply_operation`, the pull-envelope change, and the tests.
+   - Stop at the end of P2.1, report, wait. Do not roll into P2.2.
+
+   The three things most likely to go wrong in P2.1, all called out in the
+   plan file: a `rejected` op that quietly appends an event anyway (assert
+   row counts, not just status); `DEFAULT now()` sneaking into migration
+   `0003` because plan §6.1 literally writes it (use the injected Clock);
+   and breaking the two Playwright fault tests when the pull envelope
+   changes shape (they are the regression check that the toy path still
+   works).
 
 ## Decisions taken by Claude Code without asking
 
@@ -217,6 +257,16 @@ _(one line each, so the user can overrule)_
   the bare runner — chosen so `kill_api.sh` works identically in CI and
   locally, at the cost of a slower job (image builds + browser download
   on every run).
+- **Created `docs/PHASE2_PLAN.md`**, a per-phase plan document. Plan §2.2's
+  directory layout does not list such a file — it assumes
+  `IMPLEMENTATION_PLAN.md` plus `PROGRESS.md` are enough. Added it because
+  Phase 2 is being implemented in a fresh session and the D1–D4 decisions
+  need to survive in the repository, not in a chat transcript. If this
+  proves to be clutter, fold it into `PROGRESS.md` and delete it.
+- **Phase 2 is split into P2.1 and P2.2**, proposed rather than requested.
+  Reason: §6.5's four exit criteria divide cleanly into domain correctness
+  (first three) and visibility (fourth), and Phase 1's split worked well.
+  Overrule this if you want it built in one session.
 
 ## Open questions for the user
 
