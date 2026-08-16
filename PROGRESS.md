@@ -12,109 +12,135 @@
 
 ## Current phase
 
-Phase 1.1 (server sync core) — built, committed, pushed, verified. **Not yet
-marked complete** — same reason as Phase 0: no `gh` CLI in this environment,
-so GitHub Actions has not been confirmed green on either push. Next is
-**Phase 1.2 — client sync engine**, on the user's go-ahead.
+**Phase 1 (sync core) is complete — both P1.1 and P1.2.** All five exit
+criteria from plan §5.6 are met and verified by running them, not by
+inspection. **Not yet marked "done"** in the strict sense used elsewhere in
+this file — GitHub Actions has still not been confirmed green by the user on
+any of the pushes so far (no `gh` CLI in this environment). Next is
+**Phase 2 — domain, state machine, RBAC** (plan §6), on the user's go-ahead.
+Phase 2 is design-and-schema work first — read plan §6 in full before writing
+any code, and the schema/state-machine decisions there are squarely "ask the
+user" territory per handoff §2, not "decide yourself."
 
 ## Done
 
 - Read handoff, preflight, implementation plan, ADR template.
 - Preflight green. Two ADRs written (ADR-001, ADR-002), commit `d1fbd71`.
 - Phase 0 + Phase 1 build plan approved by the user; saved at
-  `C:\Users\pavan\.claude\plans\kind-spinning-fountain.md`. P1 split into
-  P1.1 (server) and P1.2 (client) at the user's direction.
-- **Phase 0 built, commit `3e73369`.** PROGRESS/decision updates in
-  `6064dea`, `2cb34b4`.
-- **Phase 1.1 built, commit `982f203`, pushed to `origin/main`.**
+  `C:\Users\pavan\.claude\plans\kind-spinning-fountain.md`.
+- **Phase 0 built, commit `3e73369`.**
+- **Phase 1.1 (server sync core) built, commit `982f203`.**
+- **Phase 1.2 (client sync engine) built, commit `5038708`, pushed.**
+- PROGRESS/decision-log updates: `6064dea`, `2cb34b4`, `c49a30d`.
 
-## Phase 1.1 — what was built
+## Phase 1.2 — what was built
 
-- Alembic `0002`: `toy`, `toy_event`, `sync_receipt`, `request_timing`. No
-  DB-side `now()` default on any timestamp column — every one is written
-  from the injected Clock (ADR-001), so `CLOCK_MODE=simulated` runs stay
-  internally coherent.
-- `server/app/sync/push.py` — `handle_push()` follows plan §5.3 exactly:
-  claim the `op_id` via `INSERT ... ON CONFLICT DO NOTHING RETURNING`
-  first; a second submission of the same `op_id` replays the stored
-  receipt and touches nothing else. One transaction per op.
-  `apply_operation()` resolves concurrent writes to the same entity as a
-  Lamport-clock **last-writer-wins register**: after appending the event,
-  whichever event has the highest `(lamport, device_id)` for that entity
-  wins, independent of arrival order. This was a real design decision, not
-  in the plan's bare `CREATE TABLE toy(...)` — see "Decisions" below for
-  why it does not need a schema change and why it makes `accepted_stale`
-  mean something concrete (recorded per I2, but not the current winner).
-- `server/app/sync/pull.py` — `seq > since`, ordered, fetches `limit+1` to
-  compute `has_more` precisely without an extra count query.
-- `server/app/schemas/sync.py` — the push/pull contract from plan §5.2/5.4.
-  **Frozen — do not change without asking the user.**
-- `server/app/instrumentation/timing.py` — every request now lands in
-  `request_timing` (middleware was wired in Phase 0, unused until now).
-- `server/app/sync/lamport.py` — `merge_lamport()`, the same max-merge
-  formula the client uses after a pull (plan §5.4), used server-side to
-  compute the push response's `server_lamport`.
-- `server/app/sync/conflicts.py` — stub; real decision table is Phase 2
-  §6.3.
-- Tests (25 total, all new since Phase 0's 11): idempotent-replay
-  (`test_push_idempotent.py`), concurrent-write cursor-gap check
-  (`test_pull_cursor.py` — 20 concurrent pushes through the real ASGI app,
-  asserts the pull afterwards has no missing `seq`), `request_timing`
-  coverage, and two Hypothesis property tests in `test_permutation.py`:
-  permutation invariance (three orderings of the same op set converge to
-  the same final value) and retry-order idempotence (a shuffled retry
-  batch produces byte-identical per-op results). Plan §5.6 calls the
-  permutation test out as worth a paragraph in Chapter 4.
+- `client/src/db/schema.ts` — Dexie `outbox` / `toy_cache` / `sync_meta`.
+  `toy_cache` also carries `lamport`/`device_id` (not just `value`) so the
+  client can replay pulled events using the same last-writer-wins
+  comparison the server uses in `apply_operation()`, rather than naively
+  taking whichever event arrived last in a pull.
+- `client/src/db/meta.ts` — device_id / lamport / cursor / last-sync-at,
+  all persisted in `sync_meta`. `mergeLamport()` mirrors the server's
+  `app/sync/lamport.py`.
+- `client/src/api/client.ts` — thin fetch wrapper matching
+  `app/schemas/sync.py` exactly (the frozen contract).
+- `client/src/sync/engine.ts` — `flush()` (single-flight guard, marks the
+  batch `inflight` before the request so a crash mid-request is safe to
+  retry — the server is idempotent by `op_id`), `applyResults()`
+  (accepted/accepted_stale → synced; conflict/rejected → re-pull and
+  overwrite, never a hand-written inverse op), `pullAndApply()` (folds
+  pulled events into `toy_cache` via the LWW rule), `startAutoFlush()`
+  (wires the four triggers: `online`, 15s timer, after every mutation,
+  `visibilitychange`).
+- `client/src/pages/ToyPage.tsx` — the minimal harness: number input, Save
+  button, status line (online/offline, pending count, last sync). Reads
+  only from the local cache (handoff §8). Wired into `App.tsx`.
+- Fault tests, all three from plan §5.6, all become experiment E4:
+  - `client/tests/offline-sync.spec.ts` (Playwright) — 50 ops created
+    offline, reconnect, all 50 land exactly once. Verified both
+    client-side (outbox all `synced`) and server-side (each generated
+    `op_id` appears in a pull exactly once — not zero, not more).
+  - `client/tests/client-kill-resume.spec.ts` (Playwright) — intercepts
+    `/sync/push` to hang forever, closes the tab while the op is
+    `inflight`, reopens a fresh page against the same persistent
+    IndexedDB, confirms the retry lands exactly once.
+  - `server/tests/fault/kill_api.sh` — `docker kill`s the API mid-batch
+    (20 ops), restarts it, retries the identical batch, confirms exactly
+    20 `toy_event` rows exist for that entity — not 40, not fewer. **Not
+    part of CI's automated pytest run** — it manipulates real containers,
+    run on demand: `bash server/tests/fault/kill_api.sh`.
+- `.github/workflows/ci.yml` — new `e2e` job. Runs `docker compose`
+  directly (not uv/npm on the runner) so the environment matches local dev
+  exactly and `kill_api.sh`'s `docker compose kill` works unmodified. Runs
+  Playwright, then the kill_api fault script, then tears the stack down.
 
-## Two real bugs found and fixed while making this pass
+## Real bugs found and fixed while making the fault tests pass
 
-- **Windows `ProactorEventLoop` + asyncpg across pytest-asyncio's
-  function-scoped event loop.** The module-level `app.db.engine`'s
-  connection pool got bound to whichever event loop first used it; the
-  next test's fresh loop then broke it (`AttributeError: 'NoneType' object
-  has no attribute 'send'`). Fixed with
-  `asyncio_default_fixture_loop_scope = "session"` and
-  `asyncio_default_test_loop_scope = "session"` in `pyproject.toml`, so the
-  whole test session shares one loop. Confirmed the same fix holds inside
-  the Linux container too, not just on the Windows host.
-- **SQLAlchemy's `text()` will not treat `:name::type` as a bind
-  parameter** — it deliberately backs off to avoid clashing with
-  Postgres's `::` cast syntax, so `detail=:d::jsonb` silently left `:d`
-  unsubstituted and Postgres saw a syntax error. Fixed with
-  `CAST(:d AS jsonb)`. Separately, raw `text()` queries get no help from
-  SQLAlchemy's JSONB type layer for encoding/decoding — the dict is
-  hand-`json.dumps`ed going in and `json.loads`ed coming back out
-  (`_decode_detail()` in `push.py`) at that boundary.
+- **A stale Docker volume served pre-Dexie code for over an hour.** Both
+  the client and server images use a named volume
+  (`client_node_modules`, `server_venv`) so the bind-mounted source
+  directory (needed for live reload) doesn't shadow the dependencies
+  baked into the image. Named volumes are still **reused across `--build`**
+  unless explicitly recreated with `-V` — `docker compose up --build`
+  alone silently keeps serving the old `node_modules`. This is now
+  documented with a comment directly in `docker-compose.yml`.
+- **React 18 StrictMode double-invokes effects in dev mode.** The
+  `ToyPage` mount effect does `await login(); stop = startAutoFlush();` —
+  StrictMode's simulated unmount runs the cleanup *before* that `await`
+  resolves, so it captures `stop` as still `undefined` and the cleanup is
+  a no-op. Without a guard this leaves two 15-second intervals and two
+  sets of `online`/`visibilitychange` listeners running concurrently.
+  Fixed with a module-level "started once" guard in `startAutoFlush()`
+  (`client/src/sync/engine.ts`).
+- **The flakiness chased while debugging `client-kill-resume.spec.ts`
+  turned out to be a test bug, not an engine bug.** React's
+  `pendingCount` state starts at `0`, and the actual retry after "reload"
+  completes in single-digit milliseconds — faster than the harness's own
+  500ms display-poll interval. A UI-text assertion of `"0 pending"` could
+  therefore pass against the stale *initial* render, before any real poll
+  had run at all. Fixed by polling the actual IndexedDB row via
+  `expect.poll()` instead of asserting on the UI text for correctness —
+  the UI text is still checked, just not relied on for the pass/fail
+  signal.
+
+## Decision put to the user mid-phase
+
+`docs/SETUP_PREFLIGHT.md` flagged Playwright's ~1-2GB browser download as
+a Phase-4 concern, not now. But P1.2's fault tests need a real browser and
+real IndexedDB to be genuine — a lighter Node + `fake-indexeddb` approach
+was offered as the alternative. **User chose: install Playwright now.**
+Chromium is installed at `C:\Users\pavan\AppData\Local\ms-playwright\`.
+This also means CI's new `e2e` job downloads a browser on every run —
+adds real minutes to the private repo's metered Actions usage (see open
+questions).
 
 ## Verified, by running it, not by inspection
 
-- Full suite green (25/25) via `uv run pytest` locally against the real
-  `nirantharseva_test` database.
-- Same 25/25 green via the exact containerized CI-equivalent command:
-  `docker compose run --rm ... api sh -c "alembic upgrade head && ruff
-  check . && ruff format --check . && pytest -v"`.
-- Cold start (`docker compose down -v` then `up -d --build`) applies both
-  migrations (`0001` then `0002`) cleanly and all four services reach a
-  healthy state.
-- Manual push → replay (identical response, event count still 1) → pull,
-  against the live dev database via curl.
-- The concurrency test (`test_pull_cursor.py`) and both property tests run
-  clean across multiple repeated runs (not just once) — checked for
-  flakiness deliberately given they exercise timing-sensitive paths.
-- ADR-001's clock-discipline grep still passes with the new code.
-- `ruff check` / `ruff format --check` clean; no new dependencies added
-  (`uv.lock` untouched by this phase — confirmed via diff before
-  committing).
+- Full cold start from a wiped volume state
+  (`docker compose down -v` then `up -d --build`) — all four services
+  healthy, both migrations (`0001`, `0002`) applied cleanly.
+- Server suite: 25/25 green via the exact containerized command CI uses.
+- Both Playwright fault tests: green, individually and together, across
+  five repeated runs each (checked deliberately for flakiness given they
+  are timing-sensitive).
+- `kill_api.sh`: green across three repeated runs.
+- Client `npm run typecheck` and `npm run build`: clean.
+- All of the above run **in sequence against the same cold-started stack**,
+  matching the new CI `e2e` job's actual order, not just individually.
 
 ## NOT verified
 
-- **GitHub Actions has still not been confirmed green** — on Phase 0
-  (`3e73369`) or Phase 1.1 (`982f203`). Same reason as before: no `gh` CLI
-  here. Everything CI does was run locally in the identical containerized
-  form and passed, but that is not the same claim as "CI passed." **User:
-  please check the Actions tab for both.**
-- Stack is running (`docker compose ps` — all four up) so it can be poked
-  at directly without a rebuild.
+- **GitHub Actions has still not been confirmed green** — not on `3e73369`
+  (Phase 0), not on `982f203` (Phase 1.1), not on `5038708` (Phase 1.2).
+  Same reason every time: no `gh` CLI in this environment. Everything CI
+  does was run locally in the identical or near-identical form and
+  passed, but that is not the same claim as "CI passed." **User: please
+  check the Actions tab for all three.** The new `e2e` job in particular
+  is worth watching — it is the most complex job (docker compose + a
+  browser download + two kinds of fault test) and has not run on GitHub's
+  runners even once yet, only on this machine.
+- Stack is running; `docker compose ps` shows all four up.
 
 ## Settled decisions (carried forward)
 
@@ -126,52 +152,40 @@ so GitHub Actions has not been confirmed green on either push. Next is
 - **`make` will not be installed** — use the equivalent `docker compose`
   command from the Makefile directly.
 - **Screenshots are not required** — do not raise this again.
+- **Playwright installed now, not deferred to Phase 4** (see above).
 
-## Exit criteria status — Phase 1.1
+## Exit criteria status — Phase 1 (plan §5.6, all five)
 
-- [x] POST the same batch five times → row created once, five identical
-      responses
-- [x] Hypothesis permutation test passes
-- [x] Pull returns a gap-free ordered scan under concurrent writers
-- [x] Every request appears in `request_timing`
-- [ ] CI green — **user must confirm** (see NOT verified)
+- [x] 50 ops created offline → reconnect → all 50 land exactly once
+- [x] `docker kill` the API mid-batch → retry → final state identical, no
+      duplicates
+- [x] Kill the client mid-push → reload → ops resume and land exactly once
+- [x] Same batch POSTed 5× → created once, 5 identical responses
+- [x] Hypothesis permutation property test passes
 
-**Phase 1.1 is not marked complete** until GitHub Actions is confirmed
-green. Verify yourself:
+**All five met.** GitHub Actions confirmation is the only thing standing
+between this and an unqualified "Phase 1 done."
 
-```bash
-git log --oneline -1                 # should show 982f203 or later
-docker compose up -d                 # if stack isn't already running
-docker compose run --rm \
-  -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
-  api sh -c "alembic upgrade head && pytest -v"
-```
+## Exit criteria status — Phase 0 and 1.1, for reference
 
-## Exit criteria status — Phase 0 (Week 1), for reference
-
-- [x] `docker compose up` starts db, api, scheduler, client
-- [x] API health check returns 200
-- [ ] GitHub Actions workflow green on push — user must confirm
-- [x] `Clock` protocol wired, `CLOCK_MODE` working
-- [x] `pg_advisory_xact_lock(4711)` helper in place — now actually called,
-      by `handle_push()` in Phase 1.1
-- [x] ADR-001 and ADR-002 written
-- [ ] Review-0 submitted — the user's task, not Claude's
+Both fully met locally; same GitHub Actions caveat as above. See commit
+messages on `3e73369` and `982f203` for detail if needed — not repeating
+the full checklist here to keep this file from growing without bound.
 
 ## Next concrete step
 
-1. **User confirms GitHub Actions is green** on `3e73369` and `982f203`.
-2. On the user's go-ahead, start **Phase 1.2 — client sync engine**, per
-   the approved plan: Dexie schema (`outbox`, `toy_cache`, `sync_meta`),
-   the `flush()` single-flight loop with the four triggers (`online`
-   event, 15s timer, after every local mutation, `visibilitychange`),
-   `applyResults()` (accepted/accepted_stale → synced; conflict/rejected →
-   re-pull and overwrite, never hand-written inverse ops), the minimal
-   `ToyPage.tsx` harness (number input, Save button, online/pending/last-
-   sync status line — no PWA, no service worker, those are Phase 4), and
-   the three fault tests from plan §5.6 (50 ops offline → reconnect;
-   `docker kill` the API mid-batch; kill the client mid-push). These three
-   become experiment E4. Stop after P1.2, verify, report, wait.
+1. **User confirms GitHub Actions is green** on `3e73369`, `982f203`, and
+   `5038708` — especially the new `e2e` job, which has never run on
+   GitHub's infrastructure.
+2. On the user's go-ahead, start **Phase 2 — domain, state machine, RBAC**
+   (plan §6, week 3). This is a bigger phase than P0/P1.1/P1.2: it
+   introduces the real schema (patients, referrals, org units, roles),
+   throws away the toy model, builds the state machine as pure functions
+   (plan §6.2), the conflict decision table (§6.3, replacing the P1.1 stub
+   in `app/sync/conflicts.py`), and RBAC scoping by org subtree (§6.4).
+   **Read plan §6 in full before starting, and expect to stop and ask the
+   user about the schema** — handoff §2 requires it, and P2 is where the
+   schema stops being a throwaway toy and becomes the real one.
 
 ## Decisions taken by Claude Code without asking
 
@@ -182,31 +196,35 @@ _(one line each, so the user can overrule)_
 - `PyJWT` + `argon2-cffi`, `ruff` for lint/format, stdlib JSON log
   formatter, no `app_user` table in P0 — dev users come from `DEV_USERS`.
 - **ADR-001's CI grep** — enforces the no-direct-clock rule at build time.
-- **`server_venv` named volume** in Compose — the bind mount for live
-  reload otherwise wipes the built virtualenv.
+- **`server_venv` / `client_node_modules` named volumes** in Compose — the
+  bind mount for live reload otherwise wipes the built dependencies.
 - **Separate `nirantharseva_test` database** — tests never touch dev data.
-- **The LWW-register conflict resolution in `apply_operation()`** — the
-  plan's toy schema (`toy(id, value, updated_at)`) has no lamport column,
-  and the plan does not spell out how "final state" should converge under
-  permuted delivery order. Rather than add a `lamport` column to `toy`
-  (a schema change beyond what was approved) I compute the winner by
-  re-querying `toy_event` for the highest `(lamport, device_id)` after
-  every append, and write only *that* event's value into the `toy.value`
-  cache. No schema change; the property test needs this to hold, and it
-  is what gives `accepted_stale` a real meaning. Flagging this because
-  it is a real design decision, not a formatting choice.
+- **The LWW-register conflict resolution in `apply_operation()`** (P1.1) —
+  the plan's toy schema has no lamport column; resolved by re-querying
+  `toy_event` for the highest `(lamport, device_id)` rather than adding a
+  column. Mirrored client-side in `toy_cache` for the same reason.
 - **`asyncio_default_fixture_loop_scope`/`asyncio_default_test_loop_scope
-  = "session"`** in `pyproject.toml` — required for asyncpg to work
-  correctly across the whole pytest session; see "bugs found" above.
+  = "session"`** — required for asyncpg across the whole pytest session
+  on this Windows host (and confirmed necessary in the Linux container
+  too).
 - Client `npm audit` flags a moderate `esbuild`/Vite dev-server-only
   vulnerability; fixing needs a Vite 6→8 breaking bump. Left as-is,
   documented, low real-world risk for solo local dev.
-- `client/tsconfig.tsbuildinfo` added to `.gitignore`.
+- **`startAutoFlush()`'s module-level guard against double-starting**
+  (P1.2) — StrictMode's double effect invocation would otherwise leave
+  two intervals and two listener sets running.
+- **CI's new `e2e` job runs `docker compose` directly**, not uv/npm on
+  the bare runner — chosen so `kill_api.sh` works identically in CI and
+  locally, at the cost of a slower job (image builds + browser download
+  on every run).
 
 ## Open questions for the user
 
-- Private repo means GitHub Actions minutes are metered (2000/month free).
-  Fine now; worth knowing before P8's heavier CI.
+- Private repo means GitHub Actions minutes are metered (2000/month
+  free). The new `e2e` job downloads a Playwright browser on every run
+  and builds Docker images — this is the heaviest job so far and will
+  consume more of that budget than P0/P1.1's jobs did. Worth watching,
+  especially once P8's load tests add more CI weight.
 
 ## Known problems and workarounds
 
@@ -218,3 +236,8 @@ _(one line each, so the user can overrule)_
   `toy`/`toy_event` rows when `RUN_ID` is set to an empty string in
   `.env` — cosmetic, not a correctness issue. Real experiment runs (P8)
   set it explicitly per run.
+- **Named Docker volumes (`server_venv`, `client_node_modules`) need `-V`
+  to refresh after a dependency change**, e.g.
+  `docker compose up -d --build -V <service>`. Plain `--build` alone is
+  not enough and fails silently (old dependencies keep being served,
+  with a confusing "module not found" error at runtime, not build time).
