@@ -12,21 +12,26 @@
 
 ## Current phase
 
-Preflight complete and green. Phase 0 not started — waiting only on the
-user's explicit go-ahead.
+Phase 0 — step 0 (the two ADRs) is done. The Phase 0 **code** has not started
+and needs the user's go-ahead plus a switch to Sonnet.
 
 ## Done
 
-- Read handoff, preflight, implementation plan (§0–§5, §12).
-- Ran the full preflight check. Result recorded below.
+- Read handoff, preflight, implementation plan (§0–§5, §6.4, §11.2, §12, §15–16).
+- Ran the full preflight check. Result recorded below. It is green.
 - Renamed `docs/NirantarSeva_Technical_Implementation_Plan.md` to
   `docs/IMPLEMENTATION_PLAN.md` — every other document references that path,
   and plan §2.2 names it that way.
 - Kickoff questions answered by the user (see "Settled decisions").
+- **Phase 0 + Phase 1 build plan approved** by the user. Saved at
+  `C:\Users\pavan\.claude\plans\kind-spinning-fountain.md`. P1 is split into
+  P1.1 (server sync core) and P1.2 (client sync engine) at the user's direction.
+- **ADR-001** (injectable clock) and **ADR-002** (serialised sequence
+  assignment) written and pushed — commit `d1fbd71`.
 
 ## In progress / not done
 
-- Everything in Phase 0. No code written.
+- All Phase 0 code. Nothing has been written yet.
 
 ## Preflight status
 
@@ -77,26 +82,37 @@ Watch:
 - [ ] `Clock` protocol with `RealClock` and `SimulatedClock`, wired as a
       dependency, `CLOCK_MODE` env var working
 - [ ] `pg_advisory_xact_lock(4711)` helper in place for event appends
-- [ ] ADR-001 (injectable clock) and ADR-002 (sequence serialisation) written
-- [ ] Review-0 submitted
+- [x] ADR-001 (injectable clock) and ADR-002 (sequence serialisation) written
+- [ ] Review-0 submitted ← the user's task, not Claude's
 
 ## Next concrete step
 
+**Switch to Sonnet**, then build Phase 0 exactly as the approved plan describes:
+repository skeleton per §2.2, Compose per §2.3, CI per §2.4, injectable clock
+per §3.1, `acquire_seq_lock` per §3.2, auth stub, and the Vite/React health
+screen.
 
-Preflight is green. Nothing is blocking Phase 0 except the user's go-ahead.
-
-On his word, start Phase 0 **on Sonnet**: repository skeleton per plan §2.2,
-Compose skeleton per §2.3, CI workflow per §2.4, injectable clock per §3.1,
-advisory-lock helper per §3.2.
-
-ADR-001 (injectable clock) and ADR-002 (sequence serialisation) are design work
-— write them on Opus, either before the Phase 0 code session or after it.
+The approved plan file is the working spec for this and for P1.1 / P1.2. Read it
+before starting.
 
 ## Decisions taken by Claude Code without asking
 
 _(one line each, so the user can overrule)_
 
 - Renamed the implementation plan file to `docs/IMPLEMENTATION_PLAN.md`.
+- Postgres database name is lowercase `nirantharseva`, not `NirantharSeva` as
+  written in plan §2.3 — unquoted identifiers fold to lowercase silently.
+- `PyJWT` + `argon2-cffi`; the plan names "JWT + argon2id" but not the libraries.
+- `ruff` for lint and format; §2.4 requires a linter without naming one.
+- Stdlib JSON log formatter rather than `structlog`, to avoid an unnamed
+  dependency.
+- No `app_user` table in P0 — dev users come from config, so Phase 2 does not
+  have to migrate a throwaway table away.
+- Timing middleware and `request_timing` land in P1.1, not P0 (§12 says "from
+  Phase 1").
+- **ADR-001 adds one thing beyond the plan:** a CI grep that fails the build on
+  `datetime.now(`, `datetime.utcnow(` or `time.time(` under `server/app/`. The
+  no-direct-clock rule fails silently otherwise, and silent is the whole problem.
 
 ## Open questions for the user
 
