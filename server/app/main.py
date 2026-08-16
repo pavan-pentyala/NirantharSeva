@@ -4,10 +4,12 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import router as auth_router
+from app.api.sync import router as sync_router
 from app.clock import Clock, get_clock
 from app.config import get_settings
 from app.db import get_session
 from app.instrumentation.logging import configure_logging
+from app.instrumentation.timing import TimingMiddleware
 
 configure_logging()
 settings = get_settings()
@@ -20,8 +22,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(TimingMiddleware)
 
 app.include_router(auth_router)
+app.include_router(sync_router)
 
 
 @app.get("/health")
