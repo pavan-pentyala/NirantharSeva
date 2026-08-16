@@ -12,7 +12,7 @@
 
 ## Current phase
 
-Preflight. Phase 0 not started — waiting on host tool installation and on the
+Preflight complete and green. Phase 0 not started — waiting only on the
 user's explicit go-ahead.
 
 ## Done
@@ -38,15 +38,19 @@ Green:
 - Virtualization available (HypervisorPresent = True).
 - Git remote configured: `git@github.com:pavan-pentyala/NirantharSeva.git`.
 
-Blocking, user is installing:
-- [ ] WSL 2 — not installed (`wsl --install`, admin PowerShell, then reboot)
-- [ ] Docker Desktop — not installed; must use the WSL 2 backend
-- [ ] Docker daemon running; `docker run --rm hello-world` passes
-- [ ] Python 3.12 — no `python`, no `py` launcher on PATH
-- [ ] `uv` — not installed (chosen tooling)
-- [ ] SSH key for GitHub — `ssh -T git@github.com` returns
-      "Permission denied (publickey)". Cannot push until fixed.
-- [ ] First commit pushed to the remote
+Verified working (second run, 2026-08-16):
+- [x] WSL 2 — installed, Docker Desktop runs on it
+- [x] Docker Engine 29.7.2, Compose plugin v5.3.1 (`docker compose`, not the old
+      hyphenated tool)
+- [x] Docker daemon running; `docker run --rm hello-world` prints
+      "Hello from Docker!"
+- [x] Python on host: 3.14.7 (see Known problems — not a blocker)
+- [x] `uv` 0.12.5 installed
+- [x] SSH to GitHub: `Hi pavan-pentyala! You've successfully authenticated.`
+      Passphrase removed, so Claude Code can push non-interactively.
+- [x] First commit pushed: `fd5735c` is on `origin/main`
+
+**Preflight is green. Phase 0 is unblocked.**
 
 Watch:
 - P: drive (where this repo lives) has 7.8 GB free of 10 GB total. Docker images
@@ -78,13 +82,15 @@ Watch:
 
 ## Next concrete step
 
-User finishes installing WSL 2, Docker Desktop, Python 3.12, uv, and the GitHub
-SSH key. Then, on his explicit go-ahead, start Phase 0 **on Sonnet**: repository
-skeleton per plan §2.2, Compose skeleton per §2.3, CI workflow per §2.4, clock
-per §3.1, advisory-lock helper per §3.2.
 
-ADR-001 and ADR-002 are design work — write them on Opus, either before the
-Phase 0 code session or after it.
+Preflight is green. Nothing is blocking Phase 0 except the user's go-ahead.
+
+On his word, start Phase 0 **on Sonnet**: repository skeleton per plan §2.2,
+Compose skeleton per §2.3, CI workflow per §2.4, injectable clock per §3.1,
+advisory-lock helper per §3.2.
+
+ADR-001 (injectable clock) and ADR-002 (sequence serialisation) are design work
+— write them on Opus, either before the Phase 0 code session or after it.
 
 ## Decisions taken by Claude Code without asking
 
@@ -98,8 +104,12 @@ _(one line each, so the user can overrule)_
   Fine for this project, but worth knowing before P8's heavier CI.
 
 ## Known problems and workarounds
+- **Schedule.** Plan §4 dates are tentative — the user has confirmed no revised
+  calendar is needed. Phase order is what matters, not the dates.
+- Host Python is 3.14.7, plan wants 3.12. Not a problem: `uv` will manage a
+  private 3.12 for editor support, and the container uses `python:3.12-slim`.
+  Do not build against 3.14.
+- `uv` is installed via winget at
+  `C:\Users\pavan\AppData\Local\Microsoft\WinGet\Links\uv.exe` but is not on the
+  PATH of Claude Code's shell. Use the full path, or restart the session.
 
-- **Schedule slip.** Plan §4 dates put P0 at Aug 3–9 and P1 at Aug 10–16. Today
-  is Aug 16 and nothing is built. The project is starting roughly two weeks
-  behind the plan's calendar. The phase *order* is still right; the dates are
-  not. Needs a re-planned calendar before Review-0.
