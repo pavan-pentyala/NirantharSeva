@@ -1,0 +1,71 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev}
+      POSTGRES_DB: ${POSTGRES_DB:-nirantharseva}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+
+  api:
+    build: ./server
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-480}
+      CLOCK_MODE: ${CLOCK_MODE:-real}
+      SIM_START: ${SIM_START:-}
+      RUN_ID: ${RUN_ID:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DEV_USERS: ${DEV_USERS:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server:/app
+      - server_venv:/app/.venv
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  scheduler:
+    build: ./server
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      CLOCK_MODE: ${CLOCK_MODE:-real}
+      SIM_START: ${SIM_START:-}
+      RUN_ID: ${RUN_ID:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./server:/app
+      - server_venv:/app/.venv
+    command: python -m app.scheduler.run
+
+  client:
+    build: ./client
+    environment:
+      VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+
+volumes:
+  pgdata: {}
+  server_venv: {}
