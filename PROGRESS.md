@@ -105,6 +105,14 @@ marked complete** — GitHub Actions has not been confirmed green by the user
 - **Git hosting:** GitHub, private repo, GitHub Actions for CI.
 - **Schedule:** plan §4 dates are tentative; no revised calendar needed —
   phase order is what matters.
+- **`make` will not be installed.** The Makefile stays in the repo (its
+  targets are documented in CLAUDE.md and used by the plan), but on this
+  Windows host the user runs the equivalent `docker compose` commands
+  directly instead. See each target's `docker compose` equivalent in the
+  Makefile itself.
+- **Screenshots are not required.** Handoff §9's "screenshot every screen
+  that works for the first time" rule is waived by the user. Not doing this
+  going forward; do not raise it again as an open item.
 
 ## Exit criteria status — Phase 0 (Week 1)
 
@@ -175,14 +183,6 @@ _(one line each, so the user can overrule)_
 
 - Private repo means GitHub Actions minutes are metered (2000/month free).
   Fine now; worth knowing before P8's heavier CI.
-- **`make` is not installed on this Windows host, and it is not in
-  `docs/SETUP_PREFLIGHT.md`'s checklist either — a gap in that document.**
-  Every Makefile target was verified by running the equivalent
-  `docker compose` command directly, so nothing is blocked, but `make up` /
-  `make test` etc. will not work until `make` exists on PATH. Two options:
-  install GNU Make for Windows (`winget install ezwinports.make` — not run,
-  needs your OK since it is new host software), or keep using the equivalent
-  `docker compose` commands directly. Your call.
 
 ## Known problems and workarounds
 
