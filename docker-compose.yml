@@ -64,8 +64,16 @@ services:
       - "5173:5173"
     volumes:
       - ./client:/app
-      - /app/node_modules
+      - client_node_modules:/app/node_modules
 
+# server_venv and client_node_modules exist so the bind-mounted source dirs
+# (needed for live reload) don't shadow the dependencies baked into each
+# image. They are named, not anonymous, so a stale copy is visible via
+# `docker volume ls` — but they still only get refreshed from a rebuilt
+# image with `docker compose up --build -V <service>` (the -V flag renews
+# named/anonymous volumes; without it Compose reuses the existing one even
+# after --build, which silently keeps old dependencies).
 volumes:
   pgdata: {}
   server_venv: {}
+  client_node_modules: {}

@@ -22,3 +22,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.tsbuildinfo
+
+# Playwright
+client/test-results/
+client/playwright-report/
+client/blob-report/

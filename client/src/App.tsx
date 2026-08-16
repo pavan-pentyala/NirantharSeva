@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import ToyPage from "./pages/ToyPage";
 
 type HealthResponse = {
   status: string;
@@ -33,6 +34,7 @@ export default function App() {
           <li>server time: {health.server_time}</li>
         </ul>
       )}
+      <ToyPage />
     </main>
   );
 }
