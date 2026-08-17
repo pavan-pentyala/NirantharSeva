@@ -14,74 +14,107 @@ conversation about it every session.
 
 ## 1. Reference images or links
 
-_Paste screenshots into `docs/design/` and list them here, or link to any app
-whose look you want. "Like the Google Pay list screen" is a useful instruction._
-
--
--
+Designed from scratch, no external references. The actual design files —
+`Design System.dc.html` and `Screen 1`–`Screen 7` (`.dc.html`) — are not yet
+in this repo; they arrive attached to this brief the moment it is sent to
+Claude Code via the design tool's "Send to Claude Code" button (Phase 4).
+If you're reading this before that send, treat every filename mentioned below
+as a forward reference: open the attached design files first, matching them
+up by the names given, then read the rest of this brief against them.
 
 ## 2. Overall feeling
 
-_Pick one, or write your own:_
-
-- [ ] Clinical and plain — white, high contrast, no decoration. Looks like a tool.
-- [ ] Warm and simple — soft colours, big friendly type. Looks approachable.
-- [ ] Government-service style — familiar to Indian public-health users.
-- [ ] Claude decides.
+- [x] Clinical and plain, with one warm touch: square sheets, hairline rules,
+  dense rows, monospace numbers, one blue accent (from the "clinical"
+  direction) — but state labels are rounded pills in plain language (from the
+  "warm" direction). Two directions were shown side by side and this is the
+  chosen mix. Not government-service style.
 
 ## 3. Colour
 
-- Primary colour: _(hex, or "Claude decides")_
-- Are there colours to avoid? _(e.g. red reserved only for overdue)_
-- State colours — one per referral state, or one for "fine / overdue / done"?
+- Primary colour: `#32679b` (oklch(0.5 0.1 250)) — the only interface accent;
+  means "the app", never a patient state.
+- Ink: `#171a1e` (headings/body), `#484e53` (secondary), `#65686e` (meta/timestamps).
+- Sheet: `#ffffff`; sheet-2 (headers/groups): `#f2f4f8`; hairline `#dee3e4` / `#ced1d4`.
+- Colours to avoid: red (`#b33637`) is reserved only for Escalated/overdue —
+  never decorative. Amber (`#8b5601` on `#fef1d4`) is reserved only for "saved
+  here, not sent yet" — never a medical meaning.
+- State colours: one treatment per state (see §7 in the design system doc),
+  grouped into three visual families — fine / overdue / done — see next
+  section.
 
 ## 4. Type
 
-- Font preference: _(or "Claude decides")_
-- Any need for Devanagari or Tamil glyphs later? _(scope says English only —
-  confirm)_
+- Font: device default only — `system-ui` (renders as Roboto on the ASHA's
+  Android phone). No downloaded fonts. Numbers that must align (times, counts,
+  phone numbers) use `ui-monospace`.
+- Devanagari/Tamil: not needed — English only, per scope.
 
 ## 5. Screens you know you want
 
-_List the screens you already have in mind. Anything not listed, Claude Code
-proposes and you approve — screen structure is a user decision under §2 of the
-handoff._
+Seven screens, designed and built as `.dc.html` files, arriving attached
+alongside this brief when it is sent (see §1):
 
 **ASHA (phone):**
-- Create referral
-- My referrals list
--
+- My referrals list — 3 states shown: online/synced, offline with 3 updates
+  waiting, empty (`Screen 1 - ASHA My Referrals.dc.html`)
+- Create referral — form + saved-offline confirmation
+  (`Screen 2 - ASHA Create Referral.dc.html`)
+- Referral detail and timeline — normal + escalated version
+  (`Screen 3 - Referral Detail.dc.html`)
 
 **ANM:**
-- Identity review queue
--
+- Identity review queue — side-by-side match, differing fields highlighted
+  (`Screen 6 - ANM Identity Review.dc.html`)
 
-**MO (tablet or desktop):**
--
+**MO (tablet):**
+- Incoming referrals — one-tap state changes on the card, no detail screen
+  needed (`Screen 5 - MO Incoming Referrals.dc.html`)
 
 **Supervisor (desktop):**
-- Live escalation dashboard
--
+- Live dashboard — counts by state + overdue list, steady state and the
+  moment a new breach lands (`Screen 4 - Supervisor Dashboard.dc.html`)
+
+**All roles:**
+- Login — phone number, PIN, role picker (`Screen 7 - Login.dc.html`)
+
+Anything beyond these seven, Claude Code proposes and the user approves.
+All seven are HTML design references, not production code — recreate them in
+the project's actual stack (React 18 + TypeScript + Vite, reading from
+Dexie.js, per `CLAUDE.md`), don't embed the HTML.
 
 ## 6. The offline indicator
 
-This is the one piece of interface the whole architecture exists to justify, so
-be deliberate. The user must always know: am I online, how many updates are
-waiting, when did I last sync.
-
-- Where does it live? _(top bar / bottom bar / floating / Claude decides)_
-- What does it say when offline with work pending?
-- What does it say the moment everything has synced?
+- Lives in a band directly under the header on every worker screen (not
+  floating, not a separate bar) — the first thing under the page title.
+- Offline with work pending: amber band, dot, "No signal" / "3 updates waiting
+  to send. They will send when signal comes back." / monospace "Last sent
+  today 9:14 am" underneath.
+- Fully synced: neutral grey band, dot, "Connected" / "Everything is sent." /
+  "Last sent 2 minutes ago".
+- Row-level: any referral holding an unsent change also carries its own small
+  "Waiting to send" pill next to its state.
+- Banned words anywhere in copy: sync, pending ops, conflict, operation,
+  queue, offline mode, retry, payload.
 
 ## 7. The escalation moment
 
-A referral breaching its deadline and appearing live on the supervisor dashboard
-without a page refresh is the twenty seconds the panel will remember. Design for
-it deliberately.
+- Appears, does not animate in aggressively: on the dashboard, a new overdue
+  row's background fades from a pale red to plain white over ~2 seconds while
+  everything else on screen stays still; the overdue count and a one-line
+  banner update in place at the same time. No motion elsewhere, no colour
+  flash on unrelated rows.
+- Sound: none.
+- "Overdue by 2 hours" vs "overdue by 2 days": both use the identical red
+  pill + left border treatment — severity is not colour-coded further. The
+  overdue list is simply sorted by how overdue, worst first, and each row
+  states the plain duration ("2 days", "19 h", "40 min"). This keeps the
+  signal legible in bright light without adding a second colour scale.
 
-- Should it animate in, or just appear?
-- Sound? _(usually no — reviews are in a quiet room)_
-- How obvious should "overdue by 2 days" be versus "overdue by 2 hours"?
+Sunlight/no-colour fallback: every referral group is carried by pill *shape*
+first, colour second, and a word always — fine = filled soft pill, overdue =
+solid dark pill with a "!" mark and a 4px left bar, done = outline-only pill
+with a ✓/✕. Confirmed to hold up in greyscale (see §7 of the design system).
 
 ## 8. Hard constraints — these are not negotiable
 
