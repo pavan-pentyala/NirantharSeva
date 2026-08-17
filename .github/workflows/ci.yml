@@ -40,7 +40,7 @@ jobs:
       CLOCK_MODE: real
       RUN_ID: ci
       LOG_LEVEL: INFO
-      DEV_USERS: "asha1:dev:ASHA:1"
+      DEV_USERS: "asha1:dev:ASHA:1,anm1:dev:ANM:1,mo1:dev:MO:1"
     defaults:
       run:
         working-directory: server

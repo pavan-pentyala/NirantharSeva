@@ -4,6 +4,11 @@
 # no duplicates." This is I1 under real process death, not just a mocked
 # exception.
 #
+# Ported from the toy model to referrals in Phase 2.1 (D1, docs/PHASE2_PLAN.md):
+# the toy model itself stays frozen, but this fault test needs no UI — pure
+# curl — so it moves onto the real domain surface now instead of waiting
+# for Phase 4 like the two Playwright fault tests do.
+#
 # This is NOT part of CI — it manipulates real containers (docker kill /
 # docker compose up) and is meant to be run on demand, on the host, with
 # the stack already up. Run from anywhere; it cds to the repo root itself.
@@ -15,21 +20,26 @@ set -euo pipefail
 cd "$(dirname "$0")/../../.."
 
 BATCH_SIZE=20
-TOY_ID=$(python3 -c "import uuid; print(uuid.uuid4())")
+PATIENT_ID=$(python3 -c "import uuid; print(uuid.uuid4())")
 
-BATCH_JSON=$(python3 - "$TOY_ID" "$BATCH_SIZE" <<'PY'
+echo "Seeding one patient row for the batch to reference: $PATIENT_ID"
+docker compose exec -T db psql -U postgres -d nirantharseva -v ON_ERROR_STOP=1 -c \
+  "INSERT INTO patient (id, name, normalized_name, created_at) VALUES ('$PATIENT_ID', 'Fault Test Patient', 'fault test patient', now());" \
+  > /dev/null
+
+BATCH_JSON=$(python3 - "$PATIENT_ID" "$BATCH_SIZE" <<'PY'
 import json
 import sys
 import uuid
 
-toy_id, n = sys.argv[1], int(sys.argv[2])
+patient_id, n = sys.argv[1], int(sys.argv[2])
 ops = [
     {
         "op_id": str(uuid.uuid4()),
-        "entity": "toy",
-        "entity_id": toy_id,
-        "operation": "set_value",
-        "payload": {"value": i},
+        "entity": "referral",
+        "entity_id": str(uuid.uuid4()),
+        "operation": "create_referral",
+        "payload": {"patient_id": patient_id, "reason": "fault test", "priority": "normal"},
         "lamport": i + 1,
         "device_time": "2026-08-10T09:00:00Z",
     }
@@ -49,7 +59,7 @@ login() {
     | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])"
 }
 
-echo "toy_id under test: $TOY_ID"
+echo "patient_id under test: $PATIENT_ID"
 echo "Logging in..."
 TOKEN=$(login)
 
@@ -79,10 +89,14 @@ TOKEN=$(login)
 RETRY_RESPONSE=$(curl -s -X POST localhost:8000/sync/push -H "authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' -d @"$BATCH_FILE")
 
+# Each op in the batch created its own referral (distinct entity_id, same
+# patient) — count events transitively via the patient, not a single
+# shared entity_id like the toy version did.
 COUNT=$(docker compose exec -T db psql -U postgres -d nirantharseva -tAc \
-  "select count(*) from toy_event where toy_id = '$TOY_ID';" | tr -d '[:space:]')
+  "select count(*) from referral_event e join referral r on r.id = e.referral_id
+   where r.patient_id = '$PATIENT_ID';" | tr -d '[:space:]')
 
-echo "toy_event rows for $TOY_ID: $COUNT (expected $BATCH_SIZE)"
+echo "referral_event rows for patient $PATIENT_ID: $COUNT (expected $BATCH_SIZE)"
 
 if [ "$COUNT" != "$BATCH_SIZE" ]; then
   echo "FAIL: expected exactly $BATCH_SIZE events, found $COUNT — retry was not idempotent."

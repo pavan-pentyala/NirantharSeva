@@ -137,13 +137,19 @@ export async function pullAndApply(): Promise<void> {
 
 async function applyPulledEvents(events: api.EventOut[]): Promise<void> {
   for (const e of events) {
-    const cached = await db.toy_cache.get(e.toy_id);
+    // D1: the toy model is the only thing this client caches through
+    // Phase 4. Referral events already flow through /sync/pull (D3) but
+    // have no client-side cache to land in yet.
+    if (e.entity_type !== "toy") continue;
+
+    const newValue = e.payload.new_value as number;
+    const cached = await db.toy_cache.get(e.entity_id);
     const isWinner =
       !cached || e.lamport > cached.lamport || (e.lamport === cached.lamport && e.device_id >= cached.device_id);
     if (isWinner) {
       await db.toy_cache.put({
-        id: e.toy_id,
-        value: e.new_value,
+        id: e.entity_id,
+        value: newValue,
         updated_at: e.server_time,
         lamport: e.lamport,
         device_id: e.device_id,

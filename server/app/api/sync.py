@@ -17,10 +17,13 @@ async def push(
     body: PushRequest,
     clock: Clock = Depends(get_clock),
     settings: Settings = Depends(get_settings),
-    _user: CurrentUser = Depends(get_current_user),
+    user: CurrentUser = Depends(get_current_user),
 ) -> PushResponse:
+    # The role that guards a referral transition (I4) comes from the
+    # server-verified JWT claim, never from anything in the op payload — a
+    # device cannot be trusted to name its own role.
     results, server_lamport = await handle_push(
-        async_session_factory, body.device_id, body.ops, clock, settings.run_id
+        async_session_factory, body.device_id, body.ops, clock, settings.run_id, user.role
     )
     return PushResponse(results=results, server_lamport=server_lamport)
 

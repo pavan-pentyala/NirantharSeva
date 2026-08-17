@@ -27,16 +27,22 @@ export interface PushResponse {
   server_lamport: number;
 }
 
+/** Generic pull envelope (D3, docs/decisions/ADR-004.md). Fields the sync
+ * engine itself reads stay flat; everything only the domain reads is in
+ * `payload`, discriminated by `entity_type`. For entity_type "toy": payload
+ * is {old_value, new_value}. For "referral": payload is {from_state,
+ * to_state, actor_role, actor_user_id} — referral events are not yet
+ * applied to any client cache (D1: the referral UI lands at Phase 4). */
 export interface EventOut {
   seq: number;
-  toy_id: string;
-  old_value: number | null;
-  new_value: number;
+  entity_type: string;
+  entity_id: string;
   op_id: string;
   device_id: string;
   lamport: number;
   device_time: string;
   server_time: string;
+  payload: Record<string, unknown>;
 }
 
 export interface PullResponse {

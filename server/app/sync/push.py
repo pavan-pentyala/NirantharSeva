@@ -5,9 +5,15 @@ neighbours. The receipt is claimed before the work and finalised with the
 work in the same transaction, so a crash anywhere leaves either nothing or
 everything applied. A replay never re-executes — it returns the stored
 answer, so the client sees an identical response the second time.
+
+Phase 2.1 adds the referral entity alongside the toy model (D1: toy stays
+frozen, unchanged). See docs/decisions/ADR-003.md for the conflict policy
+and app/domain/states.py for the state machine apply_operation dispatches
+into.
 """
 
 import json
+import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -17,7 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.clock import Clock
 from app.db import acquire_seq_lock
+from app.domain.states import Role, State, may, replay_state
 from app.schemas.sync import Op, OpResult, OpStatus
+from app.sync.conflicts import decide
 from app.sync.lamport import merge_lamport
 
 
@@ -44,6 +52,7 @@ async def handle_push(
     ops: Sequence[Op],
     clock: Clock,
     run_id: str | None,
+    actor_role: str = "",
 ) -> tuple[list[OpResult], int]:
     results: list[OpResult] = []
 
@@ -79,8 +88,8 @@ async def handle_push(
             # 2. Serialise sequence assignment (ADR-002).
             await acquire_seq_lock(s)
 
-            # 3. Validate + apply. In P2 this becomes the state machine guard.
-            outcome = await apply_operation(s, op, device_id, clock, run_id)
+            # 3. Validate + apply.
+            outcome = await apply_operation(s, op, device_id, clock, run_id, actor_role)
 
             # 4. Record the real result — SAME transaction as the effect.
             # detail is JSONB; the asyncpg driver's jsonb codec encodes/decodes
@@ -112,7 +121,14 @@ async def handle_push(
     # every event this batch just wrote. Merged with the batch's own lamports
     # as a safety net (plan §5.4's client-side formula, mirrored server-side).
     async with session_factory() as s:
-        max_row = await s.execute(text("SELECT COALESCE(MAX(lamport), 0) AS m FROM toy_event"))
+        max_row = await s.execute(
+            text(
+                """SELECT GREATEST(
+                     (SELECT COALESCE(MAX(lamport), 0) FROM toy_event),
+                     (SELECT COALESCE(MAX(lamport), 0) FROM referral_event)
+                   ) AS m"""
+            )
+        )
         db_max = max_row.scalar_one()
 
     server_lamport = merge_lamport(db_max, [op.lamport for op in ops])
@@ -125,8 +141,37 @@ async def apply_operation(
     device_id: str,
     clock: Clock,
     run_id: str | None,
+    actor_role: str,
+) -> Outcome:
+    if op.entity == "toy" and op.operation == "set_value":
+        return await _apply_toy_set_value(session, op, device_id, clock, run_id)
+    if op.entity == "referral" and op.operation == "create_referral":
+        return await _apply_create_referral(session, op, device_id, clock, run_id, actor_role)
+    if op.entity == "referral" and op.operation == "transition":
+        return await _apply_referral_transition(session, op, device_id, clock, run_id, actor_role)
+    return Outcome(
+        status="rejected",
+        server_seq=None,
+        detail={"reason": f"unsupported entity/operation: {op.entity}/{op.operation}"},
+    )
+
+
+def _parse_role(raw: str) -> Role | None:
+    try:
+        return Role(raw)
+    except ValueError:
+        return None
+
+
+async def _apply_toy_set_value(
+    session: AsyncSession,
+    op: Op,
+    device_id: str,
+    clock: Clock,
+    run_id: str | None,
 ) -> Outcome:
     """Toy model: one supported operation, "set_value" on entity "toy".
+    Unchanged since Phase 1.1 — frozen per D1.
 
     Concurrent writes are resolved as a Lamport-clock last-writer-wins
     register: after appending this event, the winner for the entity is
@@ -134,13 +179,6 @@ async def apply_operation(
     arrival order. That is what makes the final state the same regardless
     of the order a valid op set is applied in — see tests/property.
     """
-    if op.entity != "toy" or op.operation != "set_value":
-        return Outcome(
-            status="rejected",
-            server_seq=None,
-            detail={"reason": f"unsupported entity/operation: {op.entity}/{op.operation}"},
-        )
-
     value = op.payload.get("value")
     if not isinstance(value, int) or isinstance(value, bool):
         return Outcome(
@@ -220,3 +258,220 @@ async def apply_operation(
 
     status: OpStatus = "accepted" if w.op_id == op.op_id else "accepted_stale"
     return Outcome(status=status, server_seq=seq, detail=None)
+
+
+async def _append_referral_event(
+    session: AsyncSession,
+    *,
+    referral_id: uuid.UUID,
+    from_state: str | None,
+    to_state: str,
+    actor_role: str,
+    op: Op,
+    device_id: str,
+    server_time: Any,
+    run_id: str | None,
+) -> int:
+    # actor_user_id is NULL in Phase 2.1: app_user has no rows yet (real
+    # auth against it arrives in P2.2, plan §6.4). actor_role always comes
+    # from the caller's server-verified identity, never from op.payload —
+    # a device cannot be trusted to name its own role.
+    inserted = await session.execute(
+        text(
+            """INSERT INTO referral_event
+                 (id, referral_id, from_state, to_state, actor_user_id, actor_role,
+                  device_time, server_time, lamport, op_id, device_id, payload, run_id)
+               VALUES
+                 (:id, :referral_id, :from_state, :to_state, NULL, :actor_role,
+                  :device_time, :server_time, :lamport, :op_id, :device_id,
+                  CAST(:payload AS jsonb), :run_id)
+               RETURNING seq"""
+        ),
+        {
+            "id": uuid.uuid4(),
+            "referral_id": referral_id,
+            "from_state": from_state,
+            "to_state": to_state,
+            "actor_role": actor_role,
+            "device_time": op.device_time,
+            "server_time": server_time,
+            "lamport": op.lamport,
+            "op_id": op.op_id,
+            "device_id": device_id,
+            "payload": json.dumps(op.payload),
+            "run_id": run_id,
+        },
+    )
+    return inserted.scalar_one()
+
+
+async def _apply_create_referral(
+    session: AsyncSession,
+    op: Op,
+    device_id: str,
+    clock: Clock,
+    run_id: str | None,
+    actor_role_raw: str,
+) -> Outcome:
+    role = _parse_role(actor_role_raw)
+    if role is None:
+        return Outcome("rejected", None, {"reason": "unknown_role"})
+    if not may(role, State.CREATED):
+        return Outcome("rejected", None, {"reason": "role_not_permitted"})
+
+    existing = await session.execute(
+        text("SELECT 1 FROM referral WHERE id=:id"), {"id": op.entity_id}
+    )
+    if existing.first() is not None:
+        # A genuine op_id collision, not a replay (I1's receipt already
+        # intercepts replays before apply_operation is ever called).
+        return Outcome("rejected", None, {"reason": "already_exists"})
+
+    patient_id = op.payload.get("patient_id")
+    if not patient_id:
+        return Outcome("rejected", None, {"reason": "patient_id is required"})
+    patient_exists = await session.execute(
+        text("SELECT 1 FROM patient WHERE id=:id"), {"id": patient_id}
+    )
+    if patient_exists.first() is None:
+        return Outcome("rejected", None, {"reason": "unknown_patient"})
+
+    now = clock.now()
+    await session.execute(
+        text(
+            """INSERT INTO referral
+                 (id, patient_id, origin_user_id, origin_org_id, target_org_id,
+                  reason, priority, current_state, state_entered_at,
+                  sla_profile_id, created_device_time, created_server_time)
+               VALUES
+                 (:id, :patient_id, NULL, :origin_org_id, :target_org_id,
+                  :reason, :priority, 'CREATED', :now, NULL, :device_time, :now)"""
+        ),
+        {
+            "id": op.entity_id,
+            "patient_id": patient_id,
+            "origin_org_id": op.payload.get("origin_org_id"),
+            "target_org_id": op.payload.get("target_org_id"),
+            "reason": op.payload.get("reason"),
+            "priority": op.payload.get("priority"),
+            "now": now,
+            "device_time": op.device_time,
+        },
+    )
+
+    seq = await _append_referral_event(
+        session,
+        referral_id=op.entity_id,
+        from_state=None,
+        to_state=State.CREATED.value,
+        actor_role=actor_role_raw,
+        op=op,
+        device_id=device_id,
+        server_time=now,
+        run_id=run_id,
+    )
+    return Outcome("accepted", seq, None)
+
+
+async def _apply_referral_transition(
+    session: AsyncSession,
+    op: Op,
+    device_id: str,
+    clock: Clock,
+    run_id: str | None,
+    actor_role_raw: str,
+) -> Outcome:
+    role = _parse_role(actor_role_raw)
+    if role is None:
+        return Outcome("rejected", None, {"reason": "unknown_role"})
+
+    referral_row = await session.execute(
+        text("SELECT current_state FROM referral WHERE id=:id"), {"id": op.entity_id}
+    )
+    row = referral_row.first()
+    if row is None:
+        # ADR-003 "Gap 2" — not one of the five table rows.
+        return Outcome("rejected", None, {"reason": "unknown_referral"})
+    current_state = State(row.current_state)
+
+    from_state_raw = op.payload.get("from_state")
+    to_state_raw = op.payload.get("to_state")
+    if from_state_raw is None or to_state_raw is None:
+        return Outcome("rejected", None, {"reason": "from_state and to_state are required"})
+    try:
+        from_state = State(from_state_raw)
+        to_state = State(to_state_raw)
+    except ValueError:
+        return Outcome("rejected", None, {"reason": "unknown_state"})
+
+    history = await session.execute(
+        text(
+            """SELECT from_state, to_state, lamport, op_id FROM referral_event
+               WHERE referral_id=:id ORDER BY seq ASC"""
+        ),
+        {"id": op.entity_id},
+    )
+    triples = [
+        (State(r.from_state) if r.from_state else None, State(r.to_state), r.lamport, str(r.op_id))
+        for r in history
+    ]
+    replayed_state, current_lamport, winning_op_id = replay_state(triples)
+    # Sanity check, not a substitute for the cache (I3): the log and the
+    # cache must already agree, or something upstream already broke I3.
+    assert replayed_state == current_state, (
+        f"current_state cache ({current_state}) disagrees with the replayed "
+        f"event log ({replayed_state}) for referral {op.entity_id} — I3 violated"
+    )
+
+    decision = decide(
+        actor_role=role,
+        from_state=from_state,
+        to_state=to_state,
+        current_state=current_state,
+        incoming_lamport=op.lamport,
+        current_lamport=current_lamport,
+    )
+
+    if decision.status == "rejected":
+        return Outcome("rejected", None, {"reason": decision.reason})
+
+    now = clock.now()
+    seq = await _append_referral_event(
+        session,
+        referral_id=op.entity_id,
+        from_state=from_state.value,
+        to_state=to_state.value,
+        actor_role=actor_role_raw,
+        op=op,
+        device_id=device_id,
+        server_time=now,
+        run_id=run_id,
+    )
+
+    if decision.status == "accepted":
+        await session.execute(
+            text("UPDATE referral SET current_state=:to, state_entered_at=:now WHERE id=:id"),
+            {"to": to_state.value, "now": now, "id": op.entity_id},
+        )
+    elif decision.status == "conflict":
+        # I6: the losing write is never deleted — it is already in
+        # referral_event, appended above. This records the pair.
+        await session.execute(
+            text(
+                """INSERT INTO sync_conflict
+                     (id, entity_type, entity_id, field, winning_op_id, losing_op_id,
+                      detected_at, run_id)
+                   VALUES (:id, 'referral', :entity_id, 'current_state', :winning, :losing,
+                           :now, :run_id)"""
+            ),
+            {
+                "id": uuid.uuid4(),
+                "entity_id": op.entity_id,
+                "winning": winning_op_id,
+                "losing": op.op_id,
+                "now": now,
+                "run_id": run_id,
+            },
+        )
+
+    return Outcome(decision.status, seq, None)
