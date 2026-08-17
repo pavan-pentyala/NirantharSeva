@@ -6,7 +6,9 @@
 > session builds on top of something that does not exist.
 
 **Last updated:** 2026-08-17
-**Last session model:** Opus 5 (CI investigation, ADRs) then Sonnet 5 (P2.1 code)
+**Last session model:** Opus 5 — P2.2 planning docs + ADR-005/006.
+**Documentation only: no file under `server/`, `client/` or `.github/` changed,
+and CI was not re-run.**
 
 ---
 
@@ -27,11 +29,35 @@ client update are all committed and pushed. CI run
 [32019283579](https://github.com/pavan-pentyala/NirantharSeva/actions/runs/32019283579)
 is green on commit `4dd737b` — all four jobs.
 
-**P2.2 (auth on `app_user`, RBAC, org scoping) is not started.** Per
-handoff R1, stop at the end of a sub-phase and wait — P2.2 needs the user's
-go-ahead before any code is written for it.
+**P2.2 (auth on `app_user`, RBAC, org scoping) is planned and documented, but
+NOT started — no code exists for it.** Its plan was rewritten on 2026-08-17
+because, as previously written, **it could not be built as specified**: its exit
+criterion referenced a referral API that does not exist, and its security filter
+trusted a column the client controls. Four further decisions (**D5–D8**) were
+settled with the user, and **ADR-005 and ADR-006 are written**. Per handoff R1,
+P2.2 still needs the user's explicit go-ahead before any code.
 
-## Done this session
+## Done in this planning session (2026-08-17, docs only)
+
+- Re-read the whole Phase 2 document set against the code that now exists, and
+  found that **P2.2 as written could not be built**: its exit criterion named a
+  referral API that does not exist, its scoping filter trusted a client-supplied
+  column, `app_user` had no unique constraint for the login it specifies, and the
+  `DEV_USERS` removal it describes in four files actually touches thirteen and
+  breaks CI login unless seeding lands first.
+- Settled **D5–D8** with the user (read API; write-path trust boundary; toy
+  branch unscoped; migration `0004` integrity pass). Recorded in
+  `docs/PHASE2_PLAN.md`.
+- **Wrote ADR-005** (org-subtree visibility, read side) and **ADR-006**
+  (server-derived org identity, write side). Two ADRs rather than the one the
+  plan budgeted — reasoning in the Step 0 section of the phase plan.
+- Rewrote the P2.2 section, the "Verify Phase 2 yourself" block (now includes a
+  seed step and `make`-free commands) and "Traps" (six → eleven).
+- **`docs/IMPLEMENTATION_PLAN.md` was not edited.** Every divergence is carried
+  as an override in `docs/PHASE2_PLAN.md`, whose preamble was updated to say that
+  is what it does. Exactly one true supersession exists in Phase 2: D7.
+
+## Done in the previous session (P2.1 code + the CI fix)
 
 - Read `docs/HANDOFF_CLAUDE_CODE.md`, `PROGRESS.md`, `docs/PHASE2_PLAN.md`,
   plan §6, in full, per the session's own instructions.
@@ -160,11 +186,19 @@ _(one line each, so the user can overrule)_
   `sla_profile_id`) are bare `UUID`, unconstrained — Phase 2.2's real auth
   and seed data are what give these something real to reference; forcing
   FK integrity now would need seed data that doesn't exist yet.
+  > **Resolved in plan on 2026-08-17 — NOT in code.** D8 / migration `0004`:
+  > the FKs land alongside the seed script, with `UNIQUE (app_user.name)`, an
+  > index on `origin_org_id`, and `origin_org_id SET NOT NULL`. **Requires
+  > `docker compose down -v`** — every existing referral has a NULL origin.
+  > `0004` does not exist yet.
 - **`actor_user_id` and `referral.origin_user_id` are left `NULL` in
   P2.1.** `app_user` has no rows until Phase 2.2's real auth lands against
   it. `actor_role` is always populated (D2's requirement) from the
   authenticated JWT claim; the *user* identity behind that role isn't
   linkable to a real row yet.
+  > **Resolved in plan on 2026-08-17 — NOT in code.** D6 / ADR-006: both are
+  > resolved from the authenticated session once `app_user` has rows. **Still
+  > NULL in the code today.**
 - **`origin_org_id`/`target_org_id` come from the client's `create_referral`
   payload, not from the authenticated identity.** `DEV_USERS`' `org_unit_id`
   is a placeholder string (`"1"`), not a real `org_unit` UUID, so there is
@@ -172,6 +206,10 @@ _(one line each, so the user can overrule)_
   P2.1 does not enforce org-scoping — **P2.2 must revisit this** when
   scoping enforcement makes `origin_org_id` a security-relevant field, not
   just a data field.
+  > **Resolved in plan on 2026-08-17 — NOT in code.** D6 / ADR-006:
+  > `origin_org_id` and `origin_user_id` become server-derived and the payload
+  > value is ignored; `target_org_id` stays a payload field because it is not a
+  > visibility input. **Nothing under `server/` has changed.**
 - **`referral_event` and `sync_conflict` both gained a `run_id` column**
   beyond what plan §6.1's raw SQL lists, matching `toy_event`'s. Handoff
   §R8 requires instrumentation on anything that handles a request or an
@@ -230,9 +268,11 @@ boxes checked including CI.
   3,000 monthly minutes used as of this session. Do not raise this again
   unless usage actually climbs.
 
-### Phase 2 decisions (D1–D4) — settled, do not re-litigate
+### Phase 2 decisions (D1–D8) — settled, do not re-litigate
 
-Full reasoning in `docs/PHASE2_PLAN.md`.
+Full reasoning in `docs/PHASE2_PLAN.md`. D1–D4 were settled before P2.1;
+D5–D8 before P2.2, on 2026-08-17. All eight were the user's decisions, taken
+with options and a recommendation — none were unilateral.
 
 - **D1 — the toy model survives until Phase 4.** Toy tables and `ToyPage`
   stay frozen through P2 and P3. `kill_api.sh` ported to referrals in
@@ -244,8 +284,24 @@ Full reasoning in `docs/PHASE2_PLAN.md`.
   convention not constraint.
 - **D3 — `/sync/pull` is a generic envelope with a typed `payload`**
   (**done this session** — see "Phase 2.1 — what was built" above).
-- **D4 — seed data is a small hand-written fixture.** Not yet built —
-  this is P2.2 work.
+- **D4 — seed data is a small hand-written fixture.** **Not built.** P2.2
+  work. Its org assignments and `target_org_id` values were pinned during
+  P2.2 planning — a completion of D4, not a change to it.
+- **D5 — P2.2 ships a minimal scoped referral read API.** **Not built.**
+  `GET /referrals` and `GET /referrals/{id}`, 404 (not 403) outside the
+  subtree. Plan §6.5's fourth exit criterion is untestable without it, and
+  plan §2.2's layout already lists `api/referrals.py`. An API, not a screen.
+- **D6 — the write path is locked down both ways.** **Not built.**
+  `origin_org_id`/`origin_user_id` server-derived, payload ignored;
+  out-of-subtree transitions `rejected` as `outside_org_scope`. ADR-006.
+- **D7 — the toy branch of `/sync/pull` stays unscoped until P4.** **Not
+  built.** **The one place Phase 2 supersedes plan §6.4.** An application of
+  D1, not an exception to it. ADR-005 records why this is not the failure
+  ADR-004 warns about.
+- **D8 — migration `0004` is a full integrity pass.** **Not built.** Unique
+  `app_user.name`, index on `origin_org_id`, the deferred FKs, and
+  `origin_org_id SET NOT NULL` — which is what stops the data-leak test
+  passing vacuously. **Requires `docker compose down -v`.**
 
 ## Exit criteria status — Phase 2.1 (plan §6.5 items 1-3, `docs/PHASE2_PLAN.md`)
 
@@ -267,24 +323,31 @@ commit messages on `3e73369`, `982f203`, `5038708` if detail is needed.
 
 ## Next concrete step
 
-P2.1 is fully done and reported. Per handoff R1, **wait for the user's
-explicit go-ahead before starting P2.2** — do not roll into it just
-because P2.1 finished clean.
+P2.1 is done and reported. P2.2 is planned in full and **ADR-005 / ADR-006 are
+already written**, so Step 0 is complete. Per handoff R1, **wait for the user's
+explicit go-ahead before starting P2.2.**
 
-When told to start **P2.2**, per `docs/PHASE2_PLAN.md`:
-   - Move auth off `DEV_USERS` onto `app_user` (argon2id, same JWT claim
-     shape — no contract change).
-   - `app/api/scoping.py` — the recursive-CTE org-subtree helper, applied
-     to referral endpoints **and to `/sync/pull`** (the data-leak risk
-     plan §6.4 calls out explicitly).
-   - The D4 seed script, wired to `make demo`'s `docker compose`
-     equivalent.
-   - ADR-005 (org-subtree visibility), written next to the code it
-     governs.
-   - **Revisit the `origin_org_id`/`target_org_id` decision above** — once
-     real org linkage exists, decide whether these should keep coming
-     from the client payload or be re-derived from the (by-then-real)
-     authenticated identity, the way `actor_role` already is.
+When told to start **P2.2**, build in this order (`docs/PHASE2_PLAN.md` has the
+detail for each; **switch to Sonnet — all of it is code**):
+
+1. **Migration `0004`** — unique `app_user.name`, index on `origin_org_id`, the
+   deferred FKs, `origin_org_id SET NOT NULL`. Needs `docker compose down -v`.
+2. **`server/app/seed.py`** — D4's fixture, idempotent, using the injected
+   `Clock`. Everything after this depends on it, including every auth fixture
+   and `kill_api.sh`.
+3. **Auth off `DEV_USERS` onto `app_user`** — all 13 sites listed in the phase
+   plan, including the two CI seed steps that removal *creates*, and
+   `test_referral_replay.py`, which calls `handle_push()` directly and does not
+   look like auth code.
+4. **`app/api/scoping.py`** — the recursive-CTE helper, returning a SQL fragment
+   rather than a list of ids.
+5. **The read API** (`app/api/referrals.py`) — 404, never 403.
+6. **The write-path lockdown** — server-derived origin; `outside_org_scope`.
+7. **Scope the referral branch of `/sync/pull`** — inside the branch, before
+   `LIMIT`. Leave the toy branch alone (D7).
+
+ADR-005 (org-subtree visibility) and ADR-006 (server-derived org identity) are
+written and should be read before step 1, not after.
 
 ## Known problems and workarounds
 
@@ -305,3 +368,19 @@ When told to start **P2.2**, per `docs/PHASE2_PLAN.md`:
   by default. Use the three-argument form (`value`, `is_called`) when the
   target might legitimately be zero/empty; see migration `0003`'s comment
   for the pattern.
+- **Migration `0004` will require `docker compose down -v`.** Every referral
+  written during P2.1 has `origin_org_id IS NULL`, and `0004` sets that column
+  `NOT NULL`. CI is unaffected — it always starts from a clean database.
+- **Once `DEV_USERS` is removed, an unseeded database fails at login with a
+  bare 401**, not with a clear error. If auth suddenly breaks in P2.2, check
+  whether the seed ran before assuming the auth code is wrong.
+- **`.env.example` currently ships `admin1:dev:ADMIN:1`, and `ADMIN` is not one
+  of the five `user_role` values.** That user can log in and obtain a valid
+  token, and then every push it sends is rejected as `unknown_role`. It is a
+  live bug today, closed by the `DEV_USERS` removal in P2.2. Do not try to
+  migrate `admin1` into `app_user` — it has no home in the enum.
+- **`app_user.name` will be doing double duty** as login handle and display
+  name, and `asha_a` is not a name a panel wants on a demo screen. Nothing
+  displays a user's name until P4, so the decision belongs there (a
+  `display_name` column, or renamed seed rows). Do not add a column in `0004`
+  for a screen that does not exist.
