@@ -83,6 +83,26 @@ jobs:
     needs: [server, client]
     steps:
       - uses: actions/checkout@v4
+      # npm ci and the Playwright browser install run BEFORE `docker compose
+      # up`, not after. The client service bind-mounts ./client:/app and
+      # mounts the named volume client_node_modules at /app/node_modules —
+      # since that path sits inside a host bind mount, Docker has to create
+      # client/node_modules on the actual host filesystem as the mount
+      # point if it doesn't exist yet, and it does that as the (root) Docker
+      # daemon. On a clean runner nothing exists yet, so `docker compose up`
+      # first leaves client/node_modules root-owned, and a later `npm ci`
+      # (running as the unprivileged runner user) fails with EACCES trying
+      # to write into it. Installing first means npm creates the directory
+      # with the right ownership, and Docker just reuses it as-is.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
+      - working-directory: client
+        run: npm ci
+      - working-directory: client
+        run: npx playwright install --with-deps chromium
       - run: cp .env.example .env
       - run: docker compose up -d --build
       - name: Wait for API health
@@ -96,15 +116,6 @@ jobs:
           echo "::error::API never became healthy"
           docker compose logs
           exit 1
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: client/package-lock.json
-      - working-directory: client
-        run: npm ci
-      - working-directory: client
-        run: npx playwright install --with-deps chromium
       - working-directory: client
         run: npx playwright test
       - name: Kill-API fault test (plan §5.6)
