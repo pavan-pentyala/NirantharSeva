@@ -75,3 +75,9 @@ He is a student working alone, and not a native English speaker. Use plain words
 Be direct. If something is a bad idea, say it in one sentence with the reason.
 Do not flatter, do not pad, do not repeat the plan back at him. Tell him about
 every choice you made on your own — he has to defend this repository to a panel.
+
+## Commits
+
+- Do not add "Co-Authored-By: Claude" or any Claude/Anthropic attribution line
+  to commit messages.
+- No "Generated with Claude Code" footer either.
