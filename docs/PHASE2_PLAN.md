@@ -1,6 +1,9 @@
 # Phase 2 plan — domain, state machine, RBAC
 
-**Status:** P2.1 built and CI-green (`4dd737b`). P2.2 planned, not started.
+**Status:** **Phase 2 complete.** P2.1 built and CI-green (`4dd737b`); P2.2 built
+and CI-green (`5802b13`, docstring fix `03fdbcf`, run `32101818251`). All
+exit criteria below are met. What the build actually taught — as opposed to what
+this document predicted before it — is in `docs/PHASE2_OBSERVATIONS.md`.
 **Source of truth for *what*:** `docs/IMPLEMENTATION_PLAN.md` §6. This file does
 not replace it — it records the decisions §6 leaves open, the order of work,
 **and the places where a later decision supersedes §6. Every such override is
@@ -364,15 +367,15 @@ events instead of `new_value`.
 
 ## P2.1 exit criteria
 
-- [ ] A referral traverses CREATED → … → CLOSED through the API
-- [ ] Every guard violation returns `rejected` and writes no event
-- [ ] All five conflict-table rows have a passing test
-- [ ] I3 property test passes (replayed state == cached state)
-- [ ] Both Playwright fault tests still green through the new envelope
-- [ ] ADR-003 and ADR-004 written
-- [ ] CI green
+- [x] A referral traverses CREATED → … → CLOSED through the API
+- [x] Every guard violation returns `rejected` and writes no event
+- [x] All five conflict-table rows have a passing test
+- [x] I3 property test passes (replayed state == cached state)
+- [x] Both Playwright fault tests still green through the new envelope
+- [x] ADR-003 and ADR-004 written
+- [x] CI green — run `32019283579` on commit `4dd737b`
 
-**Stop. Report. Wait.**
+**All met. P2.1 done.**
 
 ---
 
@@ -577,24 +580,27 @@ it there — a `display_name` column, or renamed seed rows. Do not add a column 
 
 ## P2.2 exit criteria
 
-- [ ] An ASHA in village A cannot see a referral from village B, via
+- [x] An ASHA in village A cannot see a referral from village B, via
       `GET /referrals`, `GET /referrals/{id}`, **or** `/sync/pull`
-- [ ] Scoping tests pass at all three tree levels
-- [ ] `origin_org_id`/`origin_user_id` come from the session; a payload claiming
+- [x] Scoping tests pass at all three tree levels
+- [x] `origin_org_id`/`origin_user_id` come from the session; a payload claiming
       otherwise is ignored, with a test proving it
-- [ ] A transition against an out-of-scope referral is
+- [x] A transition against an out-of-scope referral is
       `rejected`/`outside_org_scope` and writes zero events
-- [ ] Auth works against `app_user`; `DEV_USERS` is gone from all 13 sites
-- [ ] `0004` applies to a cold database; `origin_org_id` is NOT NULL and
+- [x] Auth works against `app_user`; `DEV_USERS` is gone from all 13 sites —
+      **it was 14.** The list above missed `client/src/pages/ToyPage.tsx`'s
+      hardcoded dev auto-login. See observation 10 in
+      `docs/PHASE2_OBSERVATIONS.md`
+- [x] `0004` applies to a cold database; `origin_org_id` is NOT NULL and
       indexed; `app_user.name` is unique
-- [ ] The seed runs in dev, in CI's `server` job, and in CI's `e2e` job
-- [ ] `docker compose run --rm api python -m app.seed` seeds a working district
+- [x] The seed runs in dev, in CI's `server` job, and in CI's `e2e` job
+- [x] `docker compose run --rm api python -m app.seed` seeds a working district
       (the `make demo` equivalent — `make` is not installed here)
-- [ ] Both Playwright fault tests and `kill_api.sh` still green
+- [x] Both Playwright fault tests and `kill_api.sh` still green
 - [x] ADR-005 and ADR-006 written
-- [ ] CI green
+- [x] CI green — run `32101818251` on commit `03fdbcf`, all four jobs
 
-**Stop. Report. Wait.**
+**All met. P2.2 done. Phase 2 done.**
 
 ---
 
