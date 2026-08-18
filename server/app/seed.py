@@ -16,8 +16,8 @@ not meant to drift once written.
 
 Every referral gets its CREATED event appended in the same statement group
 as the referral row (I3 — the event log is the truth, never just the
-cache). Uses the injected Clock, never datetime.now() (ADR-001; CI greps
-this file too).
+cache). Uses the injected Clock — see docs/decisions/ADR-001.md, which
+applies to this file too, and which CI enforces with a grep.
 
 Invoked as `python -m app.seed`. Also called by
 server/tests/conftest.py's session-scoped seed fixture, so demo data and
