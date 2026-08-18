@@ -180,11 +180,15 @@ _(one line each, so the user can overrule)_
 
 ## NOT verified
 
-- **CI has not been checked yet as of this write-up** — commit not yet
-  pushed. Next action after this file is saved: commit, push, `gh run
-  watch`/`gh run view` on the resulting run, and report the result honestly
-  (this note should not still be here if the session report claims CI is
-  green).
+Nothing outstanding. **CI is confirmed green** — run
+[32101818251](https://github.com/pavan-pentyala/NirantharSeva/actions/runs/32101818251)
+on commit `03fdbcf`, all four jobs (`client`, `clock-discipline`, `server`,
+`e2e`). The first push (`5802b13`) failed `clock-discipline`: the grep for
+`datetime.now(` outside `app/clock.py` matched that literal string inside a
+docstring in `server/app/seed.py` that was *explaining* the file doesn't
+call it — a false positive from the grep's own bluntness, not a real
+violation. Fixed by rewording the docstring (commit `03fdbcf`) so it no
+longer contains the exact substring.
 
 ## Settled decisions (carried forward)
 
@@ -230,14 +234,15 @@ just decided:
       (plus the 14th this session found)
 - [x] `0004` applies to a cold database; `origin_org_id` is NOT NULL and
       indexed; `app_user.name` is unique
-- [x] The seed runs in dev (verified) and CI's `server`/`e2e` jobs (steps
-      added — **not yet confirmed green on GitHub Actions**, see "NOT
-      verified" above)
+- [x] The seed runs in dev, CI's `server` job, and CI's `e2e` job — all
+      confirmed on the green run
 - [x] `docker compose run --rm api python -m app.seed` seeds a working
       district
 - [x] Both Playwright fault tests and `kill_api.sh` still green
 - [x] ADR-005 and ADR-006 written
-- [ ] **CI green — not yet checked, see "NOT verified"**
+- [x] CI green — run `32101818251` on commit `03fdbcf`, all four jobs
+
+**All ten met. P2.2 is done. Phase 2 is done.**
 
 ## Exit criteria status — Phase 2.1, Phase 1, Phase 0
 
@@ -245,12 +250,9 @@ All met and previously confirmed on GitHub Actions. Unchanged this session.
 
 ## Next concrete step
 
-**Immediate:** commit this session's work, push, and check the resulting CI
-run with `gh run watch` / `gh run view`. Report the result honestly — do not
-mark P2.2 "done" in conversation until that run is actually green.
-
-**After that:** Phase 2 is complete. Per handoff R1, **wait for the user's
-explicit go-ahead before starting Phase 3.**
+Phase 2 is complete — P2.1 and P2.2 both built, tested, and CI-green. Per
+handoff R1, **wait for the user's explicit go-ahead before starting Phase
+3.**
 
 ## Known problems and workarounds
 
