@@ -1,84 +1,100 @@
-"""Auth stub tests. No database needed — dev users come from config (P0 only,
-see PROGRESS.md). Hermetic: each test clears the lru_cache'd stores it
-touches so DEV_USERS changes in one test never leak into another.
+"""Auth against the real user table (app_user). See docs/decisions/ADR-006.md.
+
+server/tests/conftest.py's session-scoped autouse fixture seeds the
+district (server/app/seed.py) once per test session, so these tests need
+no monkeypatching — DEV_USERS is gone.
 """
 
+import base64
+import json
+from datetime import UTC, datetime, timedelta
+
 import jwt
-import pytest
+from sqlalchemy import text
 
-from app.api import auth as auth_module
-from app.clock import RealClock
-from app.config import Settings
+from app.config import get_settings
+from app.db import async_session_factory
 
-
-@pytest.fixture(autouse=True)
-def _clear_caches():
-    auth_module._dev_user_store.cache_clear()
-    yield
-    auth_module._dev_user_store.cache_clear()
+FIXED_TIME = datetime(2026, 8, 18, 9, 0, tzinfo=UTC)
 
 
-def _settings(dev_users: str) -> Settings:
-    return Settings(dev_users=dev_users, jwt_secret="test-secret-at-least-32-bytes-long!!")
+def _tamper_payload_role(token: str) -> str:
+    """Decode the payload, change a claim, re-encode it, and reassemble
+    with the ORIGINAL signature — a signature that no longer matches its
+    payload. Flipping a single character of the token string is not a
+    reliable way to do this: base64url's final character of a segment can
+    carry unused padding bits, and a flip that only touches those bits
+    leaves the decoded bytes — and therefore the signature check —
+    unchanged by coincidence."""
+    header_b64, payload_b64, sig_b64 = token.split(".")
+    padded = payload_b64 + "=" * (-len(payload_b64) % 4)
+    payload = json.loads(base64.urlsafe_b64decode(padded))
+    payload["role"] = "MO"
+    new_payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
+    return f"{header_b64}.{new_payload_b64}.{sig_b64}"
 
 
-async def test_login_issues_token_for_valid_credentials(client, monkeypatch):
-    monkeypatch.setenv("DEV_USERS", "asha1:dev:ASHA:1")
-    from app.config import get_settings
-
-    get_settings.cache_clear()
-
-    resp = await client.post("/auth/login", json={"username": "asha1", "password": "dev"})
+async def test_login_issues_token_for_valid_credentials(client):
+    resp = await client.post("/auth/login", json={"username": "asha_a", "password": "dev"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["token_type"] == "bearer"
     assert body["access_token"]
 
-    get_settings.cache_clear()
 
-
-async def test_login_rejects_wrong_password(client, monkeypatch):
-    monkeypatch.setenv("DEV_USERS", "asha1:dev:ASHA:1")
-    from app.config import get_settings
-
-    get_settings.cache_clear()
-
-    resp = await client.post("/auth/login", json={"username": "asha1", "password": "wrong"})
+async def test_login_rejects_wrong_password(client):
+    resp = await client.post("/auth/login", json={"username": "asha_a", "password": "wrong"})
     assert resp.status_code == 401
 
-    get_settings.cache_clear()
 
-
-async def test_login_rejects_unknown_user(client, monkeypatch):
-    monkeypatch.setenv("DEV_USERS", "asha1:dev:ASHA:1")
-    from app.config import get_settings
-
-    get_settings.cache_clear()
-
+async def test_login_rejects_unknown_user(client):
     resp = await client.post("/auth/login", json={"username": "nobody", "password": "dev"})
     assert resp.status_code == 401
 
-    get_settings.cache_clear()
 
+async def test_token_claims_match_the_real_app_user_row(client):
+    resp = await client.post("/auth/login", json={"username": "asha_a", "password": "dev"})
+    token = resp.json()["access_token"]
 
-def test_create_token_roundtrip():
-    settings = _settings("asha1:dev:ASHA:1")
-    user = auth_module._parse_dev_users(settings.dev_users)["asha1"]
-    token = auth_module._create_token(user, settings, RealClock())
-
+    settings = get_settings()
     payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-    assert payload["sub"] == "asha1"
+    assert payload["sub"] == "asha_a"
     assert payload["role"] == "ASHA"
-    assert payload["org_unit_id"] == "1"
+
+    async with async_session_factory() as session:
+        row = (
+            await session.execute(
+                text("SELECT org_unit_id FROM app_user WHERE name = :name"), {"name": "asha_a"}
+            )
+        ).one()
+    assert payload["org_unit_id"] == str(row.org_unit_id)
 
 
-def test_tampered_token_is_rejected():
-    settings = _settings("asha1:dev:ASHA:1")
-    user = auth_module._parse_dev_users(settings.dev_users)["asha1"]
-    token = auth_module._create_token(user, settings, RealClock())
+async def test_tampered_token_is_rejected(client):
+    resp = await client.post("/auth/login", json={"username": "asha_a", "password": "dev"})
+    token = resp.json()["access_token"]
+    tampered = _tamper_payload_role(token)
 
-    other_settings = _settings("asha1:dev:ASHA:1")
-    other_settings.jwt_secret = "a-different-secret-at-least-32-bytes!!"
+    pull_resp = await client.get(
+        "/sync/pull?since=0", headers={"authorization": f"Bearer {tampered}"}
+    )
+    assert pull_resp.status_code == 401
 
-    with pytest.raises(jwt.InvalidTokenError):
-        jwt.decode(token, other_settings.jwt_secret, algorithms=[other_settings.jwt_algorithm])
+
+async def test_a_validly_signed_token_for_a_nonexistent_user_is_rejected(client):
+    """The token is well-formed and correctly signed, but names a user
+    app_user has no row for (e.g. one that was removed after the token was
+    issued). get_current_user must still reject it — the database, not the
+    token, is authoritative (ADR-006)."""
+    settings = get_settings()
+    payload = {
+        "sub": "nobody",
+        "role": "ASHA",
+        "org_unit_id": "00000000-0000-0000-0000-000000000000",
+        "iat": FIXED_TIME,
+        "exp": FIXED_TIME + timedelta(minutes=settings.jwt_expire_minutes),
+    }
+    token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+    resp = await client.get("/sync/pull?since=0", headers={"authorization": f"Bearer {token}"})
+    assert resp.status_code == 401

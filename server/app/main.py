@@ -4,6 +4,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import router as auth_router
+from app.api.referrals import router as referrals_router
 from app.api.sync import router as sync_router
 from app.clock import Clock, get_clock
 from app.config import get_settings
@@ -26,6 +27,7 @@ app.add_middleware(TimingMiddleware)
 
 app.include_router(auth_router)
 app.include_router(sync_router)
+app.include_router(referrals_router)
 
 
 @app.get("/health")

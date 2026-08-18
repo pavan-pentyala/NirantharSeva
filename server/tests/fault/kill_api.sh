@@ -13,6 +13,9 @@
 # docker compose up) and is meant to be run on demand, on the host, with
 # the stack already up. Run from anywhere; it cds to the repo root itself.
 #
+# P2.2: logs in as asha_a (server/app/seed.py's D4 fixture), so the district
+# must be seeded first — `docker compose run --rm api python -m app.seed`.
+#
 # Usage: bash server/tests/fault/kill_api.sh
 
 set -euo pipefail
@@ -55,7 +58,7 @@ trap 'rm -f "$BATCH_FILE"' EXIT
 
 login() {
   curl -s -X POST localhost:8000/auth/login -H 'content-type: application/json' \
-    -d '{"username":"asha1","password":"dev"}' \
+    -d '{"username":"asha_a","password":"dev"}' \
     | python3 -c "import json,sys; print(json.load(sys.stdin)['access_token'])"
 }
 

@@ -22,8 +22,9 @@ test:
 		-e DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-dev}@db:5432/${POSTGRES_DB:-nirantharseva}_test \
 		api sh -c "alembic upgrade head && pytest"
 
+# Seeds the D4 fixture district (docs/PHASE2_PLAN.md) — idempotent.
 demo:
-	@echo "make demo: not implemented until Phase 4 (needs seeded referral data)."
+	docker compose run --rm api sh -c "alembic upgrade head && python -m app.seed"
 
 experiments:
 	@echo "make experiments: not implemented until Phase 8."

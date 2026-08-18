@@ -4,7 +4,7 @@ const API_BASE = "http://localhost:8000";
 
 export async function loginToken(request: APIRequestContext): Promise<string> {
   const res = await request.post(`${API_BASE}/auth/login`, {
-    data: { username: "asha1", password: "dev" },
+    data: { username: "asha_a", password: "dev" },
   });
   const body = await res.json();
   return body.access_token;

@@ -1,23 +1,32 @@
-"""Auth stub for Phase 0.
+"""Auth against the real user table. See docs/decisions/ADR-006.md.
 
-Real JWT + argon2id plumbing against a config-defined user list. There is no
-user table yet — it arrives with the Phase 2 schema (plan §6.4), and a
-throwaway P0 table would only have to be migrated away. See PROGRESS.md
-"Decisions taken by Claude Code without asking".
+login and get_current_user resolve `sub` against app_user on every
+request — no caching. After ADR-005, org membership is the confidentiality
+boundary; a cached row would let a moved or disabled user keep their old
+scope until the process restarts (docs/PHASE2_PLAN.md trap 11).
+
+The JWT claim shape (`sub`, `role`, `org_unit_id`, `iat`, `exp`) is
+unchanged from Phase 0. The claims are still set at login time to satisfy
+that contract, but get_current_user never reads role/org_unit_id back off
+the token — it re-resolves both from app_user on every request, because a
+token is an up-to-8-hour-stale snapshot of a value that is now
+security-relevant.
 """
 
-from dataclasses import dataclass
 from datetime import timedelta
-from functools import lru_cache
+from uuid import UUID
 
 import jwt
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.clock import Clock, get_clock
 from app.config import Settings, get_settings
+from app.db import async_session_factory, get_session
 from app.schemas.auth import CurrentUser, LoginRequest, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -26,41 +35,14 @@ _hasher = PasswordHasher()
 _bearer = HTTPBearer(auto_error=False)
 
 
-@dataclass(frozen=True)
-class DevUser:
-    username: str
-    password_hash: str
-    role: str
-    org_unit_id: str
-
-
-def _parse_dev_users(raw: str) -> dict[str, DevUser]:
-    users: dict[str, DevUser] = {}
-    for entry in raw.split(","):
-        entry = entry.strip()
-        if not entry:
-            continue
-        username, password, role, org_unit_id = entry.split(":")
-        users[username] = DevUser(
-            username=username,
-            password_hash=_hasher.hash(password),
-            role=role,
-            org_unit_id=org_unit_id,
-        )
-    return users
-
-
-@lru_cache
-def _dev_user_store() -> dict[str, DevUser]:
-    return _parse_dev_users(get_settings().dev_users)
-
-
-def _create_token(user: DevUser, settings: Settings, clock: Clock) -> str:
+def _create_token(
+    username: str, role: str, org_unit_id: UUID, settings: Settings, clock: Clock
+) -> str:
     now = clock.now()
     payload = {
-        "sub": user.username,
-        "role": user.role,
-        "org_unit_id": user.org_unit_id,
+        "sub": username,
+        "role": role,
+        "org_unit_id": str(org_unit_id),
         "iat": now,
         "exp": now + timedelta(minutes=settings.jwt_expire_minutes),
     }
@@ -68,24 +50,29 @@ def _create_token(user: DevUser, settings: Settings, clock: Clock) -> str:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(
+async def login(
     body: LoginRequest,
+    session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
     clock: Clock = Depends(get_clock),
 ) -> TokenResponse:
-    user = _dev_user_store().get(body.username)
-    if user is None:
+    result = await session.execute(
+        text("SELECT role, org_unit_id, password_hash FROM app_user WHERE name = :name"),
+        {"name": body.username},
+    )
+    row = result.first()
+    if row is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials")
     try:
-        _hasher.verify(user.password_hash, body.password)
+        _hasher.verify(row.password_hash, body.password)
     except VerifyMismatchError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid credentials") from exc
 
-    token = _create_token(user, settings, clock)
+    token = _create_token(body.username, row.role, row.org_unit_id, settings, clock)
     return TokenResponse(access_token=token)
 
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     settings: Settings = Depends(get_settings),
 ) -> CurrentUser:
@@ -100,8 +87,19 @@ def get_current_user(
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid token") from exc
 
-    return CurrentUser(
-        username=payload["sub"],
-        role=payload["role"],
-        org_unit_id=payload["org_unit_id"],
-    )
+    username = payload["sub"]
+    # A short-lived session, not the request-scoped Depends(get_session) —
+    # this runs on every authenticated request (ADR-006's "third cost"), and
+    # holding a connection open for the whole request instead of just this
+    # one lookup starves the pool under concurrency (see
+    # tests/integration/test_pull_cursor.py's 20-way concurrent push).
+    async with async_session_factory() as session:
+        result = await session.execute(
+            text("SELECT id, role, org_unit_id FROM app_user WHERE name = :name"),
+            {"name": username},
+        )
+        row = result.first()
+    if row is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "unknown user")
+
+    return CurrentUser(id=row.id, username=username, role=row.role, org_unit_id=row.org_unit_id)

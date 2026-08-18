@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import BaseModel
 
 
@@ -12,6 +14,7 @@ class TokenResponse(BaseModel):
 
 
 class CurrentUser(BaseModel):
+    id: UUID
     username: str
     role: str
-    org_unit_id: str
+    org_unit_id: UUID

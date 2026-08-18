@@ -30,7 +30,6 @@ services:
       SIM_START: ${SIM_START:-}
       RUN_ID: ${RUN_ID:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      DEV_USERS: ${DEV_USERS:-}
     ports:
       - "8000:8000"
     volumes:

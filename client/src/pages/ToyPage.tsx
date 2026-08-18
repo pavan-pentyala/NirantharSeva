@@ -19,9 +19,9 @@ export default function ToyPage() {
   useEffect(() => {
     let stop: (() => void) | undefined;
     (async () => {
-      // Dev-only auto-login (asha1/dev, see .env.example DEV_USERS). Real
-      // auth is out of scope until the real UI lands in Phase 2+.
-      await login("asha1", "dev");
+      // Dev-only auto-login (asha_a/dev — server/app/seed.py's D4 fixture).
+      // Real auth UI is out of scope until the real screens land in Phase 4.
+      await login("asha_a", "dev");
       stop = startAutoFlush();
       setReady(true);
     })();

@@ -21,10 +21,6 @@ class Settings(BaseSettings):
     run_id: str | None = None
     log_level: str = "INFO"
 
-    # Dev users for the auth stub. Format: "user:pass:role:org_unit_id,..."
-    # Real user table arrives with the Phase 2 schema.
-    dev_users: str = ""
-
 
 @lru_cache
 def get_settings() -> Settings:

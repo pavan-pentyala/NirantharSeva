@@ -10,6 +10,10 @@ Phase 2.1 adds the referral entity alongside the toy model (D1: toy stays
 frozen, unchanged). See docs/decisions/ADR-003.md for the conflict policy
 and app/domain/states.py for the state machine apply_operation dispatches
 into.
+
+Phase 2.2 (docs/decisions/ADR-006.md): who is acting comes from the
+authenticated Actor, resolved server-side — never from op.payload. A
+device cannot be trusted to name its own role, org, or user id.
 """
 
 import json
@@ -21,12 +25,17 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.api.scoping import SUBTREE_CTE, subtree_params
 from app.clock import Clock
 from app.db import acquire_seq_lock
-from app.domain.states import Role, State, may, replay_state
+from app.domain.actor import Actor
+from app.domain.states import State, may, replay_state
+from app.instrumentation.logging import get_logger
 from app.schemas.sync import Op, OpResult, OpStatus
 from app.sync.conflicts import decide
 from app.sync.lamport import merge_lamport
+
+_logger = get_logger(__name__)
 
 
 @dataclass
@@ -52,8 +61,12 @@ async def handle_push(
     ops: Sequence[Op],
     clock: Clock,
     run_id: str | None,
-    actor_role: str = "",
+    actor: Actor | None = None,
 ) -> tuple[list[OpResult], int]:
+    # actor is only required for entity="referral" ops (D6/ADR-006) — toy
+    # pushes (D1, frozen) never read it, so it stays optional here rather
+    # than forcing every toy-only caller (tests/property/test_permutation.py,
+    # tests/integration/test_pull_cursor.py) to fabricate one.
     results: list[OpResult] = []
 
     for op in ops:  # one transaction PER OP, not per batch
@@ -89,7 +102,7 @@ async def handle_push(
             await acquire_seq_lock(s)
 
             # 3. Validate + apply.
-            outcome = await apply_operation(s, op, device_id, clock, run_id, actor_role)
+            outcome = await apply_operation(s, op, device_id, clock, run_id, actor)
 
             # 4. Record the real result — SAME transaction as the effect.
             # detail is JSONB; the asyncpg driver's jsonb codec encodes/decodes
@@ -141,26 +154,19 @@ async def apply_operation(
     device_id: str,
     clock: Clock,
     run_id: str | None,
-    actor_role: str,
+    actor: Actor | None = None,
 ) -> Outcome:
     if op.entity == "toy" and op.operation == "set_value":
         return await _apply_toy_set_value(session, op, device_id, clock, run_id)
     if op.entity == "referral" and op.operation == "create_referral":
-        return await _apply_create_referral(session, op, device_id, clock, run_id, actor_role)
+        return await _apply_create_referral(session, op, device_id, clock, run_id, actor)
     if op.entity == "referral" and op.operation == "transition":
-        return await _apply_referral_transition(session, op, device_id, clock, run_id, actor_role)
+        return await _apply_referral_transition(session, op, device_id, clock, run_id, actor)
     return Outcome(
         status="rejected",
         server_seq=None,
         detail={"reason": f"unsupported entity/operation: {op.entity}/{op.operation}"},
     )
-
-
-def _parse_role(raw: str) -> Role | None:
-    try:
-        return Role(raw)
-    except ValueError:
-        return None
 
 
 async def _apply_toy_set_value(
@@ -266,23 +272,22 @@ async def _append_referral_event(
     referral_id: uuid.UUID,
     from_state: str | None,
     to_state: str,
-    actor_role: str,
+    actor: Actor,
     op: Op,
     device_id: str,
     server_time: Any,
     run_id: str | None,
 ) -> int:
-    # actor_user_id is NULL in Phase 2.1: app_user has no rows yet (real
-    # auth against it arrives in P2.2, plan §6.4). actor_role always comes
-    # from the caller's server-verified identity, never from op.payload —
-    # a device cannot be trusted to name its own role.
+    # actor_user_id and actor_role come from the caller's server-verified
+    # identity, never from op.payload — a device cannot be trusted to name
+    # its own role, org, or user (docs/decisions/ADR-006.md).
     inserted = await session.execute(
         text(
             """INSERT INTO referral_event
                  (id, referral_id, from_state, to_state, actor_user_id, actor_role,
                   device_time, server_time, lamport, op_id, device_id, payload, run_id)
                VALUES
-                 (:id, :referral_id, :from_state, :to_state, NULL, :actor_role,
+                 (:id, :referral_id, :from_state, :to_state, :actor_user_id, :actor_role,
                   :device_time, :server_time, :lamport, :op_id, :device_id,
                   CAST(:payload AS jsonb), :run_id)
                RETURNING seq"""
@@ -292,7 +297,8 @@ async def _append_referral_event(
             "referral_id": referral_id,
             "from_state": from_state,
             "to_state": to_state,
-            "actor_role": actor_role,
+            "actor_user_id": actor.user_id,
+            "actor_role": actor.role.value,
             "device_time": op.device_time,
             "server_time": server_time,
             "lamport": op.lamport,
@@ -305,18 +311,34 @@ async def _append_referral_event(
     return inserted.scalar_one()
 
 
+def _warn_if_payload_claims_org_identity(op: Op, actor: Actor) -> None:
+    """D6: origin_org_id/origin_user_id in the payload are ignored, not
+    rejected — rejecting would turn a stale offline client into a
+    data-loss path. Logged so a disagreement is visible without being
+    fatal."""
+    claimed_org = op.payload.get("origin_org_id")
+    if claimed_org is not None and str(claimed_org) != str(actor.org_unit_id):
+        _logger.warning(
+            "op payload claims a different origin_org_id than the actor's; ignoring it",
+            extra={"op_id": str(op.op_id)},
+        )
+    claimed_user = op.payload.get("origin_user_id")
+    if claimed_user is not None and str(claimed_user) != str(actor.user_id):
+        _logger.warning(
+            "op payload claims a different origin_user_id than the actor's; ignoring it",
+            extra={"op_id": str(op.op_id)},
+        )
+
+
 async def _apply_create_referral(
     session: AsyncSession,
     op: Op,
     device_id: str,
     clock: Clock,
     run_id: str | None,
-    actor_role_raw: str,
+    actor: Actor,
 ) -> Outcome:
-    role = _parse_role(actor_role_raw)
-    if role is None:
-        return Outcome("rejected", None, {"reason": "unknown_role"})
-    if not may(role, State.CREATED):
+    if not may(actor.role, State.CREATED):
         return Outcome("rejected", None, {"reason": "role_not_permitted"})
 
     existing = await session.execute(
@@ -336,6 +358,8 @@ async def _apply_create_referral(
     if patient_exists.first() is None:
         return Outcome("rejected", None, {"reason": "unknown_patient"})
 
+    _warn_if_payload_claims_org_identity(op, actor)
+
     now = clock.now()
     await session.execute(
         text(
@@ -344,13 +368,14 @@ async def _apply_create_referral(
                   reason, priority, current_state, state_entered_at,
                   sla_profile_id, created_device_time, created_server_time)
                VALUES
-                 (:id, :patient_id, NULL, :origin_org_id, :target_org_id,
+                 (:id, :patient_id, :origin_user_id, :origin_org_id, :target_org_id,
                   :reason, :priority, 'CREATED', :now, NULL, :device_time, :now)"""
         ),
         {
             "id": op.entity_id,
             "patient_id": patient_id,
-            "origin_org_id": op.payload.get("origin_org_id"),
+            "origin_user_id": actor.user_id,
+            "origin_org_id": actor.org_unit_id,
             "target_org_id": op.payload.get("target_org_id"),
             "reason": op.payload.get("reason"),
             "priority": op.payload.get("priority"),
@@ -364,7 +389,7 @@ async def _apply_create_referral(
         referral_id=op.entity_id,
         from_state=None,
         to_state=State.CREATED.value,
-        actor_role=actor_role_raw,
+        actor=actor,
         op=op,
         device_id=device_id,
         server_time=now,
@@ -373,26 +398,38 @@ async def _apply_create_referral(
     return Outcome("accepted", seq, None)
 
 
+async def _actor_can_see_referral_origin(
+    session: AsyncSession, actor: Actor, origin_org_id: uuid.UUID
+) -> bool:
+    query = f"{SUBTREE_CTE}\nSELECT 1 FROM subtree WHERE id = :origin_org_id"
+    params = {**subtree_params(actor.org_unit_id), "origin_org_id": origin_org_id}
+    result = await session.execute(text(query), params)
+    return result.first() is not None
+
+
 async def _apply_referral_transition(
     session: AsyncSession,
     op: Op,
     device_id: str,
     clock: Clock,
     run_id: str | None,
-    actor_role_raw: str,
+    actor: Actor,
 ) -> Outcome:
-    role = _parse_role(actor_role_raw)
-    if role is None:
-        return Outcome("rejected", None, {"reason": "unknown_role"})
-
     referral_row = await session.execute(
-        text("SELECT current_state FROM referral WHERE id=:id"), {"id": op.entity_id}
+        text("SELECT current_state, origin_org_id FROM referral WHERE id=:id"),
+        {"id": op.entity_id},
     )
     row = referral_row.first()
     if row is None:
         # ADR-003 "Gap 2" — not one of the five table rows.
         return Outcome("rejected", None, {"reason": "unknown_referral"})
     current_state = State(row.current_state)
+
+    # D6/ADR-006: does this actor have any authority over this referral at
+    # all — checked before the op's own coherence, alongside ADR-003's
+    # rows 1 and 2, and before any lamport reasoning. Writes no event.
+    if not await _actor_can_see_referral_origin(session, actor, row.origin_org_id):
+        return Outcome("rejected", None, {"reason": "outside_org_scope"})
 
     from_state_raw = op.payload.get("from_state")
     to_state_raw = op.payload.get("to_state")
@@ -424,7 +461,7 @@ async def _apply_referral_transition(
     )
 
     decision = decide(
-        actor_role=role,
+        actor_role=actor.role,
         from_state=from_state,
         to_state=to_state,
         current_state=current_state,
@@ -441,7 +478,7 @@ async def _apply_referral_transition(
         referral_id=op.entity_id,
         from_state=from_state.value,
         to_state=to_state.value,
-        actor_role=actor_role_raw,
+        actor=actor,
         op=op,
         device_id=device_id,
         server_time=now,

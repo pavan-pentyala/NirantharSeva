@@ -5,6 +5,13 @@ Same fresh-engine-per-example pattern as tests/property/test_permutation.py
 — app.db's module-level engine is bound to whichever event loop first used
 it, and asyncpg connections cannot cross loops, so reusing it across many
 Hypothesis examples (each its own asyncio.run()) would break.
+
+Calls handle_push() directly — no client, no login, no JWT — so it builds
+its own Actor by looking up the seeded asha_a / mo1 rows (server/app/seed.py)
+by name, exactly like get_current_user does against a real request. This
+test has no reference to authentication otherwise, which is exactly why
+it is in scope for docs/decisions/ADR-006.md's actor-threading change (see
+docs/PHASE2_PLAN.md, "the one that gets missed").
 """
 
 import asyncio
@@ -15,10 +22,11 @@ from hypothesis import given
 from hypothesis import settings as hyp_settings
 from hypothesis import strategies as st
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.clock import RealClock
 from app.config import get_settings
+from app.domain.actor import Actor
 from app.domain.states import TRANSITIONS, Role, State, replay_state
 from app.schemas.sync import Op
 from app.sync.push import handle_push
@@ -36,6 +44,19 @@ _ROLE_FOR_STATE = {
     State.BACK_REFERRED: Role.MO,
     State.CLOSED: Role.ASHA,
 }
+_USERNAME_FOR_ROLE = {Role.ASHA: "asha_a", Role.MO: "mo1"}
+
+
+async def _actor_for(session_factory: async_sessionmaker[AsyncSession], role: Role) -> Actor:
+    username = _USERNAME_FOR_ROLE[role]
+    async with session_factory() as s:
+        row = (
+            await s.execute(
+                text("SELECT id, org_unit_id FROM app_user WHERE name = :name"),
+                {"name": username},
+            )
+        ).one()
+    return Actor(user_id=row.id, role=role, org_unit_id=row.org_unit_id)
 
 
 async def _run_walk(path: list[State]) -> tuple[State | None, State | None]:
@@ -56,6 +77,7 @@ async def _run_walk(path: list[State]) -> tuple[State | None, State | None]:
                 {"id": patient_id, "now": DEVICE_TIME},
             )
 
+        asha_actor = await _actor_for(session_factory, Role.ASHA)
         create_op = Op(
             op_id=uuid.uuid4(),
             entity="referral",
@@ -65,7 +87,7 @@ async def _run_walk(path: list[State]) -> tuple[State | None, State | None]:
             lamport=1,
             device_time=DEVICE_TIME,
         )
-        await handle_push(session_factory, "d-1", [create_op], RealClock(), None, Role.ASHA.value)
+        await handle_push(session_factory, "d-1", [create_op], RealClock(), None, asha_actor)
 
         for i, (frm, to) in enumerate(zip(path, path[1:], strict=False), start=2):
             op = Op(
@@ -77,9 +99,8 @@ async def _run_walk(path: list[State]) -> tuple[State | None, State | None]:
                 lamport=i,
                 device_time=DEVICE_TIME,
             )
-            results, _ = await handle_push(
-                session_factory, "d-1", [op], RealClock(), None, _ROLE_FOR_STATE[to].value
-            )
+            actor = await _actor_for(session_factory, _ROLE_FOR_STATE[to])
+            results, _ = await handle_push(session_factory, "d-1", [op], RealClock(), None, actor)
             assert results[0].status == "accepted", results[0]
 
         async with session_factory() as s:
