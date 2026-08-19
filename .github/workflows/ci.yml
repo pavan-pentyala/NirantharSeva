@@ -82,6 +82,10 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     needs: [server, client]
+    # Safeguard, not a tuning knob: a normal run finishes in a few minutes.
+    # Bounds a hung step (the playwright install step below explains one
+    # known cause) to a clear failure instead of a silent multi-hour stall.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       # npm ci and the Playwright browser install run BEFORE `docker compose
@@ -102,7 +106,16 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - working-directory: client
         run: npm ci
+      # --with-deps runs apt-get under the hood. Recent Ubuntu runner images
+      # ship needrestart, which can pop an interactive "restart services?"
+      # prompt during that apt-get — with no TTY attached, apt just blocks
+      # forever waiting for a keypress that never comes, and the step hangs
+      # with no error output rather than failing. Both env vars force
+      # non-interactive apt.
       - working-directory: client
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          NEEDRESTART_MODE: a
         run: npx playwright install --with-deps chromium
       - run: cp .env.example .env
       - run: docker compose up -d --build
