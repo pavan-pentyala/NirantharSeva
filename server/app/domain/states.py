@@ -4,7 +4,7 @@ No database imports. No framework imports. Nothing but enums, dicts, and
 one replay function — this is the module unit-tested hardest.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from enum import StrEnum
 
 
@@ -68,12 +68,11 @@ def may(role: Role, to: State) -> bool:
     return role in GUARDS[to]
 
 
-def replay_state(
+def replay_steps(
     events: Iterable[tuple[State | None, State, int, str]],
-) -> tuple[State | None, int, str | None]:
-    """Reconstruct (current_state, current_lamport, winning_op_id) by
-    replaying an ordered (seq ASC) sequence of
-    (from_state, to_state, lamport, op_id) events.
+) -> Iterator[tuple[bool, State | None, int, str | None]]:
+    """Per event, in input order: (advanced, state_after, lamport_after,
+    winning_op_id_after) — the fold I3 and the timeline both rest on.
 
     An event advances the running state only when its from_state matches
     the state so far — exactly row 3 of the conflict table
@@ -85,17 +84,36 @@ def replay_state(
     initial running state of None, so referral creation needs no special
     case here.
 
-    This is the function invariant I3 rests on: current_state is always
-    derivable by replaying the event log. apply_operation calls this before
-    every transition to find "the current lamport"; the P3 replay endpoint
-    calls it to verify the cache against the log independently.
+    This is the fold I3 rests on: current_state is always derivable by
+    replaying the event log. replay_state (below) folds this to a single
+    end result; app/verify_replay.py and the referral timeline endpoint
+    consume the per-event flag directly, so neither has to re-derive
+    "frm == state" on its own — see docs/decisions/ADR-008.md.
     """
     state: State | None = None
     lamport = 0
     winning_op_id: str | None = None
     for frm, to, ev_lamport, op_id in events:
-        if frm == state:
-            state = to
-            lamport = ev_lamport
-            winning_op_id = op_id
-    return state, lamport, winning_op_id
+        advanced = frm == state
+        if advanced:
+            state, lamport, winning_op_id = to, ev_lamport, op_id
+        yield advanced, state, lamport, winning_op_id
+
+
+def replay_state(
+    events: Iterable[tuple[State | None, State, int, str]],
+) -> tuple[State | None, int, str | None]:
+    """Reconstruct (current_state, current_lamport, winning_op_id) by
+    replaying an ordered (seq ASC) sequence of
+    (from_state, to_state, lamport, op_id) events. A thin fold over
+    replay_steps — see its docstring for the rule.
+
+    apply_operation calls this before every transition to find "the
+    current lamport"; python -m app.verify_replay calls it to verify the
+    cache against the log independently, over every referral in the
+    database.
+    """
+    result: tuple[State | None, int, str | None] = (None, 0, None)
+    for _advanced, state, lamport, winning_op_id in replay_steps(events):
+        result = (state, lamport, winning_op_id)
+    return result

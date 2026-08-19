@@ -1,9 +1,19 @@
-"""is_legal / may across all 8 states x 5 roles, plus replay_state. Plan
-§6.2 and §6.5, docs/decisions/ADR-003.md."""
+"""is_legal / may across all 8 states x 5 roles, plus replay_state and
+replay_steps. Plan §6.2 and §6.5, docs/decisions/ADR-003.md and
+docs/decisions/ADR-008.md."""
 
 import pytest
 
-from app.domain.states import GUARDS, TRANSITIONS, Role, State, is_legal, may, replay_state
+from app.domain.states import (
+    GUARDS,
+    TRANSITIONS,
+    Role,
+    State,
+    is_legal,
+    may,
+    replay_state,
+    replay_steps,
+)
 
 ALL_STATES = list(State)
 ALL_ROLES = list(Role)
@@ -85,3 +95,35 @@ class TestReplayState:
         assert state is State.IN_TRANSIT
         assert lamport == 2
         assert op_id == "op-2"
+
+
+class TestReplaySteps:
+    def test_advancement_flag_per_event_including_a_middle_non_advancer(self):
+        # Same log as the skipped-event case above, but this asserts the
+        # per-event flag ADR-008's timeline reads, not just the fold result.
+        events = [
+            (None, State.CREATED, 1, "op-1"),
+            (State.CREATED, State.IN_TRANSIT, 2, "op-2"),
+            (State.CREATED, State.IN_TRANSIT, 0, "op-stale"),
+            (State.IN_TRANSIT, State.ARRIVED, 3, "op-3"),
+        ]
+        steps = list(replay_steps(events))
+
+        assert [advanced for advanced, *_ in steps] == [True, True, False, True]
+
+        # The non-advancing step's state/lamport/winner are the running
+        # values carried over from before it — not None/0/None, and not
+        # anything derived from the event that was skipped.
+        assert steps[2] == (False, State.IN_TRANSIT, 2, "op-2")
+        assert steps[3] == (True, State.ARRIVED, 3, "op-3")
+
+    def test_empty_log_yields_no_steps(self):
+        assert list(replay_steps([])) == []
+
+    def test_replay_state_is_the_last_step_folded(self):
+        events = [
+            (None, State.CREATED, 1, "op-1"),
+            (State.CREATED, State.IN_TRANSIT, 2, "op-2"),
+        ]
+        *_, last = replay_steps(events)
+        assert replay_state(events) == last[1:]
