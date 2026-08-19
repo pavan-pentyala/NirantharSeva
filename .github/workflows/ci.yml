@@ -55,6 +55,7 @@ jobs:
       - run: uv run alembic upgrade head
       - run: uv run python -m app.seed
       - run: uv run pytest
+      - run: uv run python -m app.verify_replay
 
   client:
     runs-on: ubuntu-latest
