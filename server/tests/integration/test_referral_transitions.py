@@ -219,3 +219,34 @@ async def test_conflict_writes_both_rows_and_leaves_current_state_untouched(
         c = conflict_row.one()
         assert str(c.winning_op_id) == accepted["op_id"]
         assert str(c.losing_op_id) == conflicting_op["op_id"]
+
+
+async def test_i3_divergence_is_logged_not_asserted_and_the_request_still_succeeds(
+    client, auth_headers, patient_id
+):
+    """Hardening (docs/decisions/ADR-007.md): a current_state cache that
+    disagrees with the replayed event log used to crash the write path
+    with a bare AssertionError — an unhandled 500 that rolled back a
+    legitimate write because of pre-existing corruption. It is now a
+    structured ERROR log, and the request completes normally. The real
+    detector for this condition is app/verify_replay.py, not this path."""
+    entity_id = uuid.uuid4()
+    await _push_accepted(client, auth_headers, "d-asha", _create_op(entity_id, patient_id, 1))
+
+    # Corrupt the cache directly, bypassing the event log entirely — the
+    # exact condition I3 forbids.
+    async with async_session_factory() as session, session.begin():
+        await session.execute(
+            text("UPDATE referral SET current_state = 'IN_TRANSIT' WHERE id=:id"),
+            {"id": entity_id},
+        )
+
+    result = await _push(
+        client, auth_headers, "d-asha", _transition_op(entity_id, "CREATED", "IN_TRANSIT", 2)
+    )
+    # The corrupted cache (IN_TRANSIT) disagrees with from_state (CREATED),
+    # and the incoming lamport (2) beats the log's replayed lamport (1) —
+    # row 5 of the conflict table, same as a genuine two-device conflict.
+    # The point of this test is that this decision is reached at all,
+    # rather than the request 500ing.
+    assert result["status"] == "conflict"

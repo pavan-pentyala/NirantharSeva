@@ -443,12 +443,18 @@ async def _apply_referral_transition(
         return Outcome("rejected", None, {"reason": "unknown_state"})
 
     replayed_state, current_lamport, winning_op_id = await replay_referral(session, op.entity_id)
-    # Sanity check, not a substitute for the cache (I3): the log and the
-    # cache must already agree, or something upstream already broke I3.
-    assert replayed_state == current_state, (
-        f"current_state cache ({current_state}) disagrees with the replayed "
-        f"event log ({replayed_state}) for referral {op.entity_id} — I3 violated"
-    )
+    # Live I3 alarm, not a substitute for the cache: the log and the cache
+    # must already agree, or something upstream already broke I3. Logged
+    # rather than raising (docs/decisions/ADR-007.md) — an AssertionError
+    # here would roll back a legitimate write because of pre-existing
+    # corruption, and python -O strips a bare `assert` statement outright.
+    # The write continues with the cached current_state;
+    # app/verify_replay.py is the real detector for this condition.
+    if replayed_state != current_state:
+        _logger.error(
+            "current_state cache disagrees with the replayed event log — I3 violated",
+            extra={"referral_id": str(op.entity_id), "op_id": str(op.op_id)},
+        )
 
     decision = decide(
         actor_role=actor.role,
