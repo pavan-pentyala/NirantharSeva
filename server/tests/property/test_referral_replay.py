@@ -27,8 +27,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.clock import RealClock
 from app.config import get_settings
 from app.domain.actor import Actor
-from app.domain.states import TRANSITIONS, Role, State, replay_state
+from app.domain.states import TRANSITIONS, Role, State
 from app.schemas.sync import Op
+from app.sync.event_log import replay_referral
 from app.sync.push import handle_push
 
 DEVICE_TIME = datetime(2026, 8, 10, 9, 0, tzinfo=UTC)
@@ -109,23 +110,7 @@ async def _run_walk(path: list[State]) -> tuple[State | None, State | None]:
             )
             cached_state = State(cache_row.scalar_one())
 
-            log_row = await s.execute(
-                text(
-                    """SELECT from_state, to_state, lamport, op_id FROM referral_event
-                       WHERE referral_id=:id ORDER BY seq ASC"""
-                ),
-                {"id": entity_id},
-            )
-            triples = [
-                (
-                    State(r.from_state) if r.from_state else None,
-                    State(r.to_state),
-                    r.lamport,
-                    str(r.op_id),
-                )
-                for r in log_row
-            ]
-        replayed_state, _, _ = replay_state(triples)
+            replayed_state, _, _ = await replay_referral(s, entity_id)
 
         return cached_state, replayed_state
     finally:

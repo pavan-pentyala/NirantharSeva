@@ -29,10 +29,11 @@ from app.api.scoping import SUBTREE_CTE, subtree_params
 from app.clock import Clock
 from app.db import acquire_seq_lock
 from app.domain.actor import Actor
-from app.domain.states import State, may, replay_state
+from app.domain.states import State, may
 from app.instrumentation.logging import get_logger
 from app.schemas.sync import Op, OpResult, OpStatus
 from app.sync.conflicts import decide
+from app.sync.event_log import replay_referral
 from app.sync.lamport import merge_lamport
 
 _logger = get_logger(__name__)
@@ -441,18 +442,7 @@ async def _apply_referral_transition(
     except ValueError:
         return Outcome("rejected", None, {"reason": "unknown_state"})
 
-    history = await session.execute(
-        text(
-            """SELECT from_state, to_state, lamport, op_id FROM referral_event
-               WHERE referral_id=:id ORDER BY seq ASC"""
-        ),
-        {"id": op.entity_id},
-    )
-    triples = [
-        (State(r.from_state) if r.from_state else None, State(r.to_state), r.lamport, str(r.op_id))
-        for r in history
-    ]
-    replayed_state, current_lamport, winning_op_id = replay_state(triples)
+    replayed_state, current_lamport, winning_op_id = await replay_referral(session, op.entity_id)
     # Sanity check, not a substitute for the cache (I3): the log and the
     # cache must already agree, or something upstream already broke I3.
     assert replayed_state == current_state, (
