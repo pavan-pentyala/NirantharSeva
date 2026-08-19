@@ -1,6 +1,8 @@
 # Phase 3 plan — hardening, replay verification, timeline
 
-**Status:** Planned, not started. ADR-007 and ADR-008 written 2026-08-18.
+**Status:** Complete. All 18 exit criteria below met, CI green on all four
+jobs. Built 2026-08-19, commits `110d2b2`..`dc20b52` on `main`. ADR-007 and
+ADR-008 written 2026-08-18.
 **Source of truth for *what*:** `docs/IMPLEMENTATION_PLAN.md` §7. That section is
 eight lines long, has no subsections, and — alone among the build phases — **no
 exit criteria**. This file supplies what it leaves out, and marks every override
@@ -355,36 +357,36 @@ the ask list), then add `0005`. Never edit `0004`.
 
 Plan §7 provides none. These are Phase 3's.
 
-- [ ] `docker compose run --rm api python -m app.verify_replay` exits **0** on a
+- [x] `docker compose run --rm api python -m app.verify_replay` exits **0** on a
       freshly seeded database and prints the referral and event counts checked
-- [ ] The identical `verify_all()` is called by a pytest test, and a second test
+- [x] The identical `verify_all()` is called by a pytest test, and a second test
       proves it **detects** a deliberately corrupted `current_state`
-- [ ] A referral with zero events is **reported as a violation**, not skipped
-- [ ] `verify_replay` runs in CI's `server` job after `pytest`, green
-- [ ] `GET /referrals/{id}/timeline` returns every event in `seq` order, each with
+- [x] A referral with zero events is **reported as a violation**, not skipped
+- [x] `verify_replay` runs in CI's `server` job after `pytest`, green
+- [x] `GET /referrals/{id}/timeline` returns every event in `seq` order, each with
       `advanced`, plus `current_state` and `replayed_state`
-- [ ] The timeline returns **404, never 403**, outside the caller's subtree —
+- [x] The timeline returns **404, never 403**, outside the caller's subtree —
       tested for `asha_a` against Village B, and for an unknown UUID
-- [ ] `grep -rn "frm == state" server/app/` returns **exactly one line**
-- [ ] `push.py`, the verifier, the timeline and `test_referral_replay.py` all go
+- [x] `grep -rn "frm == state" server/app/` returns **exactly one line**
+- [x] `push.py`, the verifier, the timeline and `test_referral_replay.py` all go
       through `app/sync/event_log.py`
-- [ ] `grep -rn "assert " server/app/sync/push.py` returns nothing; the I3
+- [x] `grep -rn "assert " server/app/sync/push.py` returns nothing; the I3
       divergence path is a structured ERROR log, with a test proving the request
       still succeeds
-- [ ] `python scripts/demo_walk.py` drives a real walk through `/sync/push`,
+- [x] `python scripts/demo_walk.py` drives a real walk through `/sync/push`,
       produces exactly one `conflict` and one `accepted_stale` through
       `conflicts.py`, and asserts every step's status
-- [ ] A second demo run changes **no** row counts — because every op replays from
+- [x] A second demo run changes **no** row counts — because every op replays from
       its receipt (I1), not because of a guard
-- [ ] An integration test pins the demo's shape, including the `sync_conflict` row
-- [ ] A `request_timing` row is written for a timeline request
-- [ ] `scoping.py`'s docstring enumerates all five call sites; `replay_state`'s no
+- [x] An integration test pins the demo's shape, including the `sync_conflict` row
+- [x] A `request_timing` row is written for a timeline request
+- [x] `scoping.py`'s docstring enumerates all five call sites; `replay_state`'s no
       longer says "endpoint"
-- [ ] ADR-007 and ADR-008 written and Accepted
-- [ ] **No new migration** — `alembic heads` is still `0004`
-- [ ] `ruff check .` and `ruff format --check .` clean; full suite green
-- [ ] CI green on all four jobs
-- [ ] One cold-start pass done end to end, with the command list in `PROGRESS.md`
+- [x] ADR-007 and ADR-008 written and Accepted
+- [x] **No new migration** — `alembic heads` is still `0004`
+- [x] `ruff check .` and `ruff format --check .` clean; full suite green
+- [x] CI green on all four jobs
+- [x] One cold-start pass done end to end, with the command list in `PROGRESS.md`
 
 Explicitly **not** an exit criterion, per D9: any live-demo rehearsal.
 

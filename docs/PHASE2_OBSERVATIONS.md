@@ -164,3 +164,155 @@ worse than a blunt matcher plus this note.
 | 8, 9 | ADR-006 — server-derived org identity; its "third cost", now measured |
 | 6, 7 | No ADR — test-design lessons, recorded only here |
 | 12 | ADR-001 — the injected clock; this is about its CI enforcement, not the rule |
+
+---
+
+# Phase 3 — implementation observations
+
+**Status:** Phase 3 complete (`110d2b2` through `2ff889a`), CI green. Built on
+Sonnet in one session, in the order `docs/PHASE3_PLAN.md` gives.
+
+**What this section is for:** the same as the Phase 2 section above — things
+learned building Phase 3 that are not derivable from the code, the ADRs, or the
+git history. This file is append-only per phase; this section never rewrites
+the Phase 2 content above it.
+
+---
+
+## Grep-based exit criteria are adversarial to the same file's own prose
+
+**13. A grep-based exit criterion counts your explanatory comments as matches
+of the thing they're explaining.** Two separate instances this phase, same
+root cause as observation 12's clock-discipline trap, worth generalising
+explicitly now that it has bitten twice more:
+
+- The exit criterion `grep -rn "frm == state" server/app/` returning exactly
+  one line broke the first time it was written, because
+  `app/domain/states.py`'s own docstring *quoted* the rule it was documenting
+  — `replay_steps`'s docstring said the timeline and the verifier don't have
+  to "re-derive `frm == state` on their own," which is itself a second textual
+  match. Fixed by describing the rule instead of quoting its exact source
+  text: "the advancement rule appears exactly once."
+- The exit criterion `grep -rn "assert " server/app/sync/push.py` returning
+  nothing broke the same way: the comment explaining *why* the bare `assert`
+  was removed said "python -O deletes a bare assert outright" — an ordinary
+  English sentence that happens to contain the literal substring `assert `
+  (the word followed by a space). Fixed by putting a backtick immediately
+  after the word (`` `assert` outright``) so the character after `t` is a
+  backtick, not a space, and by preferring "assertion" / "AssertionError"
+  elsewhere, since `assert` immediately followed by a letter never matches
+  `"assert "`.
+
+**The general rule:** before writing a comment or docstring near code a CI
+grep inspects, check whether the sentence you are about to write contains the
+literal pattern the grep is hunting for. A substring grep cannot tell
+"the code does X" from "this comment explains that the code does X" — both
+are text in the same file. This is exactly observation 12's clock-discipline
+lesson, generalised: it is not specific to `datetime.now(`, it is a property
+of every substring-match CI gate in this repository.
+
+---
+
+## The timeline's "zero events is 404, indistinguishable from out-of-scope" property is a query-shape decision, not a behaviour you can bolt on after
+
+**14. A two-query implementation of the timeline endpoint — a separate
+visibility check, then a separate events fetch — cannot produce the
+"zero-events looks like out-of-scope" property ADR-008 asks for.** The first
+draft of `GET /referrals/{id}/timeline` ran `SELECT current_state FROM
+referral WHERE id = :id AND origin_org_id IN subtree` to decide 404-or-not,
+then a second query for the events. That visibility query succeeds for a
+referral that exists, is in scope, and has zero events — it never joins
+`referral_event` at all — so a zero-event referral would return `200` with an
+empty `events` list, not the `404` ADR-008 specifies. The property only
+falls out of a **single** query: an `INNER JOIN` of `referral` to
+`referral_event`, filtered by the subtree predicate and `id`, in one round
+trip. Zero rows come back for three different reasons — doesn't exist, out of
+scope, or exists-but-zero-events — and all three are genuinely
+indistinguishable to the caller, by construction, because there is only one
+query and it only produces rows when both a referral row and at least one
+event row exist together.
+
+This was caught before it shipped (no test had to fail to find it — reading
+ADR-008's own alternatives table against the draft query was enough), but it
+is worth recording because the ADR describes the *outcome* precisely without
+spelling out that the outcome constrains the query to exactly one shape. A
+future reader implementing something similar from the ADR's prose alone could
+write the same two-query version and have every test pass except the one
+nobody thought to write: a referral that exists, is visible, and has zero
+events.
+
+---
+
+## Environment
+
+**15. A persistent Docker volume across many manual `pytest` runs in one
+session eventually breaks tests that assume a page holds everything.**
+Observation 2 (Phase 2) already established "cold-start every migration
+before believing it" for schema changes; this generalises it to test *data*.
+`tests/integration/test_org_scoping.py` has two tests that push one event and
+then assert it appears in `GET /sync/pull?since=0&limit=1000` — correct
+against a fixture-sized database, but this session ran the full suite
+manually against the same `nirantharseva_test` database close to a dozen
+times while iterating on Phase 3 (no `down -v` between runs, since that would
+have thrown away the running dev stack too), and `toy_event` alone
+accumulated past 1200 rows. Both tests then false-failed: not because
+anything in Phase 3 broke pull scoping, but because their own event fell
+outside the first 1000 rows of an already-1200-row table. `docker compose
+exec db psql -U postgres -c "DROP DATABASE nirantharseva_test;" -c "CREATE
+DATABASE nirantharseva_test;"` resets just the test database — cheap, and
+does not disturb the running dev stack the way `docker compose down -v`
+would. Do this before trusting any red run that touches `/sync/pull`'s
+`limit`, if the same test database has been reused across more than a
+handful of manual suite runs.
+
+---
+
+## A judgement call on an ambiguous instruction, recorded so it can be checked
+
+**16. Build-order step 3 ("replace the bare `assert` in `push.py` with a
+structured ERROR log") is listed among "steps 1–4 change no externally
+visible behaviour," but the exit criteria for that same step require a new
+test proving the corrupted-cache request now succeeds instead of 500ing —
+which is itself the externally visible behaviour change the step exists to
+make.** Read literally, "no test edits other than rewiring
+`test_referral_replay.py`" would forbid the very test the exit criteria
+demand. Resolved by reading "no test edits" as protecting the 168 pre-Phase-3
+tests from being altered to paper over a regression, not as forbidding a
+new, purpose-built test for a newly introduced code path — no existing test
+was touched, one new test was added
+(`test_i3_divergence_is_logged_not_asserted_and_the_request_still_succeeds`
+in `tests/integration/test_referral_transitions.py`), and the full
+pre-existing 168 stayed green throughout. Flagged to the user at the time
+this call was made, not decided silently.
+
+---
+
+## CI infrastructure — a hang unrelated to any Phase 3 code
+
+**17. `npx playwright install --with-deps chromium` can hang forever on a
+GitHub-hosted Ubuntu runner, with no error, because `--with-deps` runs
+`apt-get install` under the hood and a recent runner image ships
+`needrestart`, which can pop an interactive "which services should be
+restarted?" prompt during that install.** With no TTY attached, `apt-get`
+just blocks waiting for a keypress that will never arrive — the step shows
+"in progress" indefinitely rather than failing. This hit three consecutive
+`e2e` runs in this session, each for 20+ minutes before being cancelled by
+hand, on a workflow step neither Phase 3 nor any recent session touched — the
+`e2e` job's Playwright step has existed since Phase 0/1. Nothing about this
+is specific to this repository; it is a property of the current GitHub
+Actions Ubuntu image plus this particular install command.
+
+Fixed by setting `DEBIAN_FRONTEND=noninteractive` and `NEEDRESTART_MODE=a` as
+env vars on that one step (`.github/workflows/ci.yml`, commit `dc20b52`),
+which forces non-interactive `apt-get` and removes the prompt entirely — the
+next run finished the same step in under two minutes. A `timeout-minutes: 15`
+was also added at the job level, not as the fix, but so that *any* future
+hang (this cause or another) fails within fifteen minutes with a clear
+timeout error instead of silently consuming CI minutes for hours and leaving
+whoever is watching to notice by hand, the way this one was noticed.
+
+**The general rule:** a CI step that shows "in progress" for far longer than
+its historical duration, with zero new log output, is not "slow" — it is
+hung, and retrying without a `timeout-minutes` guard just repeats the same
+silent multi-hour wait. Add the timeout first, so the *next* hang (from
+whatever cause) announces itself.
