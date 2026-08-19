@@ -9,6 +9,8 @@ count drifts and a list can be checked — if you add one, add it here:
 4. app/sync/push.py::_actor_can_see_referral_origin — the write path needs
    the same subtree test the read path uses (D6, added after ADR-005 was
    written; see docs/PHASE2_OBSERVATIONS.md #11)
+5. GET /referrals/{id}/timeline (app/api/referrals.py::get_referral_timeline,
+   docs/decisions/ADR-008.md)
 
 Returns a SQL fragment plus params — never a materialised Python list of
 ids (ADR-005: a second round trip, a silent truncation risk, and a

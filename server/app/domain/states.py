@@ -87,8 +87,9 @@ def replay_steps(
     This is the fold I3 rests on: current_state is always derivable by
     replaying the event log. replay_state (below) folds this to a single
     end result; app/verify_replay.py and the referral timeline endpoint
-    consume the per-event flag directly, so neither has to re-derive
-    "frm == state" on its own — see docs/decisions/ADR-008.md.
+    consume the per-event flag directly, so neither has to re-derive the
+    advancement rule on its own — see docs/decisions/ADR-008.md, whose
+    exit criterion is that this rule appears exactly once under app/.
     """
     state: State | None = None
     lamport = 0
