@@ -10,16 +10,23 @@ built. See `docs/IMPLEMENTATION_PLAN.md` for what is being built.
 
 ```bash
 cp .env.example .env
-make up
+docker compose up --build
 ```
 
 - API: http://localhost:8000/health
 - Client: http://localhost:5173
 
+`Makefile` documents these as `make up` / `make test` / etc., but `make`
+itself is not installed on the reference dev machine — run the
+`docker compose` commands directly, or use the Makefile as a command
+reference on a machine that has `make`.
+
 ## Test it
 
 ```bash
-make test
+docker compose run --rm \
+  -e DATABASE_URL=postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test \
+  api sh -c "alembic upgrade head && pytest"
 ```
 
 Runs against a separate `nirantharseva_test` database — never against dev data.
