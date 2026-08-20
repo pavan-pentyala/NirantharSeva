@@ -1,0 +1,8 @@
+.marker {
+  padding: 7px 16px;
+  text-align: center;
+  font-size: var(--text-demo-marker);
+  color: var(--ink-500);
+  background: var(--sheet-2);
+  border-bottom: 1px solid var(--hairline);
+}

@@ -1,0 +1,48 @@
+.band {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  gap: 11px;
+}
+.grey {
+  background: var(--sheet-2);
+}
+.amber {
+  background: var(--waiting-bg);
+  border-bottom-color: var(--waiting-border);
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex: none;
+}
+.dotGrey {
+  background: #0b553c;
+}
+.dotAmber {
+  background: var(--waiting-text);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.status {
+  font-size: 15.5px;
+  font-weight: 650;
+}
+.detail {
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--ink-700);
+}
+.time {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink-500);
+  padding-top: 2px;
+}

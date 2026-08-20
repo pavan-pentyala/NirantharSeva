@@ -1,0 +1,63 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-label);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.created {
+  background: var(--state-created-bg);
+  color: var(--state-created-text);
+}
+.intransit {
+  background: var(--state-intransit-bg);
+  color: var(--state-intransit-text);
+}
+.arrived {
+  background: var(--state-arrived-bg);
+  color: var(--state-arrived-text);
+}
+.treated {
+  background: var(--state-treated-bg);
+  color: var(--state-treated-text);
+}
+.backreferred {
+  background: var(--state-backreferred-bg);
+  color: var(--state-backreferred-text);
+}
+
+.overdue {
+  background: var(--alert);
+  color: #fff;
+  font-weight: 700;
+  padding: 7px 14px 7px 10px;
+}
+.bangMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--alert);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.closed {
+  background: #fff;
+  border: 1.5px solid var(--done-outline);
+  color: var(--done-outline);
+  padding: 6px 14px;
+}
+.lost {
+  background: #fff;
+  border: 1.5px solid var(--lost-outline);
+  color: var(--lost-outline);
+  padding: 6px 14px;
+}
