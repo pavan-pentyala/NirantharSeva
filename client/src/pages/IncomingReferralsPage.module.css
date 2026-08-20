@@ -80,9 +80,14 @@
 .card {
   padding: 18px var(--space-6);
   border-bottom: 1px solid var(--hairline);
+  border-left: 4px solid transparent;
   display: flex;
   align-items: center;
   gap: 20px;
+}
+.cardOverdue {
+  padding-left: calc(var(--space-6) - 4px);
+  border-left-color: var(--alert);
 }
 .cardMain {
   flex: 1;

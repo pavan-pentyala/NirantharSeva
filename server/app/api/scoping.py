@@ -11,6 +11,9 @@ count drifts and a list can be checked — if you add one, add it here:
    written; see docs/PHASE2_OBSERVATIONS.md #11)
 5. GET /referrals/{id}/timeline (app/api/referrals.py::get_referral_timeline,
    docs/decisions/ADR-008.md)
+6. GET /dashboard and GET /dashboard/stream (app/api/dashboard.py::_fetch_snapshot,
+   docs/PHASE5_PLAN.md P5.2) — both queries in that one function, stats and
+   the overdue list alike
 
 Returns a SQL fragment plus params — never a materialised Python list of
 ids (ADR-005: a second round trip, a silent truncation risk, and a

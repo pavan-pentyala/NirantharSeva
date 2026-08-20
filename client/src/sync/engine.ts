@@ -270,7 +270,7 @@ async function applyPulledReferralEvent(e: api.EventOut): Promise<void> {
     from_state: fromState,
     to_state: e.payload.to_state as string,
     actor_role: e.payload.actor_role as string,
-    actor_user_id: e.payload.actor_user_id as string,
+    actor_user_id: (e.payload.actor_user_id as string | null | undefined) ?? null,
     device_time: e.device_time,
     server_time: e.server_time,
   });

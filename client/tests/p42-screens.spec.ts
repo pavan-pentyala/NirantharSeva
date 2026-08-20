@@ -100,10 +100,8 @@ test("ASHA creates a referral offline, it appears in the list and detail after r
   await expect(treatedCard).toBeVisible({ timeout: 15_000 });
   await moContext.close();
 
-  // Placeholders — reachable, not 404s.
-  await page.goto("/supervisor");
-  await expect(page.getByText("Coming in Phase 5")).toBeVisible();
-  await page.screenshot({ path: path.join(SCREENSHOT_DIR, "screen4-supervisor-placeholder.png") });
+  // Placeholder — reachable, not a 404. /supervisor is a real screen since
+  // P5.2 (client/tests/dashboard.spec.ts covers it).
   await page.goto("/identity-review");
   await expect(page.getByText("Coming in Phase 6")).toBeVisible();
   await page.screenshot({ path: path.join(SCREENSHOT_DIR, "screen6-identity-review-placeholder.png") });

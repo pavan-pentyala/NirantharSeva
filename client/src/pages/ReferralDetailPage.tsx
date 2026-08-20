@@ -2,9 +2,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { DemoMarker } from "../components/DemoMarker";
 import { StatePill } from "../components/StatePill";
 import { db } from "../db/schema";
+import { displayStateFromEvents } from "../domain/displayState";
 import { formatAgeSex } from "../domain/formatAgeSex";
 import { ashaActionFor, ashaWaitingCopyFor } from "../domain/referralActions";
-import { stateLabel } from "../domain/stateLabels";
 import { relativeTimeSince } from "../domain/relativeTime";
 import { timelineAttribution, timelineEntryLabel, timelineTimestamp } from "../domain/timeline";
 import { useLiveQuery } from "../hooks/useLiveQuery";
@@ -29,10 +29,10 @@ export default function ReferralDetailPage() {
     );
   }
 
-  const { family } = stateLabel(referral.current_state);
-  const overdue = family === "overdue";
-  const action = ashaActionFor(referral.current_state);
-  const waitingCopy = ashaWaitingCopyFor(referral.current_state);
+  const overdue = referral.current_state === "ESCALATED";
+  const displayState = displayStateFromEvents(referral.current_state, events);
+  const action = ashaActionFor(displayState);
+  const waitingCopy = ashaWaitingCopyFor(displayState);
 
   async function handleAction() {
     if (!action || !referral) return;
@@ -59,7 +59,7 @@ export default function ReferralDetailPage() {
               .join(" · ")}
           </div>
           <div className={styles.pillRow}>
-            <StatePill state={referral.current_state} />
+            <StatePill state={displayState} overdue={overdue} />
             <span className={styles.sinceLine}>since {relativeTimeSince(referral.updated_at)} ago</span>
           </div>
           {overdue && (

@@ -57,14 +57,16 @@ export interface PatientCacheRow {
  * happened" timeline reads only from here, never a live API call (brief
  * §8: the interface reads only from the local cache). Losing/stale events
  * are deliberately not cached here, same as they're not folded into
- * referral_cache (D14) — the design's timeline never shows them either. */
+ * referral_cache (D14) — the design's timeline never shows them either.
+ * actor_user_id is nullable since P5.1 (docs/PHASE5_PLAN.md "Traps"): a
+ * SYSTEM-authored escalation event has no acting user. */
 export interface ReferralEventCacheRow {
   seq: number;
   referral_id: string;
   from_state: string | null;
   to_state: string;
   actor_role: string;
-  actor_user_id: string;
+  actor_user_id: string | null;
   device_time: string;
   server_time: string;
 }
@@ -81,6 +83,38 @@ export interface OrgCacheRow {
   parent_id: string | null;
 }
 
+/** P5.2: Screen 4's stat strip, written by client/src/sync/dashboardStream.ts
+ * on every SSE message — a single row under the fixed key "current", the
+ * same one-row-table pattern app/db/meta.ts's sync_meta already uses.
+ * Mirrors app/schemas/dashboard.py's DashboardStats field-for-field. */
+export interface DashboardStatsCacheRow {
+  key: "current";
+  open: number;
+  on_the_way: number;
+  reached_centre: number;
+  treated_or_sent_back: number;
+  overdue: number;
+  closed_this_month: number;
+  updated_at: string;
+}
+
+/** P5.2: Screen 4's overdue list, one row per open escalation — replaced
+ * wholesale on every SSE message (dashboardStream.ts clears and rewrites
+ * the whole table, never a partial patch), since the server always sends
+ * the full current snapshot, not a diff (docs/decisions/ADR-011.md: a
+ * notification is a signal, and every subscriber re-runs its own query —
+ * this table is that query's result, cached). */
+export interface DashboardOverdueCacheRow {
+  escalation_id: string;
+  referral_id: string;
+  patient_name: string;
+  village_name: string | null;
+  target_org_name: string | null;
+  reason: string | null;
+  asha_name: string | null;
+  triggered_at: string;
+}
+
 class NirantharSevaDB extends Dexie {
   outbox!: Table<OutboxOp, string>;
   sync_meta!: Table<SyncMetaRow, string>;
@@ -88,6 +122,8 @@ class NirantharSevaDB extends Dexie {
   patient_cache!: Table<PatientCacheRow, string>;
   referral_event_cache!: Table<ReferralEventCacheRow, number>;
   org_cache!: Table<OrgCacheRow, string>;
+  dashboard_stats_cache!: Table<DashboardStatsCacheRow, string>;
+  dashboard_overdue_cache!: Table<DashboardOverdueCacheRow, string>;
 
   constructor() {
     super("nirantharseva");
@@ -126,6 +162,15 @@ class NirantharSevaDB extends Dexie {
     // still finds, and that is expected, not leftover code.
     this.version(4).stores({
       toy_cache: null,
+    });
+    // v5 (Phase 5.2): Screen 4's live dashboard cache — written by
+    // client/src/sync/dashboardStream.ts, read by SupervisorDashboardPage.
+    // Not shared with referral_cache/referral_event_cache: the server's
+    // dashboard payload carries village and ASHA names /sync/pull's frozen
+    // contract does not (docs/PHASE5_PLAN.md P5.2 build order #3).
+    this.version(5).stores({
+      dashboard_stats_cache: "key",
+      dashboard_overdue_cache: "escalation_id, referral_id",
     });
   }
 }

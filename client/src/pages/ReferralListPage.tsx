@@ -6,6 +6,7 @@ import { StatePill } from "../components/StatePill";
 import { SyncBand } from "../components/SyncBand";
 import { WaitingToSendPill } from "../components/WaitingToSendPill";
 import { db } from "../db/schema";
+import { displayStatesFor } from "../domain/displayState";
 import { formatAgeSex } from "../domain/formatAgeSex";
 import { relativeTimeSince } from "../domain/relativeTime";
 import { ashaActionFor } from "../domain/referralActions";
@@ -16,8 +17,12 @@ import styles from "./ReferralListPage.module.css";
 
 type Tab = "all" | "check" | "done";
 
-function needsCheck(state: string): boolean {
-  return ashaActionFor(state) !== null || stateLabel(state).family === "overdue";
+/** D20: an escalated referral still needs a check even though its display
+ * state (what ashaActionFor is asked about) is never "ESCALATED" itself —
+ * currentState carries that fact, displayState carries whether she has an
+ * action available. */
+function needsCheck(currentState: string, displayState: string): boolean {
+  return ashaActionFor(displayState) !== null || currentState === "ESCALATED";
 }
 
 export default function ReferralListPage() {
@@ -27,6 +32,8 @@ export default function ReferralListPage() {
   const [tab, setTab] = useState<Tab>("all");
 
   const referrals = useLiveQuery(() => db.referral_cache.toArray(), []) ?? [];
+  const displayStates =
+    useLiveQuery(() => displayStatesFor(referrals), [referrals]) ?? new Map<string, string>();
   const org = useLiveQuery(
     () => (session ? db.org_cache.get(session.orgUnitId) : undefined),
     [session?.orgUnitId],
@@ -42,10 +49,11 @@ export default function ReferralListPage() {
     }, []) ?? new Set<string>();
 
   const sorted = [...referrals].sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
-  const checkCount = sorted.filter((r) => needsCheck(r.current_state)).length;
+  const displayStateOf = (r: (typeof sorted)[number]) => displayStates.get(r.id) ?? r.current_state;
+  const checkCount = sorted.filter((r) => needsCheck(r.current_state, displayStateOf(r))).length;
   const doneCount = sorted.filter((r) => stateLabel(r.current_state).family === "done").length;
   const visible = sorted.filter((r) => {
-    if (tab === "check") return needsCheck(r.current_state);
+    if (tab === "check") return needsCheck(r.current_state, displayStateOf(r));
     if (tab === "done") return stateLabel(r.current_state).family === "done";
     return true;
   });
@@ -93,8 +101,7 @@ export default function ReferralListPage() {
       ) : (
         <div className={styles.list}>
           {visible.map((r) => {
-            const { family } = stateLabel(r.current_state);
-            const overdue = family === "overdue";
+            const overdue = r.current_state === "ESCALATED";
             return (
               <button
                 key={r.id}
@@ -118,7 +125,7 @@ export default function ReferralListPage() {
                     .join(" · ")}
                 </div>
                 <div className={styles.pills}>
-                  <StatePill state={r.current_state} />
+                  <StatePill state={displayStateOf(r)} overdue={overdue} />
                   {pendingEntityIds.has(r.id) && <WaitingToSendPill />}
                 </div>
               </button>

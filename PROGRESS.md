@@ -10,15 +10,18 @@
 > information, at lower quality.
 
 **Last updated:** 2026-08-20
-**Last session model:** Sonnet 5 (P5.1 implementation). Planning was Opus.
+**Last session model:** Sonnet 5 (P5.1 and P5.2 implementation, same
+session). Planning was Opus.
 
 ## Current phase
 
-**P5.1 is code-complete and verified** — SLA profiles, the escalation
-sweep, and the escalation lifecycle. Server only, no migration, `alembic
-heads` still `0006`. **Waiting for the user to review before starting
-P5.2** (SSE transport + Screen 4, `docs/PHASE5_PLAN.md`) — do not start it
-without an explicit go-ahead (handoff R1).
+**Phase 5 is code-complete and verified** — P5.1 (SLA profiles, the
+escalation sweep, escalation lifecycle) and P5.2 (LISTEN/NOTIFY, the
+dashboard endpoints, Screen 4, the D20 overlay on Screens 1/3/5), built in
+one session. Server only added two new endpoints, no migration — `alembic
+heads` is still `0006`. **Waiting for the user to review.** Phase 6
+(identity resolution) has not been planned yet — that needs its own
+planning session (Opus) before implementation starts.
 
 ## Done
 
@@ -41,13 +44,29 @@ without an explicit go-ahead (handoff R1).
   interval instead of `sleep(3600)`. `apscheduler` added as a dependency
   (already named in the plan's stack list). 10 new tests in
   `tests/integration/test_escalation_sweep.py`, one per row of
-  PHASE5_PLAN's "What P5.1 must prove" table. `docs/PHASE2_OBSERVATIONS.md`
-  Phase 5 section, observations 34–36.
+  PHASE5_PLAN's "What P5.1 must prove" table.
+- **P5.2** (`docs/PHASE5_PLAN.md` build order): `NOTIFY` inside the sweep's
+  own transaction (`app/realtime.py` holds the dedicated `LISTEN`
+  connection + subscriber fan-out, wired into `app/main.py`'s new
+  `lifespan`); `GET /dashboard` and `GET /dashboard/stream`
+  (`app/api/dashboard.py`, one shared org-scoped query, `stream_events()`
+  pulled out as a standalone generator so it's testable without going
+  through HTTP — see its docstring); `get_current_user_from_query_token`
+  in `app/api/auth.py` (ADR-012); `app/api/scoping.py`'s call-site list
+  updated. Client: Dexie v5 (`dashboard_stats_cache` +
+  `dashboard_overdue_cache`), `client/src/sync/dashboardStream.ts`
+  (`EventSource`, query-token auth), `client/src/domain/displayState.ts`
+  (D20's derivation), `StatePill`'s new `overdue` prop, Screen 4
+  (`SupervisorDashboardPage`), the D20 overlay applied to Screens 1, 3, 5.
+  9 new/changed Playwright tests in `client/tests/dashboard.spec.ts`,
+  including the plan's headline (a live breach, no reload) and one that
+  specifically exercises D22's resolution path from the client side.
+  `docs/PHASE2_OBSERVATIONS.md` Phase 5 section, observations 34–39.
 
 ## Not done / in progress
 
-- P5.2 (SSE transport, `GET /dashboard/stream`, Screen 4): not started.
-  Needs its own go-ahead.
+- Phase 6 (identity resolution + gold set + review queue): not planned.
+  Needs an Opus planning session before any code.
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
 - No known open bugs.
@@ -72,18 +91,37 @@ ones alone, two sweeps over one open breach produce one row/one event (the
 partial index's doing — see the note in `test_escalation_sweep.py` on how
 that's actually exercised, not just asserted), resolution-then-rebreach
 produces a second row, `verify_replay` is clean after a sweep, the sweep
-honours a `SimulatedClock`, `SLA_SCALE` changes the window, the
-`datetime.now()` grep is clean, `ruff` and the full suite (197 tests) are
-green.
+honours a `SimulatedClock`, `SLA_SCALE` changes the window (this specific
+check had a real bug behind it — see "Known problems" below and
+observation 37), the `datetime.now()` grep is clean.
 
-One small decision made without asking, flagged here per handoff §7:
-**`escalation.escalated_to_user_id` is left `NULL`.** The plan's own sweep
-snippet doesn't populate it either, and resolving `sla_profile.escalate_to_role`
-to one specific `app_user` needs a rule (which org? which user if several
-share the role?) that build order item 3/4 doesn't specify — "Not in this
-plan" only says the column *is* populated eventually, "but nothing acts on
-it beyond display." Left for P5.2 or later if the dashboard ends up needing
-a specific name rather than just the role.
+P5.2: every criterion in `docs/PHASE5_PLAN.md` checked against real
+commands and, for the headline one, a real browser — with demo config, a
+referral created as `asha_a` appears on `supervisor1`'s dashboard with no
+page reload (`client/tests/dashboard.spec.ts`, screenshots in
+`docs/screenshots/`); `EventSource` recovers from a dropped connection
+(simulated via `context.setOffline`, not a literal container kill — a
+Playwright spec running inside the client container has no way to restart
+a sibling container; see the test's own docstring); an escalated referral
+keeps its real state label and the overdue treatment on Screens 1, 3 and 5,
+and still offers its real action button (D20) — Screen 5 specifically
+because that's where a real bug was in the first draft (observation 38);
+subtree scoping is proven server-side (`test_dashboard.py`, two org
+branches) and not re-proven client-side, since the client has no scoping
+logic of its own to get wrong; no banned word in the dashboard's own copy,
+read by hand; `tsc --noEmit`, `npm run build`, and both test suites (server
+205, client 9) are green.
+
+Two small decisions made without asking, flagged here per handoff §7:
+
+- **`escalation.escalated_to_user_id` stays `NULL`.** Unchanged from P5.1 —
+  the dashboard shows the ASHA's name by joining `origin_user_id`, not this
+  column, so nothing in P5.2 needed it populated either.
+- **No role-gate on `GET /dashboard`/`GET /dashboard/stream` beyond
+  authentication + org-subtree scoping.** Matches every other read endpoint
+  in this codebase (`GUARDS` governs writes, not reads) — any authenticated
+  role can view the dashboard for their own subtree, same as `GET
+  /referrals`.
 
 ## Open item for the user
 
@@ -95,19 +133,44 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Start P5.2** on the user's go-ahead: SSE transport (`GET
-/dashboard/stream`, ADR-011/ADR-012) + Screen 4, per `docs/PHASE5_PLAN.md`.
+**Phase 6 needs planning first** (identity resolution + gold set + review
+queue) — an Opus session against `docs/IMPLEMENTATION_PLAN.md`'s Phase 6
+section, the way `docs/PHASE5_PLAN.md` was written for this phase. Do not
+start writing Phase 6 code without that plan existing and the user's
+go-ahead on it.
 
 ## Verify the current state yourself
 
-Client. **Both** servers must be up: `:5173` (dev, four specs) and `:4173`
-(the built app with its real PWA precache — `offline-sync.spec.ts` only).
+**Always `cd` into the repo root before any `docker compose` command —
+never pass `-f <path>` from a different cwd.** Compose derives its project
+name from the cwd's basename; a mismatched cwd made it recreate `db-1`
+unexpectedly this session (data survived only because `pgdata` is a named
+volume, not a bind mount — don't rely on that).
+
+Client. **Playwright runs from the host** (`cd client && npx playwright
+test`), not via `docker compose exec` — `client/tests/helpers.ts` calls
+`http://localhost:8000` directly, which only resolves from the host (the
+port Compose publishes), not from inside the `client` container's own
+network namespace. The host needs its own `npx playwright install
+chromium` once (separate from anything installed inside the container).
+**Both** servers must be up: `:5173` (dev) and `:4173` (the built app with
+its real PWA precache — `offline-sync.spec.ts` only).
 
 ```bash
 docker compose up -d --build
 docker compose exec client npx tsc --noEmit && docker compose exec client npm run build
 docker compose exec -d client npm run preview        # starts :4173
-cd client && npx playwright test                     # expect 5 passed
+cd client && npx playwright test                     # expect 9 passed, ~2 min (see below)
+```
+
+Two of those 9 tests need a demo-scale scheduler running first, or they'll
+sit at their real-SLA pace instead of failing fast — start one before the
+`npx playwright test` above:
+
+```bash
+docker compose run --rm -d --name demo-scheduler -e SLA_SCALE=0.0004 -e SWEEP_INTERVAL_SECONDS=5 scheduler
+# ... run the tests ...
+docker stop demo-scheduler   # started with --rm, so this also removes it
 ```
 
 Server (`alembic heads` should print `0006`):
@@ -117,30 +180,35 @@ docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS nirantharsev
 docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
   api sh -c "alembic upgrade head && python -m app.seed && ruff check . && ruff format --check . && pytest -q && python -m app.verify_replay"
 ```
-Expect `197 passed`, clean.
+Expect `205 passed`, clean.
 
-Escalation sweep, specifically (P5.1's headline, without waiting for a real
-SLA window):
+Escalation sweep + dashboard, specifically (Phase 5's headline, without
+waiting for a real SLA window):
 
 ```bash
 docker compose exec -T db psql -U postgres -d nirantharseva -c "SELECT state, max_hours, escalate_to_role FROM sla_profile ORDER BY state;"
-docker compose run --rm -e SLA_SCALE=0.0001 -e SWEEP_INTERVAL_SECONDS=2 -d --name sweep-demo scheduler
-# wait ~5s, then:
+docker compose run --rm -e SLA_SCALE=0.0004 -e SWEEP_INTERVAL_SECONDS=5 -d --name sweep-demo scheduler
+# wait ~40s (CREATED's 24h SLA scaled), then:
 docker compose exec -T db psql -U postgres -d nirantharseva -c "SELECT referral_id, breached_state, resolved_at FROM escalation;"
-docker stop sweep-demo && docker rm sweep-demo   # -d means --rm does not apply; clean up by hand
+docker stop sweep-demo   # started with --rm, this also removes it — docker ps -a is worth checking anyway
 ```
-**This escalates real dev-database referrals** — observation 35 in
-`docs/PHASE2_OBSERVATIONS.md` is the story of this exact command's
-foreground (`timeout`-wrapped, non-`-d`) form outliving its tool call and
-quietly re-escalating a "fresh" reseed for several minutes. Run it `-d` (as
-above, not foreground-and-killed) and stop/rm it explicitly, or run it
-against `nirantharseva_test` instead of `nirantharseva`, and reseed
-afterward (`docker compose exec api python -m app.seed` only re-adds
-missing rows — it does not undo an escalation).
+**This escalates real dev-database referrals** — observations 35 and 39 in
+`docs/PHASE2_OBSERVATIONS.md` are two separate incidents this session of a
+container from exactly this pattern outliving its tool call and quietly
+re-escalating a "fresh" reseed. Confirm `docker ps -a` shows only the four
+real services before trusting a "clean" reseed, and after `docker compose
+down -v` reports success — if it says a volume or network is "still in
+use," an orphan is still attached and `down` did not actually clean up.
+**`SLA_SCALE` must be a value PostgreSQL will bind as a float without an
+explicit cast doing the work — see observation 37: `0.5` and `0.0004` are
+fine, but do not remove the `CAST(:sla_scale AS double precision)` from
+`app/domain/escalation.py`'s query, or every fractional scale silently
+becomes 0 and everything escalates instantly.**
 
 To see the screens by hand: open `http://localhost:5173/login`, log in as
-`asha_a`/`dev` (or `mo1`/`dev` for Screen 5). `/supervisor` and
-`/identity-review` are reachable directly as placeholders.
+`asha_a`/`dev`, `mo1`/`dev` for Screen 5, or `supervisor1`/`dev` for Screen
+4 (`/supervisor`, now a real live dashboard, not a placeholder).
+`/identity-review` is still a Phase 6 placeholder.
 
 ## Settled decisions (do not re-ask)
 
@@ -163,6 +231,27 @@ To see the screens by hand: open `http://localhost:5173/login`, log in as
 
 ## Known problems and workarounds
 
+- **`app/domain/escalation.py`'s breach query needs `SLA_SCALE` explicitly
+  cast to `double precision` — without it, any scale strictly between 0
+  and 1 is silently truncated to integer 0 by asyncpg's prepared-statement
+  type inference, and `make_interval`'s result becomes exactly zero, so
+  every referral escalates the instant it's created regardless of its real
+  age.** `SLA_SCALE=1.0` (production) hides this completely — this only
+  shows up at demo-scale, which is exactly when someone is watching. Fixed
+  this session; see observation 37 before touching that query again.
+- Playwright runs from the **host** (`cd client && npx playwright test`),
+  not `docker compose exec client npx playwright test` —
+  `client/tests/helpers.ts` posts to `http://localhost:8000` directly,
+  which is the *host's* published port, not reachable from inside the
+  `client` container's own network namespace. The host needs its own
+  Chromium (`npx playwright install chromium`), separate from anything
+  installed inside the container.
+- **Always `cd` into the repo root before `docker compose` commands** —
+  invoking it with `-f <full-path>` from a different cwd made Compose
+  recreate `db-1` unexpectedly this session (Compose derives its project
+  name from the cwd's basename). No data was lost only because `pgdata` is
+  a named volume, reattached to the new container rather than recreated —
+  do not rely on that safety net a second time.
 - Host Python is 3.14.7; project pins 3.12 via `uv` — never build against
   host Python.
 - `uv` full path if a fresh shell can't find it:

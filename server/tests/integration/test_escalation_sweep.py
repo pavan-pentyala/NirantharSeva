@@ -305,15 +305,23 @@ async def test_sweep_honours_the_injected_clock(make_referral):
 
 async def test_sla_scale_shrinks_the_window(monkeypatch, make_referral):
     # Real-hours window untouched (D17) — only the sweep's own read of it is
-    # scaled. 1 second old is nowhere near 24 real hours, but is well past
-    # a 24h window scaled down to a fraction of a second.
-    referral_id = await make_referral("CREATED", BASE - timedelta(seconds=1))
-    monkeypatch.setattr("app.domain.escalation.get_settings", lambda: Settings(sla_scale=0.0001))
+    # scaled. sla_scale=0.5 halves the 24h CREATED window to 12h: a
+    # referral 11h old must NOT escalate and one 13h old must. A scale near
+    # 0 or 1 can't tell "scaled correctly" apart from "scale silently
+    # ignored" — 0.5 with both a just-inside and just-outside case can:
+    # if SLA_SCALE were truncated to an integer 0 instead of read as 0.5
+    # (a real bug this test caught — see docs/PHASE2_OBSERVATIONS.md),
+    # make_interval's result would be exactly zero and *both* referrals
+    # would escalate regardless of age, not just the 13h-old one.
+    within_window = await make_referral("CREATED", BASE - timedelta(hours=11))
+    past_window = await make_referral("CREATED", BASE - timedelta(hours=13))
+    monkeypatch.setattr("app.domain.escalation.get_settings", lambda: Settings(sla_scale=0.5))
     clock = SimulatedClock(BASE)
 
     escalated = await sweep(async_session_factory, clock)
 
-    assert referral_id in escalated
+    assert within_window not in escalated
+    assert past_window in escalated
 
 
 async def test_verify_replay_is_clean_after_a_sweep(client, auth_headers, mo_auth_headers):

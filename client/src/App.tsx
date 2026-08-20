@@ -7,6 +7,7 @@ import LoginPage from "./pages/LoginPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import ReferralDetailPage from "./pages/ReferralDetailPage";
 import ReferralListPage from "./pages/ReferralListPage";
+import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
 import { homeRouteFor } from "./routes";
 
 /** Phase 4.3 (D1/D7): the toy sync-engine harness that used to live here
@@ -33,10 +34,7 @@ export default function App() {
         <Route path="/referrals/new" element={<CreateReferralPage />} />
         <Route path="/referrals/:id" element={<ReferralDetailPage />} />
         <Route path="/mo/incoming" element={<IncomingReferralsPage />} />
-        <Route
-          path="/supervisor"
-          element={<PlaceholderPage title="Supervisor dashboard" comingIn="Phase 5" />}
-        />
+        <Route path="/supervisor" element={<SupervisorDashboardPage />} />
         <Route
           path="/identity-review"
           element={<PlaceholderPage title="Identity review" comingIn="Phase 6" />}

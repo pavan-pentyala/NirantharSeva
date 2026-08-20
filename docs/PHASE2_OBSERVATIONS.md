@@ -822,3 +822,116 @@ it is the kind of thing a later change could break invisibly: if the sweep
 were ever changed to escalate a referral out of a state other than the
 current one (it should not be), this UPDATE's lack of a `breached_state`
 predicate would silently resolve the wrong row.
+
+## `SLA_SCALE` was silently truncated to zero for every demo-scale value — production config hid it completely
+
+**37. asyncpg's prepared-statement type inference resolves `:sla_scale` as
+`integer`, not `double precision`, when its first appearance in the query
+is `s.max_hours * :sla_scale` and `s.max_hours` is an integer column —
+truncating any `SLA_SCALE` strictly between 0 and 1 to exactly 0.** With
+the window at zero, `state_entered_at + 0 < now` is true for a referral
+that is a single millisecond old, so P5.2's demo-scale testing (`SLA_SCALE`
+values like `0.001`) escalated every referral **instantly**, not after the
+intended scaled window. `SLA_SCALE=1.0` — the production default, and the
+only value P5.1's own test suite exercised through a real query — hides
+this completely: `round(1.0)` is `1`, so the bug produces the *correct*
+answer whenever the scale is exactly 1. It surfaces only at demo scale,
+which is the one time a human is actually watching the clock.
+
+**Caught by:** a live Playwright test (`client/tests/dashboard.spec.ts`)
+passing in ~3 seconds when the arithmetic said it needed to wait ~86.
+Diagnosed by inserting a referral with a hand-set `state_entered_at =
+now()` directly via `psql` and watching `SELECT ... current_state` show
+`ESCALATED` within one sweep tick, then isolating it further with a
+throwaway script (`server/_probe2.py`, deleted after use — not committed)
+that ran the exact breach query with an added `is_breached`/`window_interval`
+diagnostic column: `make_interval(secs => s.max_hours * :sla_scale * 3600)`
+evaluated to `timedelta(0)` for `sla_scale=0.001`, and a bare
+`SELECT make_interval(secs => 24 * :sla_scale * 3600)` reproduced it
+outside the app entirely, isolating it to the bind parameter's inferred
+type rather than anything else in the query or the sweep's own logic.
+
+**Resolved by:** `CAST(:sla_scale AS double precision)` in
+`app/domain/escalation.py`'s `_BREACH_QUERY` — forces the parameter's type
+before Postgres has a chance to infer it from context. **A second, real
+gap this exposed:** `test_sla_scale_shrinks_the_window` (P5.1) used
+`sla_scale=0.0001` and asserted only that a 1-second-old referral
+escalated — which the truncation bug would *also* make pass, since with
+the window at zero *anything* escalates instantly. A test that can't fail
+when the exact bug it's supposed to catch is present is not proving what
+its name says. Rewritten to use `sla_scale=0.5` with two referrals, one
+11h old and one 13h old against a 24h SLA (scaled to 12h) — a within-window
+case and a past-window case in the same test, which only passes if the
+scale genuinely divides the window in half rather than zeroing it.
+
+## Screen 5's action button silently no-opped for an escalated referral — D20 applied "symmetrically" was not applied correctly everywhere
+
+**38. `IncomingReferralsPage.tsx`'s `handleAdvance` re-derived
+`moActionFor(currentState)` *inside* the click handler, using the
+referral's real `current_state` ("ESCALATED" while overdue) rather than
+the display state the render already used to decide whether to show the
+button at all.** `MO_ACTIONS` has no entry for `"ESCALATED"`, so
+`moActionFor("ESCALATED")` returns `null` and the handler returned
+immediately — the button was visibly rendered (the *render* correctly used
+`moActionFor(displayState)`), looked clickable, and did nothing when
+clicked. `ReferralDetailPage.tsx`'s equivalent handler was correct, but by
+accident rather than design: it happened to close over the already-computed
+outer-scope `action` variable instead of recomputing anything, so the same
+mistake was structurally impossible there even before anyone thought about
+it. Resolved by having the render pass the already-computed `action.toState`
+into `handleAdvance` explicitly, rather than letting the handler recompute
+it from a different state.
+
+**Caught by:** a dedicated live Playwright test that creates a referral,
+advances it to `IN_TRANSIT`, lets a demo-scale sweep escalate it, and then
+actually clicks MO's "Arrived" button and asserts the card disappears from
+the tab — not by code review, and not by the same pattern already having
+been verified correct on Screens 1 and 3. Applying the same rule
+("`ashaActionFor`/`moActionFor` read the display state") in three places
+does not guarantee the *effect* of that rule is wired identically in all
+three; only exercising the actual click on each screen found the one place
+it wasn't. Worth remembering the next time "the same fix, applied
+symmetrically" feels like it should be enough on its own.
+
+## `docker compose run --rm -d` containers need to be tracked across a whole session, not just around the command that started them
+
+**39. The same class of leak documented in observation 35 recurred twice
+more in P5.2, despite already knowing about it** — a `--name
+demo-scheduler` container from an earlier round of manual verification was
+still running, 27 minutes later, holding stale pre-fix code in its already-
+imported Python process, when a later `docker compose down -v` reported
+"volume ... still in use" and only *then* revealed it. The `--rm` flag
+means the container removes itself once stopped, which is necessary but
+not sufficient — nothing stops a session from simply forgetting a
+still-running background container exists between one verification step
+and the next, especially when several verification passes happen across
+a long session with edits in between. **The fix that actually holds:**
+treat "confirm `docker ps -a` shows only the real services" as a
+mandatory step before *every* `down -v`, not just the first one after a
+known incident, and name one-off containers distinctly enough
+(`demo-scheduler`, `sweep-demo`) that a stray one is recognizable at a
+glance rather than blending into the regular service list.
+
+## httpx's `ASGITransport` cannot drive a `StreamingResponse` with a real gap between chunks — not a `BaseHTTPMiddleware` problem, a transport one
+
+**40. `client.stream(...)` against an app mounted on `ASGITransport` hangs
+before even returning a status code once the response generator's second
+chunk is more than an instant away — reproduced against a two-route
+FastAPI app with zero middleware, ruling out `BaseHTTPMiddleware` (the
+first suspect, given its well-known history with `StreamingResponse`) as
+the cause.** A finite one-chunk-and-done generator returns instantly; a
+generator that yields once and then `await`s anything before its next
+yield hangs the test, seemingly regardless of middleware. `GET
+/dashboard/stream`'s handler is exactly this shape (one snapshot on
+connect, then a wait for the next notification or heartbeat), so no
+integration test in `test_dashboard.py` opens the live route and reads
+from it — `app/api/dashboard.py`'s `stream_events()` is deliberately a
+standalone async generator, callable and `anext()`-able directly in a test
+without going through HTTP at all, and the actual wire-level behaviour
+(headers, reconnection, an open connection staying open) is proven instead
+by `client/tests/dashboard.spec.ts`'s Playwright tests against a real
+uvicorn server. The general lesson: when an integration test against an
+in-process ASGI transport hangs on something that works fine in the real
+running container, suspect the transport before suspecting the code, and
+confirm with the smallest possible repro before restructuring anything
+around a guess.

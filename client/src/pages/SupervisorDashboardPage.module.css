@@ -1,0 +1,194 @@
+/* Screen 4 — desktop only (brief §8: "Desktop layout matters only for the
+   supervisor dashboard"). Values transcribed from
+   docs/design_handoff_ui_screens/Screen 4 - Supervisor Dashboard.dc.html. */
+
+.page {
+  min-height: 100vh;
+  background: var(--sheet);
+  max-width: 1360px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 18px var(--space-6);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.blockName {
+  font-size: 24px;
+  font-weight: 650;
+}
+.subtitle {
+  font-size: var(--text-secondary);
+  color: var(--ink-500);
+}
+.liveIndicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+.dotLive {
+  background: #0b553c;
+}
+.dotConnecting {
+  background: var(--waiting-text);
+}
+.liveLabel {
+  font-size: var(--text-secondary);
+  font-weight: 650;
+}
+.updatedAt {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-500);
+}
+
+.banner {
+  padding: 11px var(--space-6);
+  background: var(--alert-bg);
+  border-bottom: 1px solid var(--alert-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.bannerDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--alert);
+  flex: none;
+}
+.bannerText {
+  font-size: var(--text-secondary);
+  color: #7a2a2a;
+  flex: 1;
+}
+.bannerDismiss {
+  border: none;
+  background: none;
+  color: #7a2a2a;
+  font-size: 14px;
+  padding: 4px 8px;
+  flex: none;
+}
+
+.statStrip {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
+  background: var(--hairline);
+  border-bottom: 1px solid var(--hairline);
+}
+.statTile {
+  background: var(--sheet);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.statValue {
+  font-size: 28px;
+  font-weight: 650;
+}
+.statLabel {
+  font-size: var(--text-label);
+  color: var(--ink-500);
+}
+.statTileOverdue {
+  border-left: 3px solid var(--alert);
+}
+.statValueOverdue {
+  font-weight: 700;
+  color: var(--alert);
+}
+.statLabelOverdue {
+  color: var(--ink-700);
+  font-weight: 650;
+}
+
+.listHeading {
+  padding: var(--space-4) var(--space-6) 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.listTitle {
+  font-size: var(--text-title);
+  font-weight: 650;
+}
+.sortNote {
+  font-size: var(--text-label);
+  color: var(--ink-500);
+}
+
+.empty {
+  padding: var(--space-8) var(--space-6);
+  color: var(--ink-500);
+  text-align: center;
+}
+
+.table {
+  padding: var(--space-3) var(--space-6) var(--space-6);
+  display: flex;
+  flex-direction: column;
+}
+.tableHeaderRow {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1.2fr 0.8fr 1fr;
+  gap: var(--space-4);
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+  border-bottom: 1px solid var(--hairline);
+}
+.tableRow {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1.2fr 0.8fr 1fr;
+  gap: var(--space-4);
+  padding: 14px 16px;
+  align-items: center;
+  border-bottom: 1px solid var(--hairline);
+  border-left: 4px solid var(--alert);
+  font-size: var(--text-secondary);
+  color: var(--ink-700);
+}
+.tableRowNew {
+  animation: newrow 2s ease-out;
+}
+@keyframes newrow {
+  from {
+    background: var(--alert-bg);
+  }
+  to {
+    background: var(--sheet);
+  }
+}
+.patientName {
+  font-size: var(--text-body);
+  font-weight: 650;
+  color: var(--ink-900);
+}
+.overdueBy {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--alert);
+  font-weight: 700;
+}

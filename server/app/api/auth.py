@@ -72,18 +72,9 @@ async def login(
     return TokenResponse(access_token=token)
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    settings: Settings = Depends(get_settings),
-) -> CurrentUser:
-    if credentials is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing bearer token")
+async def _resolve_user(token: str, settings: Settings) -> CurrentUser:
     try:
-        payload = jwt.decode(
-            credentials.credentials,
-            settings.jwt_secret,
-            algorithms=[settings.jwt_algorithm],
-        )
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid token") from exc
 
@@ -103,3 +94,24 @@ async def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "unknown user")
 
     return CurrentUser(id=row.id, username=username, role=row.role, org_unit_id=row.org_unit_id)
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    settings: Settings = Depends(get_settings),
+) -> CurrentUser:
+    if credentials is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "missing bearer token")
+    return await _resolve_user(credentials.credentials, settings)
+
+
+async def get_current_user_from_query_token(
+    token: str, settings: Settings = Depends(get_settings)
+) -> CurrentUser:
+    """GET /dashboard/stream only (docs/decisions/ADR-012.md) — EventSource
+    cannot set an Authorization header, so this one route accepts the
+    credential as a query parameter instead. Same validation as
+    get_current_user — same signature check, same app_user re-resolution —
+    only the transport differs; no other route wires this in, and
+    get_current_user's own signature is untouched."""
+    return await _resolve_user(token, settings)

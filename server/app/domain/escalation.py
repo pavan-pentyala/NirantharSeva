@@ -37,6 +37,7 @@ from app.config import get_settings
 from app.db import acquire_seq_lock
 from app.domain.states import Role, State
 from app.instrumentation.logging import get_logger
+from app.realtime import ESCALATION_CHANNEL
 from app.sync.event_log import insert_referral_event, replay_referral
 
 _logger = get_logger(__name__)
@@ -45,12 +46,26 @@ _NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, "nirantharseva.escalation")
 # secs, not hours=>, so max_hours * SLA_SCALE can be fractional (a demo runs
 # SLA_SCALE small enough to breach a 24h window in seconds) without an
 # int-parameter cast in make_interval.
+#
+# CAST(:sla_scale AS double precision) is load-bearing, not decoration:
+# without it, asyncpg's prepared-statement protocol infers :sla_scale's
+# type from its *first* use (s.max_hours * :sla_scale, s.max_hours being
+# integer) and resolves it as integer — silently truncating any SLA_SCALE
+# between 0 and 1 to 0, which makes make_interval's result exactly zero and
+# every referral "breached" the instant it's created, whatever the real
+# window was supposed to be. SLA_SCALE=1.0 (the production default) hides
+# this completely (round(1.0) == 1), which is exactly why it survived
+# app/domain/escalation.py's own test suite — see
+# docs/PHASE2_OBSERVATIONS.md for the fractional-scale test this bug
+# needed and the ones already there didn't cover.
 _BREACH_QUERY = """
     SELECT r.id, r.current_state, s.escalate_to_role, s.version
     FROM referral r
     JOIN sla_profile s ON s.state = r.current_state AND s.active
     WHERE r.current_state NOT IN ('CLOSED', 'LOST', 'ESCALATED')
-      AND r.state_entered_at + make_interval(secs => s.max_hours * :sla_scale * 3600) < :now
+      AND r.state_entered_at
+          + make_interval(secs => s.max_hours * CAST(:sla_scale AS double precision) * 3600)
+          < :now
 """
 
 
@@ -148,6 +163,15 @@ async def sweep(session_factory: async_sessionmaker[AsyncSession], clock: Clock)
                 text("UPDATE referral SET current_state=:to, state_entered_at=:now WHERE id=:id"),
                 {"to": State.ESCALATED.value, "now": now, "id": referral_id},
             )
+
+            # D18/ADR-011: NOTIFY inside this transaction, not after it —
+            # Postgres queues a transactional NOTIFY and only delivers it
+            # once the transaction commits, which is exactly "after the
+            # transaction that inserts the escalation row commits" without
+            # a second connection or a second round trip. A rollback (the
+            # continue branches above) never reaches this line, so a
+            # skipped duplicate never notifies either.
+            await s.execute(text(f"NOTIFY {ESCALATION_CHANNEL}"))
 
             escalated.append(referral_id)
             _logger.info("referral escalated by sweep", extra={"referral_id": str(referral_id)})
