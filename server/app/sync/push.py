@@ -331,6 +331,77 @@ def _warn_if_payload_claims_org_identity(op: Op, actor: Actor) -> None:
         )
 
 
+async def _resolve_patient(
+    session: AsyncSession,
+    op: Op,
+    actor: Actor,
+    now: Any,
+) -> uuid.UUID | Outcome:
+    """Resolve the patient a create_referral op names, or say why it can't
+    be. ADR-009: this is the one call site Phase 6 replaces with a blocked
+    fuzzy-match pipeline — nothing else in this function pre-empts that.
+
+    Two payload shapes, tried in order:
+    - `patient_id`: the patient must already exist (pre-Phase-4 behaviour,
+      still supported — ADR-009 adds a second path, it does not remove
+      this one).
+    - `patient_name` (+ optional age, sex, phone): exact match on
+      (normalized_name, village_org_id), scoped to the actor's own org
+      unit — the design's Screen 2 shows "Village: yours", never a picked
+      village. Reuse the match if found, otherwise insert a new row.
+    """
+    patient_id = op.payload.get("patient_id")
+    if patient_id:
+        exists = await session.execute(
+            text("SELECT 1 FROM patient WHERE id=:id"), {"id": patient_id}
+        )
+        if exists.first() is None:
+            return Outcome("rejected", None, {"reason": "unknown_patient"})
+        return uuid.UUID(str(patient_id))
+
+    name = op.payload.get("patient_name")
+    if not name:
+        return Outcome("rejected", None, {"reason": "patient_id or patient_name is required"})
+
+    normalized_name = name.strip().lower()
+    village_org_id = actor.org_unit_id
+    match = await session.execute(
+        text(
+            """SELECT id FROM patient
+               WHERE normalized_name = :normalized_name AND village_org_id = :village_org_id
+               ORDER BY created_at ASC LIMIT 1"""
+        ),
+        {"normalized_name": normalized_name, "village_org_id": village_org_id},
+    )
+    row = match.first()
+    if row is not None:
+        return row.id
+
+    new_patient_id = uuid.uuid4()
+    await session.execute(
+        text(
+            """INSERT INTO patient
+                 (id, name, normalized_name, phone, village_org_id, age, sex,
+                  created_by, created_at)
+               VALUES
+                 (:id, :name, :normalized_name, :phone, :village_org_id, :age, :sex,
+                  :created_by, :now)"""
+        ),
+        {
+            "id": new_patient_id,
+            "name": name,
+            "normalized_name": normalized_name,
+            "phone": op.payload.get("phone"),
+            "village_org_id": village_org_id,
+            "age": op.payload.get("age"),
+            "sex": op.payload.get("sex"),
+            "created_by": actor.user_id,
+            "now": now,
+        },
+    )
+    return new_patient_id
+
+
 async def _apply_create_referral(
     session: AsyncSession,
     op: Op,
@@ -350,18 +421,14 @@ async def _apply_create_referral(
         # intercepts replays before apply_operation is ever called).
         return Outcome("rejected", None, {"reason": "already_exists"})
 
-    patient_id = op.payload.get("patient_id")
-    if not patient_id:
-        return Outcome("rejected", None, {"reason": "patient_id is required"})
-    patient_exists = await session.execute(
-        text("SELECT 1 FROM patient WHERE id=:id"), {"id": patient_id}
-    )
-    if patient_exists.first() is None:
-        return Outcome("rejected", None, {"reason": "unknown_patient"})
-
     _warn_if_payload_claims_org_identity(op, actor)
 
     now = clock.now()
+    resolved_patient = await _resolve_patient(session, op, actor, now)
+    if isinstance(resolved_patient, Outcome):
+        return resolved_patient
+    patient_id = resolved_patient
+
     await session.execute(
         text(
             """INSERT INTO referral
