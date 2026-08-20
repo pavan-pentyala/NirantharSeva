@@ -46,6 +46,5 @@ async def pull(
     session: AsyncSession = Depends(get_session),
     user: CurrentUser = Depends(get_current_user),
 ) -> PullResponse:
-    # D7/ADR-005: only the referral branch is scoped by this; the toy
-    # branch stays unscoped inside handle_pull.
+    # D7/ADR-005: scoped to the caller's org subtree inside handle_pull.
     return await handle_pull(session, since, limit, user.org_unit_id)

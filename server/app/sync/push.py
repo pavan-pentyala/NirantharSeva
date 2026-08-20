@@ -6,14 +6,17 @@ work in the same transaction, so a crash anywhere leaves either nothing or
 everything applied. A replay never re-executes — it returns the stored
 answer, so the client sees an identical response the second time.
 
-Phase 2.1 adds the referral entity alongside the toy model (D1: toy stays
-frozen, unchanged). See docs/decisions/ADR-003.md for the conflict policy
-and app/domain/states.py for the state machine apply_operation dispatches
-into.
+See docs/decisions/ADR-003.md for the conflict policy and
+app/domain/states.py for the state machine apply_operation dispatches into.
 
 Phase 2.2 (docs/decisions/ADR-006.md): who is acting comes from the
 authenticated Actor, resolved server-side — never from op.payload. A
 device cannot be trusted to name its own role, org, or user id.
+
+Phase 4.3: the toy model (Phase 1's one-field scaffold, D1/D7) is dropped —
+migration 0006, docs/PHASE4_PLAN.md's P4.3. `entity="referral"` is the only
+entity this module has ever handled since; `actor` is no longer optional,
+since every op now needs one.
 """
 
 import json
@@ -62,12 +65,8 @@ async def handle_push(
     ops: Sequence[Op],
     clock: Clock,
     run_id: str | None,
-    actor: Actor | None = None,
+    actor: Actor,
 ) -> tuple[list[OpResult], int]:
-    # actor is only required for entity="referral" ops (D6/ADR-006) — toy
-    # pushes (D1, frozen) never read it, so it stays optional here rather
-    # than forcing every toy-only caller (tests/property/test_permutation.py,
-    # tests/integration/test_pull_cursor.py) to fabricate one.
     results: list[OpResult] = []
 
     for op in ops:  # one transaction PER OP, not per batch
@@ -135,14 +134,7 @@ async def handle_push(
     # every event this batch just wrote. Merged with the batch's own lamports
     # as a safety net (plan §5.4's client-side formula, mirrored server-side).
     async with session_factory() as s:
-        max_row = await s.execute(
-            text(
-                """SELECT GREATEST(
-                     (SELECT COALESCE(MAX(lamport), 0) FROM toy_event),
-                     (SELECT COALESCE(MAX(lamport), 0) FROM referral_event)
-                   ) AS m"""
-            )
-        )
+        max_row = await s.execute(text("SELECT COALESCE(MAX(lamport), 0) AS m FROM referral_event"))
         db_max = max_row.scalar_one()
 
     server_lamport = merge_lamport(db_max, [op.lamport for op in ops])
@@ -155,10 +147,8 @@ async def apply_operation(
     device_id: str,
     clock: Clock,
     run_id: str | None,
-    actor: Actor | None = None,
+    actor: Actor,
 ) -> Outcome:
-    if op.entity == "toy" and op.operation == "set_value":
-        return await _apply_toy_set_value(session, op, device_id, clock, run_id)
     if op.entity == "referral" and op.operation == "create_referral":
         return await _apply_create_referral(session, op, device_id, clock, run_id, actor)
     if op.entity == "referral" and op.operation == "transition":
@@ -168,103 +158,6 @@ async def apply_operation(
         server_seq=None,
         detail={"reason": f"unsupported entity/operation: {op.entity}/{op.operation}"},
     )
-
-
-async def _apply_toy_set_value(
-    session: AsyncSession,
-    op: Op,
-    device_id: str,
-    clock: Clock,
-    run_id: str | None,
-) -> Outcome:
-    """Toy model: one supported operation, "set_value" on entity "toy".
-    Unchanged since Phase 1.1 — frozen per D1.
-
-    Concurrent writes are resolved as a Lamport-clock last-writer-wins
-    register: after appending this event, the winner for the entity is
-    whichever event has the highest (lamport, device_id), independent of
-    arrival order. That is what makes the final state the same regardless
-    of the order a valid op set is applied in — see tests/property.
-    """
-    value = op.payload.get("value")
-    if not isinstance(value, int) or isinstance(value, bool):
-        return Outcome(
-            status="rejected",
-            server_seq=None,
-            detail={"reason": "payload.value must be an integer"},
-        )
-
-    existing = await session.execute(
-        text("SELECT value FROM toy WHERE id=:id"), {"id": op.entity_id}
-    )
-    existing_row = existing.first()
-    server_time = clock.now()
-
-    inserted = await session.execute(
-        text(
-            """INSERT INTO toy_event
-                 (toy_id, old_value, new_value, op_id, device_id, lamport,
-                  device_time, server_time, run_id)
-               VALUES
-                 (:toy_id, :old_value, :new_value, :op_id, :device_id, :lamport,
-                  :device_time, :server_time, :run_id)
-               RETURNING seq"""
-        ),
-        {
-            "toy_id": op.entity_id,
-            "old_value": existing_row.value if existing_row else None,
-            "new_value": value,
-            "op_id": op.op_id,
-            "device_id": device_id,
-            "lamport": op.lamport,
-            "device_time": op.device_time,
-            "server_time": server_time,
-            "run_id": run_id,
-        },
-    )
-    seq = inserted.scalar_one()
-
-    winner = await session.execute(
-        text(
-            """SELECT new_value, op_id
-               FROM toy_event
-               WHERE toy_id = :toy_id
-               ORDER BY lamport DESC, device_id DESC, seq DESC
-               LIMIT 1"""
-        ),
-        {"toy_id": op.entity_id},
-    )
-    w = winner.one()
-
-    if existing_row is None:
-        await session.execute(
-            text(
-                """INSERT INTO toy (id, value, updated_at, run_id)
-                   VALUES (:id, :value, :updated_at, :run_id)"""
-            ),
-            {
-                "id": op.entity_id,
-                "value": w.new_value,
-                "updated_at": server_time,
-                "run_id": run_id,
-            },
-        )
-    else:
-        await session.execute(
-            text(
-                """UPDATE toy SET value=:value, updated_at=:updated_at, run_id=:run_id
-                   WHERE id=:id"""
-            ),
-            {
-                "value": w.new_value,
-                "updated_at": server_time,
-                "run_id": run_id,
-                "id": op.entity_id,
-            },
-        )
-
-    status: OpStatus = "accepted" if w.op_id == op.op_id else "accepted_stale"
-    return Outcome(status=status, server_seq=seq, detail=None)
 
 
 async def _append_referral_event(

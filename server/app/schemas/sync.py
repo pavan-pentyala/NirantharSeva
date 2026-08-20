@@ -41,12 +41,14 @@ class PushResponse(BaseModel):
 class EventOut(BaseModel):
     """Generic pull envelope (D3, docs/decisions/ADR-004.md). Fields the
     sync engine itself reads stay flat; everything only the domain reads
-    goes in `payload`, discriminated by `entity_type`. For entity_type
-    "toy": payload is {old_value, new_value}. For "referral": payload is
-    {from_state, to_state, actor_role, actor_user_id, patient_name, age,
-    sex, reason, priority, target_org_name} — the last six are a referral
-    snapshot, not sync-engine fields (D14/ADR-010); payload stays a plain
-    dict here so this schema itself is unchanged by their addition."""
+    goes in `payload`. `entity_type` is always "referral" since the toy
+    model's drop (migration 0006, Phase 4.3) — kept as a field rather than
+    removed, since the shape still discriminates by design (D3) even with
+    one entity type today. payload is {from_state, to_state, actor_role,
+    actor_user_id, patient_name, age, sex, reason, priority,
+    target_org_name} — the last six are a referral snapshot, not
+    sync-engine fields (D14/ADR-010); payload stays a plain dict here so
+    this schema itself is unchanged by their addition."""
 
     seq: int
     entity_type: str

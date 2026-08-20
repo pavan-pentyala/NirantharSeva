@@ -3,26 +3,24 @@ are serialised through acquire_seq_lock (docs/decisions/ADR-002.md) — every
 committed seq is visible in commit order, so `seq > since` never skips a row
 that will still show up later.
 
-D3/ADR-004: toy_event and referral_event share one sequence (event_seq, see
-migration 0003), so a single seq-ordered UNION ALL across both tables is a
-gap-free stream for one cursor. Each entity type's own fields are packed
-into `payload`; only the fields the sync engine itself needs stay flat.
+D7/ADR-005: scoped to the caller's org subtree. The predicate lives inside
+the query's own WHERE, before LIMIT — never applied in Python after the
+fetch (a page filtered to empty in Python still advances has_more/cursor
+logic as if nothing more existed, and the client stops advancing
+permanently).
 
-D7/ADR-005: the referral branch is scoped to the caller's org subtree; the
-toy branch is deliberately NOT — toy_event has no org column and nothing
-worth protecting, and D1 drops the whole table at Phase 4. Do not "fix"
-this — it would break both Playwright fault tests, which are E4's evidence.
-The predicate lives inside the referral branch's own WHERE, before LIMIT —
-never applied in Python after the fetch (see ADR-005: a page filtered to
-empty in Python still advances has_more/cursor logic as if nothing more
-existed, and the client stops advancing permanently).
+D14/ADR-010: payload also carries a referral snapshot — patient_name, age,
+sex, reason, priority, target_org_name — joined from `patient` and
+`org_unit` inside the same subquery, before LIMIT, for the same reason the
+subtree predicate lives there and not in Python. Every referral event
+repeats this snapshot, not just the create_referral one — ADR-010's
+accepted cost, not an oversight.
 
-D14/ADR-010: the referral branch's payload also carries a snapshot —
-patient_name, age, sex, reason, priority, target_org_name — joined from
-`patient` and `org_unit` inside the same subquery, before LIMIT, for the
-same reason the subtree predicate lives there and not in Python. Every
-referral event repeats this snapshot, not just the create_referral one —
-ADR-010's accepted cost, not an oversight.
+Phase 4.3: this was a UNION ALL of an unscoped toy branch and this scoped
+referral branch (D7/ADR-005) until the toy model was dropped (migration
+0006, D1). event_seq (migration 0003) still isn't OWNED BY referral_event —
+that was always about surviving the toy model's own event table being
+dropped, not about that table existing forever.
 """
 
 import json
@@ -51,27 +49,21 @@ async def handle_pull(
     result = await session.execute(
         text(
             f"""{SUBTREE_CTE}
-               (SELECT seq, 'toy' AS entity_type, toy_id AS entity_id, op_id, device_id,
-                       lamport, device_time, server_time,
-                       jsonb_build_object('old_value', old_value, 'new_value', new_value) AS payload
-                FROM toy_event
-                WHERE seq > :since)
-               UNION ALL
-               (SELECT e.seq, 'referral' AS entity_type, e.referral_id AS entity_id, e.op_id,
-                       e.device_id, e.lamport, e.device_time, e.server_time,
-                       jsonb_build_object(
-                         'from_state', e.from_state, 'to_state', e.to_state,
-                         'actor_role', e.actor_role, 'actor_user_id', e.actor_user_id,
-                         'patient_name', p.name, 'age', p.age, 'sex', p.sex,
-                         'reason', r.reason, 'priority', r.priority,
-                         'target_org_name', target_org.name
-                       ) AS payload
-                FROM referral_event e
-                JOIN referral r ON r.id = e.referral_id
-                JOIN patient p ON p.id = r.patient_id
-                LEFT JOIN org_unit target_org ON target_org.id = r.target_org_id
-                WHERE e.seq > :since AND r.origin_org_id IN (SELECT id FROM subtree))
-               ORDER BY seq ASC
+               SELECT e.seq, 'referral' AS entity_type, e.referral_id AS entity_id, e.op_id,
+                      e.device_id, e.lamport, e.device_time, e.server_time,
+                      jsonb_build_object(
+                        'from_state', e.from_state, 'to_state', e.to_state,
+                        'actor_role', e.actor_role, 'actor_user_id', e.actor_user_id,
+                        'patient_name', p.name, 'age', p.age, 'sex', p.sex,
+                        'reason', r.reason, 'priority', r.priority,
+                        'target_org_name', target_org.name
+                      ) AS payload
+               FROM referral_event e
+               JOIN referral r ON r.id = e.referral_id
+               JOIN patient p ON p.id = r.patient_id
+               LEFT JOIN org_unit target_org ON target_org.id = r.target_org_id
+               WHERE e.seq > :since AND r.origin_org_id IN (SELECT id FROM subtree)
+               ORDER BY e.seq ASC
                LIMIT :fetch_limit"""
         ),
         {"since": since, "fetch_limit": limit + 1, **subtree_params(actor_org_unit_id)},
