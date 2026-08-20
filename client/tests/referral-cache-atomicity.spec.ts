@@ -12,17 +12,21 @@ import { test, expect } from "@playwright/test";
 test("createReferral's outbox+cache write is atomic — an induced mid-transaction failure leaves neither table changed", async ({
   page,
 }) => {
-  await page.goto("/");
-  await expect(page.getByTestId("status-line")).toBeVisible();
+  // Any mounted page exposes window.__db/__engine (set up in main.tsx at
+  // module load); /login is the one reachable without a session, since
+  // the Phase 1 toy harness that used to sit at "/" is gone (Phase 4.3,
+  // migration 0006).
+  await page.goto("/login");
+  await expect(page.getByTestId("username-input")).toBeVisible();
 
   const result = await page.evaluate(async () => {
     const conflictingOpId = crypto.randomUUID();
     await window.__db.outbox.add({
       op_id: conflictingOpId,
-      entity: "toy",
+      entity: "referral",
       entity_id: "seed",
-      operation: "set_value",
-      payload: { value: 0 },
+      operation: "transition",
+      payload: { from_state: "CREATED", to_state: "IN_TRANSIT" },
       lamport: 0,
       device_time: new Date().toISOString(),
       status: "synced",

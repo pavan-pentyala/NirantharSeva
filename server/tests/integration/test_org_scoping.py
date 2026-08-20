@@ -186,26 +186,6 @@ async def test_transition_outside_actors_subtree_is_rejected_and_writes_zero_eve
     assert await _event_count(entity_id) == 1  # only the create; nothing appended by the reject
 
 
-async def test_toy_events_are_still_returned_unscoped_by_pull(client, auth_headers):
-    """Pins D7/ADR-005: the toy branch stays unscoped until Phase 4. Do not
-    'fix' this — toy has no org to filter by, and excluding it breaks both
-    Playwright fault tests, which are E4's evidence."""
-    op = {
-        "op_id": str(uuid.uuid4()),
-        "entity": "toy",
-        "entity_id": str(uuid.uuid4()),
-        "operation": "set_value",
-        "payload": {"value": 42},
-        "lamport": 1,
-        "device_time": DEVICE_TIME,
-    }
-    await _push(client, auth_headers, "d-toy", op)
-
-    resp = await client.get("/sync/pull?since=0&limit=1000", headers=auth_headers)
-    toy_ids = {e["entity_id"] for e in resp.json()["events"] if e["entity_type"] == "toy"}
-    assert op["entity_id"] in toy_ids
-
-
 async def test_seeded_target_org_is_always_an_ancestor_of_origin_org(client):
     """Machine-checks ADR-005's assumption that origin-only filtering is
     correct for the D4 fixture: the target is always reached by ordinary

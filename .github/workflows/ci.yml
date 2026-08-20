@@ -132,6 +132,24 @@ jobs:
           exit 1
       - name: Seed the district (kill_api.sh needs asha_a to exist)
         run: docker compose run --rm api python -m app.seed
+      # offline-sync.spec.ts runs against the built+previewed app on :4173,
+      # not the dev server on :5173 — vite-plugin-pwa's injectManifest
+      # strategy only produces a real (non-empty) precache manifest in a
+      # production build, and that test's reload-while-offline step is
+      # exactly what the precache exists to make possible (P4.3, plan §8.4).
+      - name: Build and serve the production bundle (PWA precache)
+        run: |
+          docker compose exec -T client npm run build
+          docker compose exec -d client npm run preview
+          for _ in $(seq 1 30); do
+            if curl -s -o /dev/null -w '%{http_code}' localhost:4173/ | grep -q 200; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::vite preview never became reachable on :4173"
+          docker compose logs client
+          exit 1
       - working-directory: client
         run: npx playwright test
       - name: Kill-API fault test (plan §5.6)

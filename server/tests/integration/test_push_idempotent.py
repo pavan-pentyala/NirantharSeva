@@ -1,6 +1,7 @@
-"""POST the same batch five times: row created once, five identical
+"""POST the same batch five times: event created once, five identical
 responses. This is I1 — the receipt is claimed once, replays return the
-stored answer without re-executing."""
+stored answer without re-executing. Ported from the toy model to referral
+create_referral ops at Phase 4.3 (D1/D7 — the toy model was dropped)."""
 
 import uuid
 from datetime import UTC, datetime
@@ -11,16 +12,16 @@ from sqlalchemy import text
 from app.db import async_session_factory
 
 
-def _batch(op_id, entity_id, value=42, lamport=17, device_id="d-1"):
+def _batch(op_id, entity_id, patient_name="Idempotent Test Patient", lamport=17, device_id="d-1"):
     return {
         "device_id": device_id,
         "ops": [
             {
                 "op_id": str(op_id),
-                "entity": "toy",
+                "entity": "referral",
                 "entity_id": str(entity_id),
-                "operation": "set_value",
-                "payload": {"value": value},
+                "operation": "create_referral",
+                "payload": {"patient_name": patient_name, "reason": "fever", "priority": "normal"},
                 "lamport": lamport,
                 "device_time": datetime(2026, 8, 10, 9, 0, tzinfo=UTC).isoformat(),
             }
@@ -45,24 +46,33 @@ async def test_same_batch_posted_five_times_creates_row_once(client, auth_header
 
     async with async_session_factory() as session:
         count = await session.execute(
-            text("SELECT COUNT(*) FROM toy_event WHERE op_id = :id"), {"id": op_id}
+            text("SELECT COUNT(*) FROM referral_event WHERE op_id = :id"), {"id": op_id}
         )
         assert count.scalar_one() == 1
 
 
-async def test_five_identical_pushes_result_in_one_toy_row(client, auth_headers):
+async def test_five_identical_pushes_result_in_one_referral_row(client, auth_headers):
     op_id = uuid.uuid4()
     entity_id = uuid.uuid4()
-    body = _batch(op_id, entity_id, value=99)
+    body = _batch(op_id, entity_id, patient_name="Idempotent Test Patient Two")
 
     for _ in range(5):
         await client.post("/sync/push", json=body, headers=auth_headers)
 
     async with async_session_factory() as session:
         result = await session.execute(
-            text("SELECT value FROM toy WHERE id = :id"), {"id": entity_id}
+            text(
+                """SELECT p.name FROM referral r JOIN patient p ON p.id = r.patient_id
+                   WHERE r.id = :id"""
+            ),
+            {"id": entity_id},
         )
-        assert result.scalar_one() == 99
+        assert result.scalar_one() == "Idempotent Test Patient Two"
+
+        referral_count = await session.execute(
+            text("SELECT COUNT(*) FROM referral WHERE id = :id"), {"id": entity_id}
+        )
+        assert referral_count.scalar_one() == 1
 
 
 @pytest.mark.parametrize("bad_field", ["operation", "entity"])
@@ -80,6 +90,6 @@ async def test_unsupported_op_is_rejected_and_not_recorded(client, auth_headers,
 
     async with async_session_factory() as session:
         count = await session.execute(
-            text("SELECT COUNT(*) FROM toy_event WHERE op_id = :id"), {"id": op_id}
+            text("SELECT COUNT(*) FROM referral_event WHERE op_id = :id"), {"id": op_id}
         )
         assert count.scalar_one() == 0

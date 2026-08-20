@@ -4,10 +4,10 @@
 # no duplicates." This is I1 under real process death, not just a mocked
 # exception.
 #
-# Ported from the toy model to referrals in Phase 2.1 (D1, docs/PHASE2_PLAN.md):
-# the toy model itself stays frozen, but this fault test needs no UI — pure
-# curl — so it moves onto the real domain surface now instead of waiting
-# for Phase 4 like the two Playwright fault tests do.
+# Ported onto referrals back in Phase 2.1 (D1, docs/PHASE2_PLAN.md), ahead
+# of the two Playwright fault tests, because this one needs no UI — pure
+# curl — so it could move onto the real domain surface without waiting for
+# the real screens to exist.
 #
 # This is NOT part of CI — it manipulates real containers (docker kill /
 # docker compose up) and is meant to be run on demand, on the host, with
@@ -93,8 +93,8 @@ RETRY_RESPONSE=$(curl -s -X POST localhost:8000/sync/push -H "authorization: Bea
   -H 'content-type: application/json' -d @"$BATCH_FILE")
 
 # Each op in the batch created its own referral (distinct entity_id, same
-# patient) — count events transitively via the patient, not a single
-# shared entity_id like the toy version did.
+# patient) — so count events transitively via the patient rather than by a
+# single shared entity_id.
 COUNT=$(docker compose exec -T db psql -U postgres -d nirantharseva -tAc \
   "select count(*) from referral_event e join referral r on r.id = e.referral_id
    where r.patient_id = '$PATIENT_ID';" | tr -d '[:space:]')

@@ -75,8 +75,12 @@ const EVENTS = [
 test("applyPulledEvents only advances referral_cache when from_state matches the fold so far, not the higher-lamport event", async ({
   page,
 }) => {
-  await page.goto("/");
-  await expect(page.getByTestId("status-line")).toBeVisible();
+  // Any mounted page exposes window.__db/__engine (set up in main.tsx at
+  // module load); /login is the one reachable without a session, since
+  // the Phase 1 toy harness that used to sit at "/" is gone (Phase 4.3,
+  // migration 0006).
+  await page.goto("/login");
+  await expect(page.getByTestId("username-input")).toBeVisible();
 
   const row = await page.evaluate(async (events) => {
     await window.__engine.applyPulledEvents(events as never);
