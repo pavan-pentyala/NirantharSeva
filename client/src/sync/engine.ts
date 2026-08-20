@@ -264,18 +264,27 @@ async function applyPulledToyEvent(e: api.EventOut): Promise<void> {
 /** D14/ADR-010: the same left-to-right advancement rule
  * app/domain/states.py's replay_steps encodes server-side — an event
  * advances the cached state only when its from_state matches the state
- * already folded in from earlier pulled events, read back from
- * referral_cache itself (events for many referrals interleave in one
- * pull page, so "state so far" has to be per-referral, not a variable
- * carried across the loop). A losing or stale event is received here —
- * pull is a full log, nothing is filtered out — but never overwrites the
- * cache; this is the client's mirror of a decision the server already
- * made, not a second one. Do not add a lamport comparison here: unlike
- * the toy model's LWW register, referral state coherence is decided by
- * from_state alone (see replay_steps's own docstring). */
+ * already folded in from earlier *pulled* events. "State so far" is read
+ * from referral_event_cache (only ever written by an advancing pull), not
+ * from referral_cache — referral_cache can already be ahead of the fold at
+ * this point, because createReferral()/transitionReferral() write it
+ * optimistically before any round trip. Folding from referral_cache instead
+ * of referral_event_cache was P4.2's first attempt, and it broke exactly
+ * the case that matters most: a device's own confirming pull for its own
+ * op never advanced, because its optimistic write had already moved
+ * referral_cache past what the confirming event's from_state expected — see
+ * docs/PHASE2_OBSERVATIONS.md's P4.2 section. Folding from
+ * referral_event_cache instead is immune to that, because nothing but this
+ * function ever writes there.
+ *
+ * A losing or stale event is received here — pull is a full log, nothing is
+ * filtered out — but never advances the fold, matching the server's own
+ * decision. Do not add a lamport comparison here: unlike the toy model's
+ * LWW register, referral state coherence is decided by from_state alone
+ * (see replay_steps's own docstring). */
 async function applyPulledReferralEvent(e: api.EventOut): Promise<void> {
-  const cached = await db.referral_cache.get(e.entity_id);
-  const stateSoFar = cached?.current_state ?? null;
+  const priorEvents = await db.referral_event_cache.where("referral_id").equals(e.entity_id).sortBy("seq");
+  const stateSoFar = priorEvents.length > 0 ? priorEvents[priorEvents.length - 1].to_state : null;
   const fromState = (e.payload.from_state as string | null) ?? null;
   const advanced = fromState === stateSoFar;
   if (!advanced) return;
@@ -293,6 +302,32 @@ async function applyPulledReferralEvent(e: api.EventOut): Promise<void> {
     device_id: e.device_id,
     updated_at: e.server_time,
   });
+
+  // P4.2: Screen 3's timeline reads only this table, never a live API call
+  // (brief §8). Only advancing events are kept, matching what the design
+  // renders — a losing/stale event never appears in "What happened" either.
+  // put(), not add(): idempotent under pullAndApply()'s retry-from-cursor
+  // behaviour if applying a later event in the same page throws.
+  await db.referral_event_cache.put({
+    seq: e.seq,
+    referral_id: e.entity_id,
+    from_state: fromState,
+    to_state: e.payload.to_state as string,
+    actor_role: e.payload.actor_role as string,
+    actor_user_id: e.payload.actor_user_id as string,
+    device_time: e.device_time,
+    server_time: e.server_time,
+  });
+}
+
+/** P4.2: org names/hierarchy, fetched once rather than pulled through the
+ * sync stream — org_unit isn't an event-sourced entity (app/api/org_units.py
+ * is a plain read, not part of /sync/push|pull). Safe to call repeatedly;
+ * a bulkPut just refreshes the cache with whatever the server has now. */
+export async function refreshOrgCache(): Promise<void> {
+  if (!navigator.onLine) return;
+  const orgUnits = await api.listOrgUnits();
+  await db.org_cache.bulkPut(orgUnits);
 }
 
 async function syncNow(): Promise<void> {

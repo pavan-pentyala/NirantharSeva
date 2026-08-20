@@ -3,6 +3,14 @@
 const API_BASE = "/api";
 const TOKEN_KEY = "nirantharseva_token";
 
+/** Raw stored JWT, or null if never logged in. Client-side decoding of
+ * this token (client/src/auth/session.ts) is a UI convenience only — the
+ * server never trusts a client's claimed identity (ADR-006); it re-resolves
+ * role/org from app_user on every request. */
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
 export interface Op {
   op_id: string;
   entity: string;
@@ -57,8 +65,6 @@ function authHeader(): Record<string, string> {
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 
-/** Dev-only: the harness auto-logs in as a fixed user. Real auth/session
- * management is out of scope until the real UI lands (Phase 4). */
 export async function login(username: string, password: string): Promise<void> {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
@@ -86,4 +92,22 @@ export async function pull(since: number, limit = 500): Promise<PullResponse> {
   });
   if (!res.ok) throw new Error(`pull failed: ${res.status}`);
   return res.json();
+}
+
+export interface OrgUnit {
+  id: string;
+  name: string;
+  type: string;
+  parent_id: string | null;
+}
+
+/** P4.2 — org names/hierarchy, not patient data, unscoped server-side
+ * (app/api/org_units.py). Rarely changes; the client caches the result
+ * rather than calling this on every screen render (client/src/db/schema.ts's
+ * org_cache). */
+export async function listOrgUnits(): Promise<OrgUnit[]> {
+  const res = await fetch(`${API_BASE}/org_units`, { headers: authHeader() });
+  if (!res.ok) throw new Error(`org_units failed: ${res.status}`);
+  const body = (await res.json()) as { org_units: OrgUnit[] };
+  return body.org_units;
 }
