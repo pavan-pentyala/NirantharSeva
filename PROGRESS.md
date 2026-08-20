@@ -10,12 +10,14 @@
 > information, at lower quality.
 
 **Last updated:** 2026-08-20
-**Last session model:** Sonnet 5
+**Last session model:** Opus 5 (Phase 5 planning). Implementation is Sonnet.
 
 ## Current phase
 
-**Phase 4 is complete** — P4.1, P4.2 and P4.3 all done. Phase 5
-(escalation scheduler + SSE dashboard, Screen 4) has not started.
+**Phase 4 is code-complete; one exit criterion is outstanding and is the
+user's to do** (the real-phone clip — see "Open item"). **Phase 5 is
+planned, not started** — `docs/PHASE5_PLAN.md`, D17–D22, ADR-011, ADR-012.
+Waiting for a go-ahead to start P5.1.
 
 ## Done
 
@@ -25,49 +27,45 @@
   ADR-010): server contract + client data layer, the five real screens,
   then PWA + the toy model's removal.
 - The Phase 1 toy model is **gone** — migration `0006` drops `toy`/
-  `toy_event`; no `ToyPage`, no `toy_cache` reads/writes, no toy branch in
-  `push.py`/`pull.py`/`applyPulledEvents`. ADR-005's D7 exception ended
-  exactly here, as planned.
+  `toy_event`. ADR-005's D7 exception ended exactly here, as planned.
+- Phase 5 planning: D17–D22 decided with the user, ADR-011 (LISTEN/NOTIFY)
+  and ADR-012 (SSE query-token auth) written. P5.1/P5.2 split approved.
 
 ## Not done / in progress
 
-- Phase 5: not started, needs the user's go-ahead (handoff R1).
-- **The real-phone airplane-mode recording is not done** — it is the one
-  P4.3 exit criterion I cannot satisfy from here (it needs a physical
-  phone). Everything it would demonstrate is covered automatically by
-  `client/tests/offline-sync.spec.ts`. See "Open item" below.
+- P5.1: not started, needs the user's go-ahead (handoff R1). A ready-to-use
+  starting prompt is in `temp.txt` (gitignored scratch file).
+- **The real-phone airplane-mode recording is not done.** User has said
+  keep it — do not drop it, do not re-propose dropping it.
 - No known open bugs.
 
 ## Exit criteria status
 
-All of P4.1, P4.2 and P4.3's criteria in `docs/PHASE4_PLAN.md` are met and
-checked against real commands, **except** the real-phone recording (above).
-Two criteria needed judgement rather than a clean yes/no:
+Phase 4: every criterion in `docs/PHASE4_PLAN.md` met and checked against
+real commands, **except** the real-phone recording. Two needed judgement:
 
 - `grep -rn toy_ client/src` returns **2 matches, both required** —
   `version(1)`'s shipped declaration (never edit shipped schema history)
   and `version(4)`'s `toy_cache: null`, which *is* Dexie's drop syntax.
-  `server/app` is clean. Full reasoning: observation 30.
+  `server/app` is clean. Observation 30.
 - `offline-sync.spec.ts` runs against the **built** app on `:4173`, not the
   dev server — `injectManifest` only produces a real precache in a
   production build. Observation 33.
 
 ## Open item for the user
 
-The real-phone clip (plan §8.5, Review-III fallback) needs a physical
-Android phone: open the app, add to home screen, turn on airplane mode,
-create a referral, turn signal back on, record it syncing. Ten minutes of
-your time; I have no way to do it. Tell me if you'd rather drop it — the
-automated test already proves the same behaviour, so it's presentation
-evidence rather than verification.
+**The real-phone clip** (plan §8.5, the Review-III fallback) is still
+owed, and is being kept. Needs a physical Android phone: open the app, add
+to home screen, airplane mode, create a referral, restore signal, record it
+syncing. Ten minutes; nothing in this repo can do it. Note where the file
+lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-Wait for the user's go-ahead on Phase 5 (escalation scheduler, SSE, the
-supervisor dashboard that currently renders as a placeholder at
-`/supervisor`). `react-router-dom` (yes) / `dexie-react-hooks` (no,
-hand-rolled `useLiveQuery` instead) / `vite-plugin-pwa` (yes, named in the
-original plan) are settled — do not re-ask.
+**Start P5.1** on the user's go-ahead, in a new session, using the prompt
+in `temp.txt`. P5.1 is SLA profiles + the escalation sweep + escalation
+lifecycle: server only, no SSE, no dashboard, **no migration** (`alembic
+heads` stays `0006`). Model: Sonnet.
 
 ## Verify the current state yourself
 
@@ -107,8 +105,11 @@ To see the screens by hand: open `http://localhost:5173/login`, log in as
   currently holds one per screen plus the PWA offline-reload proof.
 - Review-I is a literature review/survey, not a live demo — no rehearsal
   needed.
-- All Phase 2/3/4-planning decisions (D1–D16): settled — see the relevant
-  `PHASE*_PLAN.md` / ADR.
+- The real-phone offline clip stays on the list. Do not propose dropping
+  it again.
+- All decisions D1–D22: settled — see the relevant `PHASE*_PLAN.md` / ADR.
+  Phase 5's four (SSE query-token auth, LISTEN/NOTIFY, `SLA_SCALE`,
+  P5.1/P5.2 split) were answered 2026-08-20; do not re-ask them.
 
 ## Known problems and workarounds
 
