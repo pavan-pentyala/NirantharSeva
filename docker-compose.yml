@@ -50,6 +50,8 @@ services:
       SIM_START: ${SIM_START:-}
       RUN_ID: ${RUN_ID:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SLA_SCALE: ${SLA_SCALE:-1.0}
+      SWEEP_INTERVAL_SECONDS: ${SWEEP_INTERVAL_SECONDS:-300}
     volumes:
       - ./server:/app
       - server_venv:/app/.venv

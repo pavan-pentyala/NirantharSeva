@@ -10,14 +10,15 @@
 > information, at lower quality.
 
 **Last updated:** 2026-08-20
-**Last session model:** Opus 5 (Phase 5 planning). Implementation is Sonnet.
+**Last session model:** Sonnet 5 (P5.1 implementation). Planning was Opus.
 
 ## Current phase
 
-**Phase 4 is code-complete; one exit criterion is outstanding and is the
-user's to do** (the real-phone clip — see "Open item"). **Phase 5 is
-planned, not started** — `docs/PHASE5_PLAN.md`, D17–D22, ADR-011, ADR-012.
-Waiting for a go-ahead to start P5.1.
+**P5.1 is code-complete and verified** — SLA profiles, the escalation
+sweep, and the escalation lifecycle. Server only, no migration, `alembic
+heads` still `0006`. **Waiting for the user to review before starting
+P5.2** (SSE transport + Screen 4, `docs/PHASE5_PLAN.md`) — do not start it
+without an explicit go-ahead (handoff R1).
 
 ## Done
 
@@ -30,11 +31,23 @@ Waiting for a go-ahead to start P5.1.
   `toy_event`. ADR-005's D7 exception ended exactly here, as planned.
 - Phase 5 planning: D17–D22 decided with the user, ADR-011 (LISTEN/NOTIFY)
   and ADR-012 (SSE query-token auth) written. P5.1/P5.2 split approved.
+- **P5.1** (`docs/PHASE5_PLAN.md` build order): `SLA_SCALE` +
+  `SWEEP_INTERVAL_SECONDS` config (D17); five `sla_profile` seed rows, one
+  per escalatable state; `app/domain/escalation.py`'s `sweep()`; the
+  system-event append (extracted into `app/sync/event_log.py`'s
+  `insert_referral_event`, shared with `push.py`); escalation resolution on
+  exit from `ESCALATED` in `push.py`'s `_apply_referral_transition` (D22);
+  `app/scheduler/run.py` now runs `sweep()` on an `AsyncIOScheduler`
+  interval instead of `sleep(3600)`. `apscheduler` added as a dependency
+  (already named in the plan's stack list). 10 new tests in
+  `tests/integration/test_escalation_sweep.py`, one per row of
+  PHASE5_PLAN's "What P5.1 must prove" table. `docs/PHASE2_OBSERVATIONS.md`
+  Phase 5 section, observations 34–36.
 
 ## Not done / in progress
 
-- P5.1: not started, needs the user's go-ahead (handoff R1). A ready-to-use
-  starting prompt is in `temp.txt` (gitignored scratch file).
+- P5.2 (SSE transport, `GET /dashboard/stream`, Screen 4): not started.
+  Needs its own go-ahead.
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
 - No known open bugs.
@@ -52,6 +65,26 @@ real commands, **except** the real-phone recording. Two needed judgement:
   dev server — `injectManifest` only produces a real precache in a
   production build. Observation 33.
 
+P5.1: every criterion in `docs/PHASE5_PLAN.md` checked against real
+commands — `alembic heads` is `0006`, seeding is idempotent, the sweep
+escalates a breached referral and leaves within-SLA/dead/already-escalated
+ones alone, two sweeps over one open breach produce one row/one event (the
+partial index's doing — see the note in `test_escalation_sweep.py` on how
+that's actually exercised, not just asserted), resolution-then-rebreach
+produces a second row, `verify_replay` is clean after a sweep, the sweep
+honours a `SimulatedClock`, `SLA_SCALE` changes the window, the
+`datetime.now()` grep is clean, `ruff` and the full suite (197 tests) are
+green.
+
+One small decision made without asking, flagged here per handoff §7:
+**`escalation.escalated_to_user_id` is left `NULL`.** The plan's own sweep
+snippet doesn't populate it either, and resolving `sla_profile.escalate_to_role`
+to one specific `app_user` needs a rule (which org? which user if several
+share the role?) that build order item 3/4 doesn't specify — "Not in this
+plan" only says the column *is* populated eventually, "but nothing acts on
+it beyond display." Left for P5.2 or later if the dashboard ends up needing
+a specific name rather than just the role.
+
 ## Open item for the user
 
 **The real-phone clip** (plan §8.5, the Review-III fallback) is still
@@ -62,10 +95,8 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Start P5.1** on the user's go-ahead, in a new session, using the prompt
-in `temp.txt`. P5.1 is SLA profiles + the escalation sweep + escalation
-lifecycle: server only, no SSE, no dashboard, **no migration** (`alembic
-heads` stays `0006`). Model: Sonnet.
+**Start P5.2** on the user's go-ahead: SSE transport (`GET
+/dashboard/stream`, ADR-011/ADR-012) + Screen 4, per `docs/PHASE5_PLAN.md`.
 
 ## Verify the current state yourself
 
@@ -86,7 +117,26 @@ docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS nirantharsev
 docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
   api sh -c "alembic upgrade head && python -m app.seed && ruff check . && ruff format --check . && pytest -q && python -m app.verify_replay"
 ```
-Expect `187 passed`, clean.
+Expect `197 passed`, clean.
+
+Escalation sweep, specifically (P5.1's headline, without waiting for a real
+SLA window):
+
+```bash
+docker compose exec -T db psql -U postgres -d nirantharseva -c "SELECT state, max_hours, escalate_to_role FROM sla_profile ORDER BY state;"
+docker compose run --rm -e SLA_SCALE=0.0001 -e SWEEP_INTERVAL_SECONDS=2 -d --name sweep-demo scheduler
+# wait ~5s, then:
+docker compose exec -T db psql -U postgres -d nirantharseva -c "SELECT referral_id, breached_state, resolved_at FROM escalation;"
+docker stop sweep-demo && docker rm sweep-demo   # -d means --rm does not apply; clean up by hand
+```
+**This escalates real dev-database referrals** — observation 35 in
+`docs/PHASE2_OBSERVATIONS.md` is the story of this exact command's
+foreground (`timeout`-wrapped, non-`-d`) form outliving its tool call and
+quietly re-escalating a "fresh" reseed for several minutes. Run it `-d` (as
+above, not foreground-and-killed) and stop/rm it explicitly, or run it
+against `nirantharseva_test` instead of `nirantharseva`, and reseed
+afterward (`docker compose exec api python -m app.seed` only re-adds
+missing rows — it does not undo an escalation).
 
 To see the screens by hand: open `http://localhost:5173/login`, log in as
 `asha_a`/`dev` (or `mo1`/`dev` for Screen 5). `/supervisor` and
@@ -123,6 +173,22 @@ To see the screens by hand: open `http://localhost:5173/login`, log in as
   the daemon.
 - Named volumes (`server_venv`, `client_node_modules`) need `-V` to refresh
   after a dependency change: `docker compose up -d --build -V <service>`.
+  **`-V` did not actually do it for `server_venv` when adding apscheduler
+  this session** — `scheduler` still raised `ModuleNotFoundError` after a
+  `--build -V` bringing up both `api` and `scheduler` (a *shared* named
+  volume, mounted by two services at once). What worked: `docker compose
+  rm -sf api scheduler && docker volume rm nirantharseva_server_venv &&
+  docker compose up -d --build api scheduler`. If `-V` alone doesn't fix a
+  stale-dependency error, remove the volume by hand rather than assuming
+  the container needs a deeper rebuild.
+- A `docker compose run --rm` container killed via a wrapping `timeout`
+  can outlive the tool call and survive a subsequent `docker compose down
+  -v` (which will report the network/volume "still in use" — read that
+  warning, it means an orphan is still attached). See observation 35,
+  `docs/PHASE2_OBSERVATIONS.md`. Check with `docker ps -a` (not `docker
+  compose ps`, which only lists service containers) after anything
+  `timeout`-wrapped; clean up with `docker rm -f <name>` before trusting
+  a "fresh" `down -v && up`.
 - A long-running `vite dev` inside Docker doesn't always pick up file
   changes through the Windows bind mount. `docker compose restart client`
   fixes it — try this before debugging a test failure that looks like an

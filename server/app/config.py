@@ -21,6 +21,14 @@ class Settings(BaseSettings):
     run_id: str | None = None
     log_level: str = "INFO"
 
+    # See docs/PHASE5_PLAN.md D17 — multiplies sla_profile.max_hours inside
+    # the escalation sweep, so a demo can shrink real-hour SLA windows to
+    # seconds without touching seed data, the schema, or E2.
+    sla_scale: float = 1.0
+    # How often app/scheduler/run.py calls the sweep. 300s in production,
+    # 10s in demo config (docs/IMPLEMENTATION_PLAN.md §9.1).
+    sweep_interval_seconds: int = 300
+
 
 @lru_cache
 def get_settings() -> Settings:

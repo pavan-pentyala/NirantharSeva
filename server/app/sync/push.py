@@ -36,7 +36,7 @@ from app.domain.states import State, may
 from app.instrumentation.logging import get_logger
 from app.schemas.sync import Op, OpResult, OpStatus
 from app.sync.conflicts import decide
-from app.sync.event_log import replay_referral
+from app.sync.event_log import insert_referral_event, replay_referral
 from app.sync.lamport import merge_lamport
 
 _logger = get_logger(__name__)
@@ -175,34 +175,21 @@ async def _append_referral_event(
     # actor_user_id and actor_role come from the caller's server-verified
     # identity, never from op.payload — a device cannot be trusted to name
     # its own role, org, or user (docs/decisions/ADR-006.md).
-    inserted = await session.execute(
-        text(
-            """INSERT INTO referral_event
-                 (id, referral_id, from_state, to_state, actor_user_id, actor_role,
-                  device_time, server_time, lamport, op_id, device_id, payload, run_id)
-               VALUES
-                 (:id, :referral_id, :from_state, :to_state, :actor_user_id, :actor_role,
-                  :device_time, :server_time, :lamport, :op_id, :device_id,
-                  CAST(:payload AS jsonb), :run_id)
-               RETURNING seq"""
-        ),
-        {
-            "id": uuid.uuid4(),
-            "referral_id": referral_id,
-            "from_state": from_state,
-            "to_state": to_state,
-            "actor_user_id": actor.user_id,
-            "actor_role": actor.role.value,
-            "device_time": op.device_time,
-            "server_time": server_time,
-            "lamport": op.lamport,
-            "op_id": op.op_id,
-            "device_id": device_id,
-            "payload": json.dumps(op.payload),
-            "run_id": run_id,
-        },
+    return await insert_referral_event(
+        session,
+        referral_id=referral_id,
+        from_state=from_state,
+        to_state=to_state,
+        actor_user_id=actor.user_id,
+        actor_role=actor.role.value,
+        device_time=op.device_time,
+        server_time=server_time,
+        lamport=op.lamport,
+        op_id=op.op_id,
+        device_id=device_id,
+        payload=op.payload,
+        run_id=run_id,
     )
-    return inserted.scalar_one()
 
 
 def _warn_if_payload_claims_org_identity(op: Op, actor: Actor) -> None:
@@ -446,6 +433,21 @@ async def _apply_referral_transition(
             text("UPDATE referral SET current_state=:to, state_entered_at=:now WHERE id=:id"),
             {"to": to_state.value, "now": now, "id": op.entity_id},
         )
+        if from_state == State.ESCALATED:
+            # D22: resolving on exit, in the SAME transaction as the event
+            # append (I1). uq_escalation_open only blocks a SECOND open row
+            # for the same (referral_id, breached_state) — without this, a
+            # referral could never escalate twice, and the bug stays
+            # invisible until a long demo. At most one escalation is open
+            # per referral at a time (the sweep never escalates a referral
+            # already in ESCALATED), so this needs no breached_state match.
+            await session.execute(
+                text(
+                    """UPDATE escalation SET resolved_at=:now
+                       WHERE referral_id=:id AND resolved_at IS NULL"""
+                ),
+                {"now": now, "id": op.entity_id},
+            )
     elif decision.status == "conflict":
         # I6: the losing write is never deleted — it is already in
         # referral_event, appended above. This records the pair.

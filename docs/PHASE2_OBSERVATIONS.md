@@ -736,3 +736,89 @@ now needs *both* servers up. `docker compose up -d` gives you `:5173`;
 client` kills the preview process (it isn't the container's main command)
 and it must be restarted by hand — which cost two confusing red runs this
 session before the pattern was obvious.
+
+---
+
+# Phase 5 — implementation observations
+
+## `docs/PHASE5_PLAN.md`'s own op_id formula collides on a legitimate re-breach — the trap it documents needed a further correction
+
+**34. Deriving the swept `ESCALATED` event's `op_id` from `uuid5(referral_id,
+breached_state)` alone, exactly as the plan's Traps section describes it,
+breaks D22's own re-breach case.** `referral_event.op_id` is `NOT NULL
+UNIQUE`. A referral can legitimately breach the *same* `breached_state`
+twice — resolve out of `ESCALATED` back into, say, `IN_TRANSIT`, then stall
+in `IN_TRANSIT` again — and `uq_escalation_open`'s partial index correctly
+allows a second `escalation` row once the first is resolved. But a second
+event with the identical `uuid5(referral, breached_state)` op_id collides
+with the first one's, and since the insert in `app/domain/escalation.py`
+has no `ON CONFLICT` clause, this would raise an `IntegrityError` and roll
+back the whole transaction — no second row either, contradicting the exit
+criterion that says re-breach must produce one.
+
+Resolved by folding `triggered_at` (the sweep's own `clock.now()`) into the
+op_id: `uuid5(referral_id, breached_state, triggered_at.isoformat())`. Two
+sweeps over the *same still-open* breach still collapse to the same input
+whenever `now` hasn't moved, which is exactly the case
+`uq_escalation_open`'s own idempotency test needs — but a genuine re-breach,
+which structurally cannot happen without the SLA window elapsing again, always
+has a different `triggered_at` and gets a distinct op_id.
+`test_resolution_on_exit_and_rebreach_creates_a_second_row` in
+`test_escalation_sweep.py` pins this: it asserts two `ESCALATED` events
+exist after the second breach, not just two `escalation` rows, which is
+the assertion the naive formula would have failed on silently rather than
+by crashing (the crash would at least have been loud; a formula using
+`ON CONFLICT DO NOTHING` instead of raising would have passed the row count
+and failed the event count only).
+
+## A `docker compose run --rm` process killed by `timeout` can outlive the tool call, survive `down -v`, and keep writing to the "clean" database that follows
+
+**35. `timeout 8 docker compose run --rm ...` returning control after 8
+seconds does not mean the container is gone.** Used to smoke-test the sweep
+live, with `SLA_SCALE=0.0001` and a 2-second interval, against the
+then-current dev database. The `timeout` wrapper reliably kills the
+foreground `docker compose run` CLI process, but that is not the same
+thing as the daemon stopping the container it started — this one kept
+running detached, invisible to `docker compose ps` (which only lists
+service containers), visible only in `docker ps -a`. `docker compose down
+-v` immediately after reported `Volume ... Resource is still in use` and
+`Network ... Resource is still in use` — the orphan holding both — and
+proceeded anyway, silently reusing the *existing* network for the fresh
+`up` rather than recreating it. The orphan, still attached to that reused
+network with Docker's embedded DNS re-resolving `db` to the new container,
+spent the next several minutes sweeping the newly-seeded, otherwise-clean
+database every 2 seconds at a 24-hour SLA window scaled to under 9 seconds
+— escalating both seed referrals within 16 seconds of being seeded, before
+any real verification had a chance to run against a genuinely clean state.
+
+**Caught by:** re-querying the "clean" database once more before trusting
+it and finding two `escalation` rows that a fresh reseed should not have
+produced. Diagnosed with `docker ps -a` (not `docker compose ps`) plus
+`docker inspect <container> --format '{{.State.StartedAt}}'` to see the
+orphan was older than the "fresh" service containers around it.
+
+**Resolved by:** `docker rm -f` on the orphan by name, then re-running
+`down -v` (this time reporting a clean removal of the network and volume,
+no "still in use" warnings) before `up` and reseeding. **For next time:** a
+one-off `docker compose run` container that will outlive the tool call
+should be started detached (`-d`) or with an explicit `docker stop`/`docker
+rm` afterward that is verified to have worked — a `timeout`-wrapped
+foreground run is not a reliable way to guarantee cleanup, and `down -v`'s
+own "still in use" warnings are worth reading, not scrolling past.
+
+## D22's resolution UPDATE does not need to match `breached_state` — the state machine already guarantees at most one open escalation per referral
+
+**36. `_apply_referral_transition`'s resolution `UPDATE escalation SET
+resolved_at=:now WHERE referral_id=:id AND resolved_at IS NULL` (D22, no
+`breached_state` predicate) is correct, not just simpler, because
+`app/domain/escalation.py`'s sweep only ever escalates a referral whose
+`current_state` is one of the five states with an `sla_profile` row —
+`ESCALATED` itself is always excluded.** So a referral already in
+`ESCALATED` can never be escalated again for a *different* breached state
+while still `ESCALATED` — there is structurally at most one unresolved
+`escalation` row per referral at any time, and this transition only ever
+resolves the transition it is literally applied to. Worth recording because
+it is the kind of thing a later change could break invisibly: if the sweep
+were ever changed to escalate a referral out of a state other than the
+current one (it should not be), this UPDATE's lack of a `breached_state`
+predicate would silently resolve the wrong row.

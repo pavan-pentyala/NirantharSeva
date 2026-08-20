@@ -127,6 +127,50 @@ PATIENTS = [
     },
 ]
 
+# One row per escalatable state (docs/PHASE5_PLAN.md D17, build order #2).
+# ESCALATED/CLOSED/LOST are not here — app/domain/escalation.py's sweep
+# already excludes them by current_state, so a profile row for them would
+# never JOIN. Real hours, scaled by SLA_SCALE inside the sweep query, not
+# here — E2 sweeps {24, 48, 72, 120}h and this column has to keep meaning
+# what it says.
+SLA_PROFILES = [
+    {
+        "key": "sla:CREATED",
+        "name": "CREATED SLA",
+        "state": State.CREATED,
+        "max_hours": 24,
+        "escalate_to_role": Role.ANM,
+    },
+    {
+        "key": "sla:IN_TRANSIT",
+        "name": "IN_TRANSIT SLA",
+        "state": State.IN_TRANSIT,
+        "max_hours": 48,
+        "escalate_to_role": Role.MO,
+    },
+    {
+        "key": "sla:ARRIVED",
+        "name": "ARRIVED SLA",
+        "state": State.ARRIVED,
+        "max_hours": 24,
+        "escalate_to_role": Role.SUPERVISOR,
+    },
+    {
+        "key": "sla:TREATED",
+        "name": "TREATED SLA",
+        "state": State.TREATED,
+        "max_hours": 48,
+        "escalate_to_role": Role.SUPERVISOR,
+    },
+    {
+        "key": "sla:BACK_REFERRED",
+        "name": "BACK_REFERRED SLA",
+        "state": State.BACK_REFERRED,
+        "max_hours": 72,
+        "escalate_to_role": Role.SUPERVISOR,
+    },
+]
+
 # One referral per village (D4). target_org_id is always an ancestor of
 # origin_org_id — the property ADR-005's origin-only filtering relies on,
 # machine-checked by a test.
@@ -205,6 +249,25 @@ async def seed(
                 },
             )
             user_ids[user["name"]] = result.scalar_one()
+
+        for profile in SLA_PROFILES:
+            await s.execute(
+                text(
+                    """INSERT INTO sla_profile
+                         (id, name, state, max_hours, escalate_to_role, active)
+                       VALUES (:id, :name, :state, :max_hours, :escalate_to_role, true)
+                       ON CONFLICT (id) DO UPDATE
+                         SET name = EXCLUDED.name, max_hours = EXCLUDED.max_hours,
+                             escalate_to_role = EXCLUDED.escalate_to_role, active = true"""
+                ),
+                {
+                    "id": _stable_id(profile["key"]),
+                    "name": profile["name"],
+                    "state": profile["state"].value,
+                    "max_hours": profile["max_hours"],
+                    "escalate_to_role": profile["escalate_to_role"].value,
+                },
+            )
 
         patient_ids: dict[str, uuid.UUID] = {}
         now = clock.now()
@@ -289,4 +352,7 @@ async def seed(
 
 if __name__ == "__main__":
     asyncio.run(seed())
-    print("Seeded PHC Ramnagar district: 4 org units, 5 users, 4 patients, 2 referrals.")
+    print(
+        "Seeded PHC Ramnagar district: 4 org units, 5 users, 4 patients, "
+        "2 referrals, 5 SLA profiles."
+    )
