@@ -10,18 +10,14 @@
 > information, at lower quality.
 
 **Last updated:** 2026-08-20
-**Last session model:** Sonnet 5 (P5.1 and P5.2 implementation, same
-session). Planning was Opus.
+**Last session model:** Opus 5 (Phase 6 planning). Implementation is Sonnet.
 
 ## Current phase
 
-**Phase 5 is code-complete and verified** — P5.1 (SLA profiles, the
-escalation sweep, escalation lifecycle) and P5.2 (LISTEN/NOTIFY, the
-dashboard endpoints, Screen 4, the D20 overlay on Screens 1/3/5), built in
-one session. Server only added two new endpoints, no migration — `alembic
-heads` is still `0006`. **Waiting for the user to review.** Phase 6
-(identity resolution) has not been planned yet — that needs its own
-planning session (Opus) before implementation starts.
+**Phase 5 is complete and verified.** **Phase 6 is planned, not started** —
+`docs/PHASE6_PLAN.md`, D23–D27, ADR-013, ADR-014. Waiting for a go-ahead
+to start P6.1. A ready-to-use starting prompt is in `temp.txt` (gitignored
+scratch file).
 
 ## Done
 
@@ -61,12 +57,15 @@ planning session (Opus) before implementation starts.
   9 new/changed Playwright tests in `client/tests/dashboard.spec.ts`,
   including the plan's headline (a live breach, no reload) and one that
   specifically exercises D22's resolution path from the client side.
-  `docs/PHASE2_OBSERVATIONS.md` Phase 5 section, observations 34–39.
+  `docs/PHASE2_OBSERVATIONS.md` Phase 5 section, observations 34–40.
+- Phase 6 planning: D23–D27 decided with the user, ADR-013 (identity merge
+  is REST, not a sync op) and ADR-014 (blocking with a missing phone)
+  written. P6.1/P6.2 split approved.
 
 ## Not done / in progress
 
-- Phase 6 (identity resolution + gold set + review queue): not planned.
-  Needs an Opus planning session before any code.
+- P6.1: not started, needs the user's go-ahead (handoff R1). Starting
+  prompt ready in `temp.txt`.
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
 - No known open bugs.
@@ -133,11 +132,11 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Phase 6 needs planning first** (identity resolution + gold set + review
-queue) — an Opus session against `docs/IMPLEMENTATION_PLAN.md`'s Phase 6
-section, the way `docs/PHASE5_PLAN.md` was written for this phase. Do not
-start writing Phase 6 code without that plan existing and the user's
-go-ahead on it.
+**Start P6.1** on the user's go-ahead, in a new session, using the prompt
+in `temp.txt`. P6.1 is the normalise/block/score pipeline + the name-variant
+generator + the gold set + the threshold sweep: server only, no migration
+(`alembic heads` stays `0006`), no `push.py` wiring, no API, no client
+file. Model: Sonnet.
 
 ## Verify the current state yourself
 
@@ -225,9 +224,12 @@ To see the screens by hand: open `http://localhost:5173/login`, log in as
   needed.
 - The real-phone offline clip stays on the list. Do not propose dropping
   it again.
-- All decisions D1–D22: settled — see the relevant `PHASE*_PLAN.md` / ADR.
+- All decisions D1–D27: settled — see the relevant `PHASE*_PLAN.md` / ADR.
   Phase 5's four (SSE query-token auth, LISTEN/NOTIFY, `SLA_SCALE`,
-  P5.1/P5.2 split) were answered 2026-08-20; do not re-ask them.
+  P5.1/P5.2 split) and Phase 6's five (gold set sliced forward from the
+  Phase 7 generator, P6.1/P6.2 split, identity merge over REST rather than
+  the outbox, no "not sure" third button on Screen 6, blocking with a
+  missing phone) were answered 2026-08-20; do not re-ask them.
 
 ## Known problems and workarounds
 
