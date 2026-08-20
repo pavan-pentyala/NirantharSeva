@@ -6,34 +6,149 @@
 > session builds on top of something that does not exist.
 
 **Last updated:** 2026-08-20
-**Last session model:** Sonnet 5 — P4.1 build (server contract + client data
-layer). No screens touched.
-**Files changed this session:** migration `server/alembic/versions/0005_patient_and_display_name.py`
-(new); `server/app/sync/push.py` (`_resolve_patient`, ADR-009);
-`server/app/sync/pull.py` (widened referral payload, ADR-010);
-`server/app/seed.py` (display names, patient age/sex); `server/app/schemas/sync.py`
-(docstring only); `server/tests/integration/test_patient_resolution.py` (new),
-`server/tests/integration/test_pull_referral_payload.py` (new);
-`client/src/db/schema.ts` (Dexie `version(2)`); `client/src/sync/engine.ts`
-(`createReferral`, `transitionReferral`, referral branch of
-`applyPulledEvents`); `client/src/main.tsx` (test hooks only);
-`client/src/api/client.ts` (docstring only);
-`client/tests/referral-cache-atomicity.spec.ts` (new),
-`client/tests/apply-pulled-referral-events.spec.ts` (new);
-`docs/PHASE2_OBSERVATIONS.md` (Phase 4 section appended, observations 18–22).
-Nothing under `client/src/pages/` or `client/src/App.tsx` changed (P4.1's own
-exit criterion).
+**Last session model:** Sonnet 5 — P4.2 build (the five screens). Continued
+straight from P4.1 in the same day.
+**Files changed this session:** new server endpoint
+`server/app/api/org_units.py` + `server/app/schemas/org_unit.py` (registered
+in `server/app/main.py`), `server/tests/integration/test_org_units.py` (new);
+client dependency `react-router-dom` added (`client/package.json`,
+`client/package-lock.json`) — `dexie-react-hooks` was **not** approved, see
+below; `client/src/db/schema.ts` (Dexie `version(3)`:
+`referral_event_cache`, `org_cache`); `client/src/sync/engine.ts`
+(`refreshOrgCache`, and a real bug fix in `applyPulledReferralEvent` — see
+"Done this session" below); `client/src/api/client.ts` (`getToken`,
+`listOrgUnits`); new: `client/src/auth/session.ts`,
+`client/src/auth/RequireAuth.tsx`, `client/src/hooks/useLiveQuery.ts`,
+`client/src/hooks/useSyncStatus.ts`, `client/src/domain/stateLabels.ts`,
+`client/src/domain/referralActions.ts`, `client/src/domain/relativeTime.ts`,
+`client/src/domain/timeline.ts`, `client/src/domain/formatAgeSex.ts`,
+`client/src/routes.ts`, `client/src/styles/tokens.css`,
+`client/src/vite-env.d.ts`; new components:
+`DemoMarker`/`StatePill`/`SyncBand`/`WaitingToSendPill` (+ CSS Modules); new
+pages: `LoginPage`, `ReferralListPage`, `CreateReferralPage`,
+`ReferralDetailPage`, `IncomingReferralsPage`, `PlaceholderPage` (+ CSS
+Modules); `client/src/App.tsx` (router — root `/` deliberately unchanged,
+still the toy harness); `client/src/main.tsx` (`BrowserRouter`, tokens.css
+import); `client/tests/p42-screens.spec.ts` (new, end-to-end);
+`docs/PHASE2_OBSERVATIONS.md` (Phase 4 section extended, observations
+23–29); `docs/screenshots/` (9 new PNGs, one per screen plus Screen 1's
+three states).
 
 ---
 
 ## Current phase
 
-**P4.1 of Phase 4 is done, not yet confirmed against a cold-start pass by the
-user.** P4.2 (the five screens) has not started — needs the user's go-ahead,
-plus a yes/no on the two dependencies P4.2 needs (`react-router-dom`,
-`dexie-react-hooks`), per `docs/PHASE4_PLAN.md`.
+**P4.2 of Phase 4 is done.** P4.3 (PWA, toy-model drop, fault-test port) has
+not started — needs the user's go-ahead per handoff R1.
 
-## Done this session (2026-08-20) — P4.1
+## Done this session (2026-08-20) — P4.2
+
+Built in the order `docs/PHASE4_PLAN.md`'s P4.2 table gives, after
+confirming `react-router-dom` (yes) and `dexie-react-hooks` (**no** — see
+below) at the start of the session as the plan requires.
+
+1. **Router + live query.** `react-router-dom` wraps `App.tsx`; root `/`
+   deliberately keeps its exact pre-P4.2 content (the toy harness) so
+   `client/tests/offline-sync.spec.ts` and `client-kill-resume.spec.ts` —
+   E4's evidence — keep passing unported, per `docs/PHASE4_PLAN.md`'s own
+   note that the port is P4.3's job. `dexie-react-hooks` was declined by the
+   user, so `client/src/hooks/useLiveQuery.ts` is hand-rolled on top of
+   Dexie core's own `liveQuery()` (already part of the `dexie` dependency —
+   no new package needed for it).
+2. **Design tokens** (`client/src/styles/tokens.css`) — colour, type scale,
+   spacing/radius, transcribed from the design bundle's README.
+3. **State → label lookup** (`client/src/domain/stateLabels.ts`) — the
+   README's table, verbatim, the only place the two vocabularies meet.
+4. **Screens 1, 2, 3, 5, 7**, real React/TS against the design bundle,
+   reading only Dexie. Screens 4 and 6 are routed placeholders
+   (`/supervisor`, `/identity-review`) naming which phase builds them for
+   real.
+5. **Sync band** (`client/src/components/SyncBand.tsx`) — amber/grey,
+   banned-words-safe copy.
+6. **Demo marker** on every real screen.
+7. **Screenshots** — `docs/screenshots/`, 9 PNGs: all seven screens plus
+   Screen 1's three states (synced, offline-with-pending, empty) separately.
+
+**A real bug, not a design gap, found and fixed:** `applyPulledEvents`'
+referral branch (P4.1) folded its "state so far" from `referral_cache`,
+which `createReferral`/`transitionReferral` write to optimistically before
+any round trip. The first real screen to create a referral and then wait
+for its own confirming pull showed an empty timeline — the confirming
+event's `from_state` never matched the already-optimistically-advanced
+cache, so the fold silently refused to advance for *any* device confirming
+its own write, referral creation included. Fixed by folding from
+`referral_event_cache` (a table only the fold itself ever writes) instead of
+`referral_cache` (which an optimistic UI write can move ahead of the fold at
+any time) — full writeup in `docs/PHASE2_OBSERVATIONS.md`, observation 23,
+including why P4.1's own fixture-based test never caught it.
+
+**Decisions made with the user mid-session, not guessed at:**
+
+- **Screen 3's mockup gives the ASHA buttons she doesn't have permission
+  for** (`GUARDS` reserves `ARRIVED` for MO, `LOST` for SYSTEM alone). User
+  chose "build only her real actions" — `CREATED → IN_TRANSIT` ("Mark as
+  sent") and `BACK_REFERRED → CLOSED` ("Mark as care finished") are the only
+  two buttons Screen 3 ever shows an ASHA; every other state shows a plain
+  waiting line instead. Observation 25.
+- **A new `GET /org_units` endpoint** — Screen 2 needs org names and nothing
+  had ever exposed them to the client (the JWT carries only a bare
+  `org_unit_id`). Asked before building, since it's a new API surface, not a
+  client-only change. Deliberately unscoped, unlike `GET /referrals` — org
+  names aren't patient data. Observation 27.
+
+**Two more calls made alone and flagged here, not asked about separately —
+both client-only or copy-only, no contract change:**
+
+- `referral_event_cache` (Dexie `version(3)`) — Screen 3's timeline needs
+  per-event history and P4.1's schema never anticipated that. Observation
+  26.
+- The timeline attributes events by role ("by the ASHA", "by the MO", "by
+  the system"), not by name — no display name is available client-side for
+  any actor, not even the one logged in (the JWT has a username, not
+  `display_name`). Observation 28.
+
+## Exit criteria status (P4.2, `docs/PHASE4_PLAN.md`)
+
+- [x] All five screens navigable from a fresh login, reading only from
+      Dexie — verified with `client/tests/p42-screens.spec.ts`, which
+      toggles the network mid-test the same way the fault tests do; no
+      screen blanked during the offline stretch.
+- [x] Screen 1's three states (synced / offline-with-pending / empty) all
+      reachable and visually distinct without a colour-only cue — three
+      separate screenshots in `docs/screenshots/`
+      (`screen1-asha-referral-list.png` caught it empty, on the first paint
+      before the initial pull finishes — offline-first working as intended,
+      not a race; `screen1-offline-with-pending.png`;
+      `screen1-synced-with-new-referral.png`).
+- [x] Screen 2 creates a referral for a brand-new patient name, offline, and
+      it appears correctly in Screen 1 and Screen 3 after reconnect —
+      `p42-screens.spec.ts`, end to end, including MO subsequently advancing
+      it through the real state machine.
+- [x] No banned word in any rendered screen's copy — verified by reading
+      every source-level match by hand (a blind grep of the *built* JS
+      bundle false-positives on internal identifiers like `syncNow` and
+      `Op.payload`; see observation 29 for why that check needs a human, not
+      a hit count).
+- [x] Screens 4 and 6 render a placeholder, not a 404 or blank route —
+      screenshotted, routed at `/supervisor` and `/identity-review`.
+- [x] `tsc --noEmit` and `npm run build` clean.
+
+## Verify this yourself
+
+```bash
+docker compose up -d --build   # if not already up
+docker compose exec client npx tsc --noEmit
+docker compose exec client npm run build
+cd client && npx playwright test
+```
+Expect `5 passed` (the two P4.1 fixture tests, the two pre-existing fault
+tests, and the new P4.2 end-to-end walkthrough).
+
+To see the screens by hand: `docker compose up -d`, open
+`http://localhost:5173/login`, log in as `asha_a`/`dev` (or `mo1`/`dev` for
+Screen 5). `/supervisor` and `/identity-review` are reachable directly.
+
+## Done in the P4.1 session (2026-08-20)
 
 Built in the order `docs/PHASE4_PLAN.md`'s P4.1 table gives:
 
@@ -290,16 +405,30 @@ editing the pipeline itself was outside what Phase 3's build order asked for.
 - **GitHub Actions minutes are not a concern** — do not raise this again.
 - **D9–D12 (Phase 3)** — settled and built. See `docs/PHASE3_PLAN.md`.
 - **Phase 2 decisions D1–D8** — settled and all built. See `docs/PHASE2_PLAN.md`.
+- **D13–D16 (Phase 4) and P4.2's own mid-session calls** — settled and
+  built. See `docs/PHASE4_PLAN.md`, ADR-009, ADR-010, and
+  `docs/PHASE2_OBSERVATIONS.md`'s Phase 4 section (observations 18–29) for
+  everything decided during the build, not just at planning time.
 - Review-I (per D9) is a literature review and survey, not a live demo. No
   rehearsal is budgeted or required.
 
 ## Next concrete step
 
-**Wait for the user's explicit go-ahead before starting P4.2** (handoff R1).
-`docs/PHASE4_PLAN.md`'s P4.2 section needs two yes/no answers first —
-`react-router-dom` and `dexie-react-hooks`, neither named in the plan, both
-new dependencies (handoff §2). P4.2 builds Screens 1, 2, 3, 5, 7 plus
-placeholders for 4 and 6. Model for P4.2: Sonnet.
+**Wait for the user's explicit go-ahead before starting P4.3** (handoff R1).
+P4.3 is: `vite-plugin-pwa` (`injectManifest` mode), migration `0006`
+(drops `toy`/`toy_event`, removes `ToyPage.tsx` and the toy branches of
+`push.py`/`pull.py`), porting `offline-sync.spec.ts` and
+`client-kill-resume.spec.ts` off the toy harness onto the real referral
+screens (root `/` currently still serves the toy harness precisely so this
+port can happen deliberately, not by accident), and a real-phone recording.
+Model for P4.3: Sonnet.
+
+**`react-router-dom` / `dexie-react-hooks`, settled this session:**
+`react-router-dom` approved and added; `dexie-react-hooks` declined —
+`client/src/hooks/useLiveQuery.ts` is hand-rolled on Dexie core's own
+`liveQuery()` instead (already part of the `dexie` dependency, no new
+package). Do not raise either again unless P4.3 needs something the
+hand-rolled hook can't do.
 
 ## Known problems and workarounds
 

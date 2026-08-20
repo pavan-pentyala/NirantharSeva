@@ -321,9 +321,8 @@ whatever cause) announces itself.
 
 # Phase 4 — implementation observations
 
-**Status:** P4.1 of 3 done (server contract + client data layer, no
-screens). Built on Sonnet in one session, in the build order
-`docs/PHASE4_PLAN.md`'s P4.1 table gives.
+**Status:** P4.2 of 3 done (the five screens). Built on Sonnet, in the build
+order `docs/PHASE4_PLAN.md`'s P4.1 and P4.2 tables give.
 
 **What this section is for:** the same as the Phase 2 and Phase 3 sections
 above — things learned building Phase 4 that are not derivable from the
@@ -430,3 +429,175 @@ mechanics without being asked risks the exact sequencing invariant (I2-
 adjacent, ADR-002) this phase has no reason to be near. Every other test in
 the suite — 186 of 187, plus all of P4.1's own new tests — passed clean on
 this same run.
+
+---
+
+## An optimistic write can poison the pull-side fold it's supposed to anticipate — the most important thing found this session
+
+**23. `applyPulledEvents`' referral branch (built and tested in P4.1) folded
+`state so far` from `referral_cache`, and that was wrong the moment P4.2
+gave `createReferral`/`transitionReferral` something real to write against.**
+Both functions write their target state into `referral_cache` optimistically,
+before any round trip (plan §8.3, by design). P4.1's own test for the fold
+(`apply-pulled-referral-events.spec.ts`) never caught this, because it built
+a synthetic event fixture with no matching optimistic write ever having
+touched `referral_cache` first — a case that cannot occur through P4.1's own
+code, since P4.1 shipped no screen that could call `createReferral`. The
+first time a real screen created a referral and then waited for its own
+confirming pull, the bug was immediate and total: the confirming
+`create_referral` event's `from_state` is `null`, but `referral_cache`
+already read `"CREATED"` (the optimistic write's own doing) by the time the
+pull processed it — `null !== "CREATED"`, so the fold's `advanced` check
+returned `false`, and the event that should have confirmed the referral's
+own creation was silently dropped instead. Every *subsequent* optimistic
+transition on that device has the identical shape: the confirming pull for
+your own accepted transition never advances, because your own optimistic
+write already moved `referral_cache` past what the confirming event's
+`from_state` expects.
+
+Caught by hand, not by a test that predicted it: the P4.2 exit-criterion
+walkthrough (create a referral offline, reconnect, open its detail page)
+showed an empty "What happened" timeline where a "Referral created" entry
+should have been. Traced with `window.__db`/`window.__engine` (the same
+Playwright test hooks `main.tsx` already exposes) by manually diffing what
+`GET /sync/pull` actually returned against what `referral_event_cache` held
+after the client processed it — the server had the event at the right seq,
+the client's cursor had advanced past it, and the client had simply never
+written it anywhere.
+
+**Fix:** fold `state so far` from `referral_event_cache` (only ever written
+by an *advancing* pull — nothing else touches it) instead of from
+`referral_cache` (which optimistic writes can move ahead of the fold at any
+time). This is more than a bug fix — it is the correct general design: two
+different jobs were sharing one table, and only one of them should have been
+folding against it. `referral_cache` stays the UI's read model (optimistic,
+can be ahead of the confirmed log); `referral_event_cache` is now the only
+thing the fold itself ever reads or writes. `apply-pulled-referral-events.spec.ts`
+still passes unmodified after the fix (its fixture never had a prior
+optimistic write to begin with, so the two implementations agree on that
+case) — a second Playwright test
+(`p42-screens.spec.ts`'s end-to-end walkthrough) is what actually exercises
+the case that broke, and would catch a regression here.
+
+**The general lesson:** a fold's "state so far" must come from a table only
+the fold itself writes. Any other writer of that table — including an
+optimistic UI update the fold's own author added, in the same file, one
+phase later — can invalidate the fold's core assumption without touching
+the fold's code at all.
+
+---
+
+## Windows Docker Desktop's bind mount does not reliably notify a long-running `vite dev` process of file changes
+
+**24. Several rounds of edits to `App.tsx`, `engine.ts`, and new page files
+were invisible to the already-running `client` container until it was
+explicitly `docker compose restart client`'d.** The container was started
+hours earlier, at the start of this session; `vite dev`'s file watcher uses
+native filesystem events by default, and those don't reliably cross a
+Windows-host-to-Linux-container bind mount without polling enabled
+(`server.watch.usePolling` in `vite.config.ts`, not currently set). The
+symptom was confusing rather than a clean failure: `npx tsc --noEmit` and
+`npm run build` (both one-shot commands that read the current file state
+directly) showed no problem at all, while a *running* Playwright test hit
+`/login` and got the stale pre-router `App.tsx` content — because the
+long-lived dev server process genuinely hadn't reloaded. Restarting the
+container (not rebuilding the image — the source is bind-mounted, so a
+restart alone re-reads it) fixed it every time this happened. Not
+configured to poll, on purpose: it would cost dev-server responsiveness for
+every session to fix a problem that a `docker compose restart client` after
+a batch of edits solves in two seconds. Worth remembering before spending
+time debugging a test failure that looks like an app bug but is actually a
+stale dev server.
+
+---
+
+## Screen 3's action buttons didn't match the ASHA's actual permissions — confirmed with the user rather than guessed
+
+**25. The design mockup gives the ASHA "Mark as arrived" (`→ ARRIVED`) and,
+on the escalated variant, "mark as lost" (`→ LOST`) — but `GUARDS`
+(`app/domain/states.py`, Phase 2, frozen) reserves `ARRIVED` for `MO` and
+`LOST` for `SYSTEM` alone; no human role can write `LOST` at all.** Building
+either button as shown would ship a control that always comes back
+`rejected: role_not_permitted` if pressed — not a styling problem,
+a design assuming looser permissions than the already-reviewed RBAC model
+grants. Flagged per handoff §8 rather than built around silently; the user
+picked "build only her real actions" over showing the mockup's buttons
+disabled-with-an-explanation or loosening `GUARDS` to match the design.
+Implemented in `client/src/domain/referralActions.ts`: `ashaActionFor`
+returns a real action only at `CREATED` (`→ IN_TRANSIT`, "Mark as sent") and
+`BACK_REFERRED` (`→ CLOSED`, "Mark as care finished") — both already
+`GUARDS`-permitted and both already implied by the rest of the design (the
+create flow, Screen 1's "Care finished" pill). Every other state shows a
+plain waiting line instead of a button, reusing the design's own
+"Waiting for: ..." pattern rather than inventing new copy.
+
+---
+
+## Two data gaps P4.1 didn't anticipate, both resolved without a server contract change
+
+**26. Screen 3's timeline needs per-event history, and P4.1's Dexie schema
+only ever gave the client a folded snapshot (`referral_cache`), not a log.**
+`docs/PHASE4_PLAN.md`'s P4.1 build-order table named `referral_cache` and
+`patient_cache` as the only new Dexie tables; nothing in P4.1's scope
+anticipated a screen needing individual event history rendered offline.
+Added `referral_event_cache` (Dexie `version(3)`, `client/src/db/schema.ts`)
+— one row per *advancing* pulled event, written alongside the
+`referral_cache` update in the same `applyPulledReferralEvent` (the same
+function observation 23 above fixed). A client-only Dexie table addition
+doesn't touch the wire protocol or any server schema, so this was decided
+without asking — flagged here rather than left implicit, per the same
+"small technical choices, but tell him" rule P4.1's `patient_cache` call
+used.
+
+**27. Screen 2 needs org names (the ASHA's own village, a facility to send
+to) and nothing had ever exposed org data to the client — the JWT carries
+only a bare `org_unit_id` UUID.** Unlike observation 26, this genuinely
+needed a new server endpoint (`GET /org_units`,
+`server/app/api/org_units.py`) — a new API surface, not a client-only
+addition — so it was asked before building, not decided alone. Deliberately
+unscoped (unlike `GET /referrals`): org names and the tree shape aren't
+patient data, so every authenticated role sees the whole tree, not just its
+own subtree — verified by a test asserting `asha_b` (Village B) still sees
+`PHC Ramnagar` and `Village A` in the response. Cached client-side into a
+new `org_cache` Dexie table (`version(3)`, same bump as observation 26),
+refreshed once after login rather than re-fetched per screen.
+
+---
+
+## No display name is available client-side for any actor but (arguably) the one logged in — the timeline is attributed by role, not name
+
+**28. The design's timeline says "by you, Sunita Kumari"; nothing on the
+wire gives the client a name to say that with.** `app_user.display_name`
+(added in migration `0005`, P4.1) has never been sent to the client anywhere
+— not in the JWT (`sub`/`role`/`org_unit_id`/`iat`/`exp` only, unchanged
+since Phase 0), not in the widened pull payload (ADR-010 lists
+`actor_role`/`actor_user_id`, not a name). Even the *current* user's own
+display name isn't available client-side: the JWT's `sub` claim is the
+login username, not `display_name`, and there's no endpoint that returns
+the latter. `client/src/domain/timeline.ts`'s `timelineAttribution`
+attributes every event by role instead — "by the ASHA", "by the MO", "by
+the system" — real data instead of a fabricated name, at the cost of the
+mockup's personalization. Not asked about separately: this is a copy
+simplification with no contract change, the same category of call as
+observation 25's waiting-line copy, and is named here so it's not mistaken
+for an oversight later.
+
+---
+
+## Verifying "no banned word" against the built JS bundle produces the same false-positive trap Phase 2/3 already documented for grep-based exit criteria
+
+**29. A blind `grep -i` for the banned words (sync, pending ops, conflict,
+operation, queue, offline mode, retry, payload) across
+`client/dist/assets/*.js` returns dozens of hits — none of them UI copy.**
+React's own internal fiber scheduler uses "queue" constantly; this project's
+own function/variable names (`syncNow`, `sync_meta`, `Op.payload`,
+`useSyncStatus`) are exactly the vocabulary the banned list forbids in
+*rendered copy*, and a production build keeps every one of them as a
+readable string or property name even after minification. Verified instead
+by grepping the **source** `.tsx`/`.module.css` files and checking every
+match by hand: every hit was an import, a function name, a CSS class, or a
+comment — never a JSX text node or string literal actually rendered to a
+screen. Same shape as observation 13 (Phase 3): a grep-based check is
+adversarial to your own identifiers, not just your prose, and "grep the
+built output" needs a human read of what each match actually is, not a
+pass/fail on hit count.
