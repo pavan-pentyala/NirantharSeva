@@ -37,10 +37,10 @@ export interface PushResponse {
 
 /** Generic pull envelope (D3, docs/decisions/ADR-004.md). Fields the sync
  * engine itself reads stay flat; everything only the domain reads is in
- * `payload`, discriminated by `entity_type`. For entity_type "toy": payload
- * is {old_value, new_value}. For "referral": payload is {from_state,
- * to_state, actor_role, actor_user_id, patient_name, age, sex, reason,
- * priority, target_org_name} (D14/ADR-010) — folded into referral_cache by
+ * `payload`. `entity_type` is always "referral" since the toy model's drop
+ * (migration 0006, Phase 4.3). payload is {from_state, to_state,
+ * actor_role, actor_user_id, patient_name, age, sex, reason, priority,
+ * target_org_name} (D14/ADR-010) — folded into referral_cache by
  * client/src/sync/engine.ts's applyPulledEvents. */
 export interface EventOut {
   seq: number;

@@ -1,10 +1,10 @@
 /** Client outbox and flush loop. See plan §5.5.
  *
  * flush() pushes pending/inflight ops; pullAndApply() pulls new events and
- * folds them into the local toy_cache. Both are idempotent and safe to
- * call repeatedly — the single-flight guard on flush() is what stops the
- * four triggers (online, 15s timer, after every mutation, visibilitychange)
- * from stampeding each other.
+ * folds them into referral_cache/referral_event_cache. Both are idempotent
+ * and safe to call repeatedly — the single-flight guard on flush() is what
+ * stops the four triggers (online, 15s timer, after every mutation,
+ * visibilitychange) from stampeding each other.
  */
 
 import * as api from "../api/client";
@@ -15,31 +15,6 @@ const BACKOFF_BASE_MS = 1000;
 const BACKOFF_MAX_MS = 30_000;
 
 let flushing = false;
-
-export async function createOp(entityId: string, value: number): Promise<void> {
-  const deviceId = await getDeviceId();
-  const lamport = await nextLamport();
-  const deviceTime = new Date().toISOString();
-  const opId = crypto.randomUUID();
-
-  await db.transaction("rw", db.outbox, db.toy_cache, async () => {
-    await db.outbox.add({
-      op_id: opId,
-      entity: "toy",
-      entity_id: entityId,
-      operation: "set_value",
-      payload: { value },
-      lamport,
-      device_time: deviceTime,
-      status: "pending",
-    });
-    // Optimistic local cache — assumed to win until told otherwise by a
-    // push response or a pulled event with a higher (lamport, device_id).
-    await db.toy_cache.put({ id: entityId, value, updated_at: deviceTime, lamport, device_id: deviceId });
-  });
-
-  void syncNow();
-}
 
 export interface CreateReferralInput {
   patientName: string;
@@ -237,27 +212,9 @@ export async function pullAndApply(): Promise<void> {
 
 export async function applyPulledEvents(events: api.EventOut[]): Promise<void> {
   for (const e of events) {
-    if (e.entity_type === "toy") {
-      await applyPulledToyEvent(e);
-    } else if (e.entity_type === "referral") {
+    if (e.entity_type === "referral") {
       await applyPulledReferralEvent(e);
     }
-  }
-}
-
-async function applyPulledToyEvent(e: api.EventOut): Promise<void> {
-  const newValue = e.payload.new_value as number;
-  const cached = await db.toy_cache.get(e.entity_id);
-  const isWinner =
-    !cached || e.lamport > cached.lamport || (e.lamport === cached.lamport && e.device_id >= cached.device_id);
-  if (isWinner) {
-    await db.toy_cache.put({
-      id: e.entity_id,
-      value: newValue,
-      updated_at: e.server_time,
-      lamport: e.lamport,
-      device_id: e.device_id,
-    });
   }
 }
 
@@ -279,9 +236,8 @@ async function applyPulledToyEvent(e: api.EventOut): Promise<void> {
  *
  * A losing or stale event is received here — pull is a full log, nothing is
  * filtered out — but never advances the fold, matching the server's own
- * decision. Do not add a lamport comparison here: unlike the toy model's
- * LWW register, referral state coherence is decided by from_state alone
- * (see replay_steps's own docstring). */
+ * decision. Do not add a lamport comparison here: referral state coherence
+ * is decided by from_state alone (see replay_steps's own docstring). */
 async function applyPulledReferralEvent(e: api.EventOut): Promise<void> {
   const priorEvents = await db.referral_event_cache.where("referral_id").equals(e.entity_id).sortBy("seq");
   const stateSoFar = priorEvents.length > 0 ? priorEvents[priorEvents.length - 1].to_state : null;
