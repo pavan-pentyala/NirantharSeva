@@ -1,0 +1,136 @@
+.page {
+  min-height: 100vh;
+  background: var(--sheet);
+  max-width: 834px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 18px var(--space-6);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.title {
+  font-size: 22px;
+  font-weight: 650;
+}
+.subtitle {
+  font-size: 14px;
+  color: var(--ink-500);
+}
+.syncInline {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  color: var(--ink-700);
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.dotOnline {
+  background: #0b553c;
+}
+.dotOffline {
+  background: var(--waiting-text);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+  padding: 14px var(--space-6);
+  border-bottom: 1px solid var(--hairline);
+}
+.tab {
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--rule);
+  color: var(--ink-700);
+  background: none;
+  font-size: var(--text-secondary);
+}
+.tabActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 650;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+.empty {
+  padding: var(--space-8) var(--space-6);
+  color: var(--ink-500);
+  text-align: center;
+}
+
+.card {
+  padding: 18px var(--space-6);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.cardMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.nameRow {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.name {
+  font-size: var(--text-name);
+  font-weight: 650;
+}
+.age {
+  font-size: 14px;
+  color: var(--ink-700);
+}
+.reason {
+  font-size: var(--text-secondary);
+  color: var(--ink-700);
+}
+.pillRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.since {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-500);
+}
+
+.actionButton {
+  height: 52px;
+  padding: 0 22px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.actionButtonOutline {
+  background: none;
+  border: 1.5px solid var(--accent);
+  color: var(--accent-dark);
+}

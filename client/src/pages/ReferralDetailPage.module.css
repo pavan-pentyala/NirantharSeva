@@ -1,0 +1,178 @@
+.page {
+  min-height: 100vh;
+  background: var(--sheet);
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.header {
+  padding: 14px var(--space-4);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.back {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--ink-700);
+  flex: none;
+}
+.title {
+  font-size: var(--text-name);
+  font-weight: 650;
+}
+
+.notFound {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--ink-500);
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.summary {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.summaryOverdue {
+  border-left: 4px solid var(--alert);
+}
+.demographics {
+  font-size: var(--text-secondary);
+  color: var(--ink-700);
+}
+.reasonLine {
+  font-size: var(--text-body);
+  color: var(--ink-900);
+}
+.pillRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.sinceLine {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-500);
+}
+.overdueCard {
+  background: var(--alert-bg);
+  border: 1px solid var(--alert-border);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #7a2a2a;
+}
+
+.timelineSection {
+  flex: 1;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+}
+.timelineHeading {
+  font-size: 15px;
+  font-weight: 650;
+  padding-bottom: 12px;
+}
+.timelineEmpty {
+  font-size: var(--text-secondary);
+  color: var(--ink-500);
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+}
+.timelineRow {
+  display: flex;
+  gap: 12px;
+}
+.timelineRail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+}
+.timelineDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.timelineDotAlert {
+  background: var(--alert);
+}
+.timelineDotHollow {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid var(--rule);
+}
+.timelineConnector {
+  width: 1.5px;
+  flex: 1;
+  background: var(--rule);
+  min-height: 20px;
+}
+.timelineContent {
+  padding-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.timelineLabel {
+  font-size: 15px;
+  font-weight: 650;
+}
+.timelineLabelAlert {
+  color: var(--alert);
+}
+.timelineMeta {
+  font-size: 13.5px;
+  color: var(--ink-500);
+}
+.timelineWaiting {
+  font-size: 15px;
+  color: var(--ink-500);
+}
+
+.footer {
+  padding: 12px var(--space-4) var(--space-4);
+  border-top: 1px solid var(--hairline);
+}
+.primaryButton {
+  height: var(--button-height);
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 650;
+}
+.waitingFooter {
+  font-size: var(--text-secondary);
+  color: var(--ink-500);
+  text-align: center;
+  padding: var(--space-3) 0;
+}

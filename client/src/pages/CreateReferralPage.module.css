@@ -1,0 +1,238 @@
+.page {
+  min-height: 100vh;
+  background: var(--sheet);
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.header {
+  padding: 14px var(--space-4);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.back {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--ink-700);
+  flex: none;
+}
+.title {
+  font-size: var(--text-name);
+  font-weight: 650;
+}
+
+.form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.label {
+  font-size: var(--text-secondary);
+  font-weight: 650;
+}
+.input,
+.select {
+  height: var(--button-height);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  padding: 0 14px;
+  font-size: 17px;
+}
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+  border-width: 1.5px;
+}
+
+.toggleRow {
+  display: flex;
+  gap: 6px;
+}
+.toggleButton {
+  flex: 1;
+  height: var(--button-height);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background: #fff;
+  color: var(--ink-700);
+  font-size: 16px;
+  font-weight: 650;
+}
+.toggleButtonActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.readonlyField {
+  height: var(--button-height);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--rule);
+  background: var(--sheet-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  font-size: 17px;
+}
+.yoursTag {
+  font-size: 12px;
+  color: var(--ink-500);
+}
+
+.urgencyRow {
+  display: flex;
+  gap: var(--space-2);
+}
+.urgencyButton {
+  flex: 1;
+  height: var(--button-height);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--rule);
+  background: #fff;
+  color: var(--ink-700);
+  font-size: 15px;
+  font-weight: 650;
+}
+.urgency_urgent {
+  background: var(--alert);
+  border-color: var(--alert);
+  color: #fff;
+}
+.urgency_soon,
+.urgency_routine {
+  background: var(--sheet-2);
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
+
+.sendingToChip {
+  height: var(--button-height);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--accent);
+  background: #d4ebff;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--ink-900);
+}
+
+.footer {
+  padding-top: var(--space-2);
+}
+
+.primaryButton {
+  height: var(--button-height);
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 650;
+}
+.secondaryButton {
+  height: 52px;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--accent);
+  background: #fff;
+  color: var(--accent-dark);
+  font-size: 16px;
+  font-weight: 650;
+  margin-top: var(--space-2);
+}
+
+.confirmContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: var(--space-8);
+  text-align: center;
+}
+.checkCircle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #cdf3e1;
+  color: #0b553c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+}
+.confirmTitle {
+  font-size: 22px;
+  font-weight: 650;
+}
+.confirmBody {
+  font-size: 16px;
+  color: var(--ink-700);
+  line-height: 1.55;
+  max-width: 300px;
+}
+.noSignalCard {
+  width: 100%;
+  background: var(--waiting-bg);
+  border: 1px solid var(--waiting-border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  display: flex;
+  gap: 11px;
+  text-align: left;
+  margin-top: var(--space-2);
+}
+.noSignalDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--waiting-text);
+  margin-top: 4px;
+  flex: none;
+}
+.noSignalTitle {
+  font-size: 15px;
+  font-weight: 650;
+}
+.noSignalBody {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-700);
+}
+.confirmFooter {
+  padding: 12px var(--space-4) var(--space-4);
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
