@@ -69,11 +69,26 @@ ORG_UNITS = [
 ]
 
 USERS = [
-    {"name": "asha_a", "role": Role.ASHA, "org": "org:Village A"},
-    {"name": "asha_b", "role": Role.ASHA, "org": "org:Village B"},
-    {"name": "anm1", "role": Role.ANM, "org": "org:Sub-centre Kotwali"},
-    {"name": "mo1", "role": Role.MO, "org": "org:PHC Ramnagar"},
-    {"name": "supervisor1", "role": Role.SUPERVISOR, "org": "org:PHC Ramnagar"},
+    {"name": "asha_a", "role": Role.ASHA, "org": "org:Village A", "display_name": "Sunita Kumari"},
+    {"name": "asha_b", "role": Role.ASHA, "org": "org:Village B", "display_name": "Meena Devi"},
+    {
+        "name": "anm1",
+        "role": Role.ANM,
+        "org": "org:Sub-centre Kotwali",
+        "display_name": "Radha Singh",
+    },
+    {
+        "name": "mo1",
+        "role": Role.MO,
+        "org": "org:PHC Ramnagar",
+        "display_name": "Dr. Arvind Sharma",
+    },
+    {
+        "name": "supervisor1",
+        "role": Role.SUPERVISOR,
+        "org": "org:PHC Ramnagar",
+        "display_name": "Vikram Rathore",
+    },
 ]
 DEV_PASSWORD = "dev"
 
@@ -83,24 +98,32 @@ PATIENTS = [
         "name": "Lakshmi Devi",
         "phone": "9800000001",
         "org": "org:Village A",
+        "age": 45,
+        "sex": "F",
     },
     {
         "key": "patient:Ramesh Kumar",
         "name": "Ramesh Kumar",
         "phone": "9800000002",
         "org": "org:Village A",
+        "age": 62,
+        "sex": "M",
     },
     {
         "key": "patient:Fatima Begum",
         "name": "Fatima Begum",
         "phone": "9800000003",
         "org": "org:Village B",
+        "age": 38,
+        "sex": "F",
     },
     {
         "key": "patient:Suresh Yadav",
         "name": "Suresh Yadav",
         "phone": "9800000004",
         "org": "org:Village B",
+        "age": 50,
+        "sex": "M",
     },
 ]
 
@@ -164,10 +187,12 @@ async def seed(
             password_hash = _hasher.hash(DEV_PASSWORD)
             result = await s.execute(
                 text(
-                    """INSERT INTO app_user (id, name, role, org_unit_id, password_hash)
-                       VALUES (:id, :name, :role, :org_unit_id, :password_hash)
+                    """INSERT INTO app_user
+                         (id, name, role, org_unit_id, password_hash, display_name)
+                       VALUES (:id, :name, :role, :org_unit_id, :password_hash, :display_name)
                        ON CONFLICT (name) DO UPDATE
-                         SET role = EXCLUDED.role, org_unit_id = EXCLUDED.org_unit_id
+                         SET role = EXCLUDED.role, org_unit_id = EXCLUDED.org_unit_id,
+                             display_name = EXCLUDED.display_name
                        RETURNING id"""
                 ),
                 {
@@ -176,6 +201,7 @@ async def seed(
                     "role": user["role"].value,
                     "org_unit_id": org_ids[user["org"]],
                     "password_hash": password_hash,
+                    "display_name": user["display_name"],
                 },
             )
             user_ids[user["name"]] = result.scalar_one()
@@ -188,8 +214,10 @@ async def seed(
             await s.execute(
                 text(
                     """INSERT INTO patient
-                         (id, name, normalized_name, phone, village_org_id, created_at)
-                       VALUES (:id, :name, :normalized_name, :phone, :village_org_id, :created_at)
+                         (id, name, normalized_name, phone, village_org_id, age, sex, created_at)
+                       VALUES
+                         (:id, :name, :normalized_name, :phone, :village_org_id, :age, :sex,
+                          :created_at)
                        ON CONFLICT (id) DO NOTHING"""
                 ),
                 {
@@ -198,6 +226,8 @@ async def seed(
                     "normalized_name": patient["name"].lower(),
                     "phone": patient["phone"],
                     "village_org_id": org_ids[patient["org"]],
+                    "age": patient["age"],
+                    "sex": patient["sex"],
                     "created_at": now,
                 },
             )
