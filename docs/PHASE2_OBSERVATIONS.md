@@ -321,8 +321,8 @@ whatever cause) announces itself.
 
 # Phase 4 — implementation observations
 
-**Status:** P4.2 of 3 done (the five screens). Built on Sonnet, in the build
-order `docs/PHASE4_PLAN.md`'s P4.1 and P4.2 tables give.
+**Status:** Phase 4 complete — P4.1, P4.2 and P4.3 all done. Built on
+Sonnet, in the build order `docs/PHASE4_PLAN.md`'s three tables give.
 
 **What this section is for:** the same as the Phase 2 and Phase 3 sections
 above — things learned building Phase 4 that are not derivable from the
@@ -601,3 +601,138 @@ screen. Same shape as observation 13 (Phase 3): a grep-based check is
 adversarial to your own identifiers, not just your prose, and "grep the
 built output" needs a human read of what each match actually is, not a
 pass/fail on hit count.
+
+---
+
+## P4.3's own `grep -rn toy_ client/src` exit criterion cannot reach zero — and that is correct, not a failure
+
+**30. Two references to the dropped scaffold table's name must survive in
+`client/src/db/schema.ts` forever, because Dexie's schema history works the
+same way Alembic's does.** `docs/PHASE4_PLAN.md` writes P4.3's criterion as
+"`grep -rn toy_ server/app client/src` returns nothing." `server/app`
+reaches zero cleanly. `client/src` cannot, for two independent reasons:
+
+1. **`version(1).stores({ toy_cache: "id", ... })` is shipped history.**
+   Dexie replays every declared version in order to upgrade an existing
+   browser's IndexedDB. Editing v1 retroactively is the same mistake as
+   editing a shipped Alembic migration — a rule this project states in
+   `CLAUDE.md` and enforces server-side.
+2. **`version(4).stores({ toy_cache: null })` *is* the drop.** Dexie's
+   "remove this table" syntax is naming it with a `null` schema. Omitting
+   the table — the way v2 and v3 omit tables they don't change — leaves it
+   in place, so the only way to actually delete it is to write its name one
+   final time.
+
+The plan's own trap list anticipated the *shape* of this ("P4.3's
+`grep -rn toy_` criterion will catch a comment that mentions toy_ in
+passing") and prescribed rewording prose. Every prose hit was reworded
+accordingly — `server/app/sync/pull.py`'s docstring now says "the toy
+model's own event table" rather than naming it. But the two lines above are
+code, not prose, and no rewording removes them. Read the criterion as "no
+leftover toy *implementation*," which is objectively true: no toy table
+server-side, no cache reads or writes anywhere, no `ToyPage`, no toy branch
+in `push.py`/`pull.py`/`applyPulledEvents`. A block comment above
+`version(4)` states this in the file itself, so a future session running
+the grep doesn't mistake the two survivors for work left undone.
+
+**The general rule, third instance now:** a grep-based exit criterion
+counts your comments (obs. 13), your own identifiers (obs. 29), and now
+your framework's required syntax. It is a starting point for a human read,
+never a pass/fail gate on its own.
+
+---
+
+## The Cache API's default `Vary` handling silently defeats a hand-rolled precache
+
+**31. `cache.match(request)` respects the `Vary` header by default, and
+`vite preview` (like most static hosts) sends `Vary: Accept-Encoding` — so
+a precached asset misses on lookup even though it is definitely in the
+cache.** The install handler's `cache.addAll()` issues its own fetches, and
+the browser's later `<script>`/`<link>` requests for the same URLs don't
+send byte-identical `Accept-Encoding` headers. `Vary: Accept-Encoding` tells
+`match()` to compare that header between the stored request and the current
+one; they differ; the lookup returns `undefined`.
+
+The failure is maximally confusing, because everything *looks* right:
+`navigator.serviceWorker.getRegistration()` reports `activated`,
+`navigator.serviceWorker.controller` is non-null, and dumping
+`caches.open(...).keys()` shows all seven expected entries with the exact
+URLs being requested. Only instrumenting the SW's own `fetch` handler with
+a `console.log` of `!!cached` (visible via Playwright's
+`context.on("serviceworker")` then `worker.on("console")`) showed
+`cached=false` for assets that were plainly present. Fixed by passing
+`{ ignoreVary: true }` to both `match()` calls in `client/src/sw.ts`. That
+is safe *here* specifically because every cached entry is this app's own
+build output, content-hashed per filename, never served with different
+content for the same URL — it would not be safe for a general-purpose
+runtime cache.
+
+Worth knowing before hand-rolling a service worker: Workbox sets
+`ignoreVary` for precached entries as a matter of course, which is part of
+why this class of bug is rarely seen by people who use it. This project
+deliberately uses `injectManifest` with a plain Cache Storage
+implementation (no Workbox runtime — plan §8.4's "precache the app shell"
+is only seven files), so the default had to be overridden by hand.
+
+---
+
+## Porting the fault tests off the toy harness exposed a real bug the toy harness structurally could not
+
+**32. `startAutoFlush()` was only ever called from `LoginPage`'s submit
+handler, so a device that reopened the app with an already-valid session
+never started flushing its outbox.** The Phase 1 toy harness called
+`startAutoFlush()` from its own page's mount effect, and that page was
+mounted at `/` unconditionally with no auth gate — so in the toy world,
+every page load started the sync engine, and the gap did not exist to be
+found. P4.2's real screens moved that call to the login moment, which is
+correct for a fresh login and silently wrong for every *subsequent* app
+boot: reopened tab, reload, PWA relaunch from the home screen.
+
+`client-kill-resume.spec.ts`'s port is what surfaced it — its whole premise
+is "kill the tab mid-push, reopen, confirm the retry lands," and the reopen
+step goes straight to `/referrals` with a valid token in localStorage,
+never through `/login`. The op sat at `inflight` forever and the test timed
+out. Fixed by also calling `startAutoFlush()` (idempotent by its own
+internal guard) from `RequireAuth`'s mount effect, which every authenticated
+route passes through regardless of how it was reached.
+
+This is the second time in Phase 4 that porting a test onto real
+infrastructure found a real defect rather than just needing new selectors
+(obs. 23 was the first, in P4.2). Both were invisible to the tests that
+existed at the time, and both were in the "works on the happy path, fails
+on resume" category the fault tests exist specifically to catch — which is
+the argument for `docs/PHASE4_PLAN.md`'s insistence that these two specs
+"must stay green through the port — they are E4's evidence, not disposable
+scaffolding."
+
+---
+
+## `vite dev` and `vite preview` are not interchangeable for anything PWA
+
+**33. `vite-plugin-pwa`'s `injectManifest` strategy injects an *empty*
+precache manifest in dev mode, so a reload-while-offline test passes
+vacuously or fails confusingly against `vite dev`, and only means anything
+against a real build.** `devOptions.enabled: true` registers a service
+worker in dev, which makes it look like the PWA is working, but
+`self.__WB_MANIFEST` is `[]` — nothing is precached, so an offline reload
+has no app shell to serve and the page comes back blank. The first attempt
+at `offline-sync.spec.ts` ran against `:5173` for exactly this reason and
+failed in a way that looked like a service-worker bug rather than a
+wrong-server bug.
+
+Resolved by: dropping `devOptions` entirely (a dev-mode SW that cannot
+serve offline is worse than none — it invites this confusion), adding a
+`preview` block to `vite.config.ts` with the same `/api` proxy the dev
+server has, publishing `4173` in `docker-compose.yml`, and pinning that one
+spec to `test.use({ baseURL: "http://localhost:4173" })`. The other four
+specs stay on the dev server, where hot reload is worth having and no
+precache is needed. CI builds and starts `vite preview` before running
+Playwright, in its own step with its own readiness poll.
+
+**Corollary for anyone running the suite by hand:** `npx playwright test`
+now needs *both* servers up. `docker compose up -d` gives you `:5173`;
+`:4173` needs `docker compose exec client npm run build` followed by
+`docker compose exec -d client npm run preview`. A `docker compose restart
+client` kills the preview process (it isn't the container's main command)
+and it must be restarted by hand — which cost two confusing red runs this
+session before the pattern was obvious.

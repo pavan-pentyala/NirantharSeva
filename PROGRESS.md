@@ -14,62 +14,81 @@
 
 ## Current phase
 
-Phase 4, sub-phase **P4.2 of 3 — done**. P4.3 (PWA, migration `0006` drops
-the toy model, port the fault tests onto the real screens, real-phone
-recording) has not started.
+**Phase 4 is complete** — P4.1, P4.2 and P4.3 all done. Phase 5
+(escalation scheduler + SSE dashboard, Screen 4) has not started.
 
 ## Done
 
 - Phases 0–3: complete. `docs/PHASE2_PLAN.md` / `docs/PHASE3_PLAN.md` for
   what; ADR-001–008 for why.
-- Phase 4 planning: D13–D16 decided (`docs/PHASE4_PLAN.md`, ADR-009,
-  ADR-010).
-- P4.1 (server contract + client data layer) and P4.2 (the five real
-  screens, `GET /org_units`, Dexie `referral_event_cache`/`org_cache`):
-  built, tested, committed.
+- Phase 4, all three sub-phases (`docs/PHASE4_PLAN.md`, D13–D16, ADR-009,
+  ADR-010): server contract + client data layer, the five real screens,
+  then PWA + the toy model's removal.
+- The Phase 1 toy model is **gone** — migration `0006` drops `toy`/
+  `toy_event`; no `ToyPage`, no `toy_cache` reads/writes, no toy branch in
+  `push.py`/`pull.py`/`applyPulledEvents`. ADR-005's D7 exception ended
+  exactly here, as planned.
 
 ## Not done / in progress
 
-- P4.3: not started, needs the user's go-ahead (handoff R1).
-- No known open bugs. P4.2 found and fixed one real bug in the client-side
-  referral fold (`docs/PHASE2_OBSERVATIONS.md`, Phase 4, observation 23) —
-  fixed and verified in the same session, not carried forward as a TODO.
+- Phase 5: not started, needs the user's go-ahead (handoff R1).
+- **The real-phone airplane-mode recording is not done** — it is the one
+  P4.3 exit criterion I cannot satisfy from here (it needs a physical
+  phone). Everything it would demonstrate is covered automatically by
+  `client/tests/offline-sync.spec.ts`. See "Open item" below.
+- No known open bugs.
 
 ## Exit criteria status
 
-P4.1 and P4.2: every criterion in `docs/PHASE4_PLAN.md` is `[x]`, checked
-against real commands, not asserted. One unrelated pre-existing test
-failure — see Known problems below, not a P4 regression.
+All of P4.1, P4.2 and P4.3's criteria in `docs/PHASE4_PLAN.md` are met and
+checked against real commands, **except** the real-phone recording (above).
+Two criteria needed judgement rather than a clean yes/no:
+
+- `grep -rn toy_ client/src` returns **2 matches, both required** —
+  `version(1)`'s shipped declaration (never edit shipped schema history)
+  and `version(4)`'s `toy_cache: null`, which *is* Dexie's drop syntax.
+  `server/app` is clean. Full reasoning: observation 30.
+- `offline-sync.spec.ts` runs against the **built** app on `:4173`, not the
+  dev server — `injectManifest` only produces a real precache in a
+  production build. Observation 33.
+
+## Open item for the user
+
+The real-phone clip (plan §8.5, Review-III fallback) needs a physical
+Android phone: open the app, add to home screen, turn on airplane mode,
+create a referral, turn signal back on, record it syncing. Ten minutes of
+your time; I have no way to do it. Tell me if you'd rather drop it — the
+automated test already proves the same behaviour, so it's presentation
+evidence rather than verification.
 
 ## Next concrete step
 
-Wait for the user's go-ahead on P4.3. `react-router-dom` (yes) /
-`dexie-react-hooks` (no, hand-rolled `useLiveQuery` instead) are already
-settled — do not re-ask.
-
-## Open question for the user
-
-An earlier session recorded "screenshots are not required, do not raise
-again." `CLAUDE.md`'s own R9 asks for a screenshot the first time a screen
-works, and P4.2 took 9 into `docs/screenshots/`. Flagged, not resolved —
-say which one should win.
+Wait for the user's go-ahead on Phase 5 (escalation scheduler, SSE, the
+supervisor dashboard that currently renders as a placeholder at
+`/supervisor`). `react-router-dom` (yes) / `dexie-react-hooks` (no,
+hand-rolled `useLiveQuery` instead) / `vite-plugin-pwa` (yes, named in the
+original plan) are settled — do not re-ask.
 
 ## Verify the current state yourself
+
+Client. **Both** servers must be up: `:5173` (dev, four specs) and `:4173`
+(the built app with its real PWA precache — `offline-sync.spec.ts` only).
 
 ```bash
 docker compose up -d --build
 docker compose exec client npx tsc --noEmit && docker compose exec client npm run build
-cd client && npx playwright test        # expect 5 passed
+docker compose exec -d client npm run preview        # starts :4173
+cd client && npx playwright test                     # expect 5 passed
 ```
+
+Server (`alembic heads` should print `0006`):
 
 ```bash
 docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS nirantharseva_test;" -c "CREATE DATABASE nirantharseva_test;"
 docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
   api sh -c "alembic upgrade head && python -m app.seed && ruff check . && ruff format --check . && pytest -q && python -m app.verify_replay"
 ```
-Expect `189 passed, 1 failed` — the failure is
-`test_concurrent_pushes_leave_no_gap_in_the_pull_cursor`, environment-
-specific to this machine (see Known problems), not a regression.
+Expect `187 passed`, clean.
 
 To see the screens by hand: open `http://localhost:5173/login`, log in as
 `asha_a`/`dev` (or `mo1`/`dev` for Screen 5). `/supervisor` and
@@ -82,8 +101,10 @@ To see the screens by hand: open `http://localhost:5173/login`, log in as
 - Git hosting: GitHub, private repo, GitHub Actions CI.
 - `make` is not installed — use the `docker compose` equivalents (Makefile
   documents the mapping).
-- `react-router-dom`: yes. `dexie-react-hooks`: no.
+- `react-router-dom`: yes. `dexie-react-hooks`: no. `vite-plugin-pwa`: yes.
 - GitHub Actions minutes: not a concern.
+- Screenshots: either way is fine (user's answer) — `docs/screenshots/`
+  currently holds one per screen plus the PWA offline-reload proof.
 - Review-I is a literature review/survey, not a live demo — no rehearsal
   needed.
 - All Phase 2/3/4-planning decisions (D1–D16): settled — see the relevant
@@ -104,17 +125,23 @@ To see the screens by hand: open `http://localhost:5173/login`, log in as
 - A long-running `vite dev` inside Docker doesn't always pick up file
   changes through the Windows bind mount. `docker compose restart client`
   fixes it — try this before debugging a test failure that looks like an
-  app bug.
-- `test_concurrent_pushes_leave_no_gap_in_the_pull_cursor` fails on this
-  machine even on old commits where CI is green on GitHub's runner —
-  environment-specific, not a regression, not investigated further
-  (`docs/PHASE2_OBSERVATIONS.md`, Phase 4, observation 22).
+  app bug. **Hit twice in P4.3**; it costs a confusing red run every time.
+- `docker compose restart client` also **kills the `:4173` preview
+  server** (it isn't the container's main command). Restart it by hand
+  afterwards or `offline-sync.spec.ts` fails for the wrong reason:
+  `docker compose exec -d client npm run preview`.
+- `test_concurrent_pushes_leave_no_gap_in_the_pull_cursor` used to fail
+  intermittently on this machine while green in CI (observation 22). P4.3
+  ported it off the toy model onto referral ops and it has passed on every
+  run since — watch it, but it is no longer a known failure.
 - A persistent test-database volume across many manual `pytest` runs can
   eventually break `/sync/pull?limit=1000`-based tests. Reset with the
   `DROP DATABASE`/`CREATE DATABASE` commands above before trusting a red
   run that touches pull.
-- Grep-based exit criteria match your own explanatory comments, not just
-  the code — reword the comment, don't weaken the grep.
+- Grep-based exit criteria match your explanatory comments, your own
+  identifiers, and your framework's required syntax — not just the code
+  you meant to find. Read every match; never treat the hit count as
+  pass/fail (observations 13, 29, 30).
 - **The rest of the hard-won detail lives in `docs/PHASE2_OBSERVATIONS.md`**
   — read it before touching `server/` or `client/src/sync/`. Append-only,
   one section per phase, never rewritten.
