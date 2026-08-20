@@ -5,21 +5,165 @@
 > an optimistic PROGRESS file is worse than no PROGRESS file, because the next
 > session builds on top of something that does not exist.
 
-**Last updated:** 2026-08-19
-**Last session model:** Sonnet 5 — Phase 3 build, start to finish.
-**Files under `server/` and `.github/` changed. No file under `client/` changed.**
+**Last updated:** 2026-08-20
+**Last session model:** Sonnet 5 — P4.1 build (server contract + client data
+layer). No screens touched.
+**Files changed this session:** migration `server/alembic/versions/0005_patient_and_display_name.py`
+(new); `server/app/sync/push.py` (`_resolve_patient`, ADR-009);
+`server/app/sync/pull.py` (widened referral payload, ADR-010);
+`server/app/seed.py` (display names, patient age/sex); `server/app/schemas/sync.py`
+(docstring only); `server/tests/integration/test_patient_resolution.py` (new),
+`server/tests/integration/test_pull_referral_payload.py` (new);
+`client/src/db/schema.ts` (Dexie `version(2)`); `client/src/sync/engine.ts`
+(`createReferral`, `transitionReferral`, referral branch of
+`applyPulledEvents`); `client/src/main.tsx` (test hooks only);
+`client/src/api/client.ts` (docstring only);
+`client/tests/referral-cache-atomicity.spec.ts` (new),
+`client/tests/apply-pulled-referral-events.spec.ts` (new);
+`docs/PHASE2_OBSERVATIONS.md` (Phase 4 section appended, observations 18–22).
+Nothing under `client/src/pages/` or `client/src/App.tsx` changed (P4.1's own
+exit criterion).
 
 ---
 
 ## Current phase
 
-**Phase 3 is complete.** All 18 exit criteria in `docs/PHASE3_PLAN.md` are met
-and ticked. Built in the exact order the plan gives, steps 1–8, commits
-`110d2b2` through `2ff889a` on `main`, plus one CI-infrastructure fix
-(`dc20b52`, see below) needed to actually get a green run. Pushed and
-CI-checked.
+**P4.1 of Phase 4 is done, not yet confirmed against a cold-start pass by the
+user.** P4.2 (the five screens) has not started — needs the user's go-ahead,
+plus a yes/no on the two dependencies P4.2 needs (`react-router-dom`,
+`dexie-react-hooks`), per `docs/PHASE4_PLAN.md`.
 
-## Done this session (2026-08-19)
+## Done this session (2026-08-20) — P4.1
+
+Built in the order `docs/PHASE4_PLAN.md`'s P4.1 table gives:
+
+1. **Migration `0005`** — `patient.age`, `patient.sex`, `app_user.display_name`,
+   all nullable, none backfilled with fake data. `0001`–`0004` untouched
+   (verified with `git diff --stat`, clean).
+2. **Patient resolution in `push.py`** (`_resolve_patient`, ADR-009) — tries
+   `patient_id` first (pre-Phase-4 callers unchanged), falls back to
+   `patient_name` (+ optional `age`/`sex`/`phone`): exact match on
+   `(normalized_name, actor.org_unit_id)`, reuse if found, insert if not.
+   Not fuzzy — the ADR names this as Phase 6's one call site to replace.
+   `village_org_id` is the actor's own org unit, not a payload field — the
+   design's Screen 2 shows "Village: yours," never a picker (observation 19,
+   `docs/PHASE2_OBSERVATIONS.md`).
+3. **Pull payload widened** (`pull.py`, ADR-010) — the referral branch's
+   subquery now joins `patient` and `org_unit` before `LIMIT`, adding
+   `patient_name`, `age`, `sex`, `reason`, `priority`, `target_org_name` to
+   `payload`. Every referral event repeats the snapshot, not just
+   `create_referral` — ADR-010's accepted cost.
+4. **`app/seed.py`** — real `display_name`s for all five seeded users, `age`/`sex`
+   for the four seeded patients.
+5. **Dexie `version(2)`** (`client/src/db/schema.ts`) — `referral_cache`
+   (populated), `patient_cache` (declared, empty — see observation 20,
+   nothing on the wire keys a patient row yet), `outbox` gains an `entity_id`
+   index.
+6. **`engine.ts`** — `createReferral`/`transitionReferral` (cache + outbox
+   in one Dexie transaction), and `applyPulledEvents`' new referral branch,
+   which fold `advanced` the same way `app/domain/states.py`'s
+   `replay_steps` does server-side: `from_state` must match the state
+   already in `referral_cache`, lamport plays no part in the decision.
+7. **Tests** — server: patient dedup + village-scoping + age/sex/phone
+   persistence + backward-compat `patient_id` path + missing-both rejection
+   (`test_patient_resolution.py`); widened pull payload on both
+   `create_referral` and `transition` events (`test_pull_referral_payload.py`).
+   Client (Playwright, driven through the existing `ToyPage`/`window.__engine`
+   harness — no new screen, no new dependency): the Dexie transaction is
+   atomic under an induced mid-transaction failure
+   (`referral-cache-atomicity.spec.ts`); `applyPulledEvents` only advances
+   the cache on `advanced=true`, using a fixture modeled on the demo walk's
+   own conflict pair, specifically proving a *higher-lamport* losing event
+   does not win (`apply-pulled-referral-events.spec.ts`).
+
+Two things worth flagging, not silent calls — full reasoning in
+`docs/PHASE2_OBSERVATIONS.md`'s new Phase 4 section:
+
+- **ADR-009 says the payload "gains" `patient_name`; read as additive, not a
+  replacement of `patient_id`** (observation 18). The other reading would
+  have broken five existing test files and `scripts/demo_walk.py` — all
+  still pass unmodified.
+- **`patient_cache` is declared but left empty this sub-phase** (observation
+  20) — `/sync/pull`'s widened payload carries a patient *snapshot*, not a
+  `patient_id`, so there is no key to cache pulled patient rows under yet.
+  If P4.2 needs something else from this table, that's worth a conversation
+  before P4.2 starts.
+
+## Exit criteria status (P4.1, `docs/PHASE4_PLAN.md`)
+
+- [x] `alembic heads` is `0005`; `0001`–`0004` byte-identical to Phase 3's commit.
+- [x] `python -m app.verify_replay` clean after seeding and a manual
+      create+transition through the new push path (ran via `scripts/demo_walk.py`,
+      which also exercises the backward-compatible `patient_id` path — same
+      8-step output as Phase 3's record).
+- [x] Two referrals, identical `(patient_name, village)` → one `patient` row;
+      same name, different village → two rows. Both proven in
+      `test_patient_resolution.py`.
+- [x] A pulled `create_referral` event's payload contains `patient_name`,
+      `age`, `sex`, `reason`, `priority`, `target_org_name`, all correct —
+      proven in `test_pull_referral_payload.py`, plus a second test proving a
+      `transition` event on the same referral repeats the snapshot.
+- [x] `ruff check`, `ruff format --check`, `tsc --noEmit`, client `npm run
+      build`, full server + client test suites — green, **with one exception**:
+      `test_concurrent_pushes_leave_no_gap_in_the_pull_cursor`
+      (`tests/integration/test_pull_cursor.py`) fails on this machine, and
+      reproduces identically on commit `a4c27aa` (the committed Phase 3 state,
+      before any P4.1 change) — see observation 22. Not caused by this
+      session; not fixed by this session either, since it's outside P4.1's
+      scope and touches sequencing code (ADR-002) nobody asked to change.
+      Every other test (186 server + 4 client Playwright specs, including
+      the two pre-existing fault tests) passed.
+- [x] No file changed under `client/src/pages/`, `client/src/App.tsx`.
+
+## Verify this yourself
+
+```bash
+docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS nirantharseva_test;" -c "CREATE DATABASE nirantharseva_test;"
+docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
+  api sh -c "alembic upgrade head && python -m app.seed && ruff check . && ruff format --check . && pytest -q && python -m app.verify_replay"
+```
+Expect `186 passed, 1 failed` (the pre-existing failure above) unless you
+also confirm it on `a4c27aa` — if it passes clean for you, that's useful
+evidence this really is environment-specific and worth a closer look.
+
+```bash
+cd client && npm run typecheck && npm run build
+docker compose up -d --build   # if not already up
+npx playwright test
+```
+Expect `4 passed`.
+
+---
+
+## Done in the Phase 4 planning session (2026-08-19)
+
+Read the design bundle (`docs/design_handoff_ui_screens/`, arrived and now
+tracked in git — see below) against the server as it exists, and found three
+places the design implies behaviour the current API cannot support:
+`create_referral` requires a patient that already exists (design wants
+inline creation of a new one), `/sync/pull`'s referral payload has no patient
+name or reason (the client can't render a list row from it), and
+`app_user.name` is both the login handle and the only display name. All
+three raised with the user and decided — D13/D14/D15 in
+`docs/PHASE4_PLAN.md`, ADR-009 and ADR-010 for the two with architectural
+weight. Phase 4 itself splits into P4.1/P4.2/P4.3 (D16), each independently
+testable, the same reasoning that split Phase 2.
+
+Wrote `docs/PHASE4_PLAN.md` (build order, exit criteria, and traps per
+sub-phase), ADR-009, ADR-010. Corrected `docs/UI_DESIGN_BRIEF.md` (it still
+said "tell Claude Code whether this is filled in" — it's filled in and
+confirmed) and one stale phase-number comment in
+`client/src/api/client.ts`. Reverted `.gitignore`'s
+`design_handoff_ui_screens/` line — that folder is now tracked; the brief
+names its files by path, and an ignored folder would leave the brief pointing
+at nothing for anyone else who clones the repo. If you want it un-tracked
+again, say so — my reasoning is in `docs/PHASE4_PLAN.md`'s context section.
+
+**Two dependency adds are still open, not assumed:** `react-router-dom` and
+`dexie-react-hooks`, both needed at P4.2, both listed in `docs/PHASE4_PLAN.md`
+waiting for a yes before that sub-phase starts.
+
+## Done in the Phase 3 session (2026-08-19)
 
 Built in the order `docs/PHASE3_PLAN.md`'s "Build order" table gives:
 
@@ -136,9 +280,9 @@ editing the pipeline itself was outside what Phase 3's build order asked for.
 
 - **Name:** NirantharSeva everywhere.
 - **Python tooling:** `uv`. `uv.lock` committed.
-- **UI design brief:** filled in, needed at Phase 4 (`docs/UI_DESIGN_BRIEF.md`).
-  The referenced `.dc.html` design files are **not in the repo** — they arrive
-  attached when Phase 4 starts.
+- **UI design brief:** filled in and confirmed (`docs/UI_DESIGN_BRIEF.md`).
+  The `.dc.html` design files it references have arrived and are tracked at
+  `docs/design_handoff_ui_screens/` — open any of them directly in a browser.
 - **Git hosting:** GitHub, private repo, GitHub Actions for CI.
 - **`gh` CLI** at `C:\Program Files\GitHub CLI\gh.exe` (not on PATH).
 - **`make` will not be installed** — use the `docker compose` equivalents.
@@ -151,10 +295,11 @@ editing the pipeline itself was outside what Phase 3's build order asked for.
 
 ## Next concrete step
 
-**Wait for the user's explicit go-ahead before starting Phase 4** (handoff
-R1). Phase 4 is the offline client — PWA, Dexie, outbox, optimistic UI. It
-needs the `.dc.html` design bundle from `docs/UI_DESIGN_BRIEF.md`, which is
-not yet in the repo; confirm it has arrived before starting.
+**Wait for the user's explicit go-ahead before starting P4.2** (handoff R1).
+`docs/PHASE4_PLAN.md`'s P4.2 section needs two yes/no answers first —
+`react-router-dom` and `dexie-react-hooks`, neither named in the plan, both
+new dependencies (handoff §2). P4.2 builds Screens 1, 2, 3, 5, 7 plus
+placeholders for 4 and 6. Model for P4.2: Sonnet.
 
 ## Known problems and workarounds
 
@@ -179,6 +324,12 @@ not yet in the repo; confirm it has arrived before starting.
 - **Grep-based exit criteria (and CI gates) match your explanatory comments
   too, not just the code.** Two more instances this phase beyond the
   Phase 2 clock-discipline one. Detail in the same file, observation 13.
+- **`test_concurrent_pushes_leave_no_gap_in_the_pull_cursor` fails on this
+  Windows/Docker Desktop machine, on a fresh test database, on commits where
+  GitHub Actions CI is recorded green** (Phase 4 section, observation 22).
+  Toy-entity-only, unrelated to any referral/patient code. Not investigated
+  further — out of scope for whatever phase is active unless a session is
+  explicitly asked to look at `acquire_seq_lock`/`app/db.py`'s pooling.
 - **The rest of the hard-won detail lives in `docs/PHASE2_OBSERVATIONS.md`** —
   read it, not this section, before touching `server/`. It now has a Phase 2
   section and a Phase 3 section; both are append-only and neither rewrites

@@ -316,3 +316,117 @@ its historical duration, with zero new log output, is not "slow" — it is
 hung, and retrying without a `timeout-minutes` guard just repeats the same
 silent multi-hour wait. Add the timeout first, so the *next* hang (from
 whatever cause) announces itself.
+
+---
+
+# Phase 4 — implementation observations
+
+**Status:** P4.1 of 3 done (server contract + client data layer, no
+screens). Built on Sonnet in one session, in the build order
+`docs/PHASE4_PLAN.md`'s P4.1 table gives.
+
+**What this section is for:** the same as the Phase 2 and Phase 3 sections
+above — things learned building Phase 4 that are not derivable from the
+code, the ADRs, or the git history. Append-only; this section never
+rewrites the Phase 2 or Phase 3 content above it.
+
+---
+
+## ADR-009's "gains" was read as additive, not a replacement — and that reading was load-bearing
+
+**18. `create_referral`'s payload could have been read two ways: `patient_id`
+replaced by `patient_name`, or `patient_name` added alongside it.** ADR-009
+says the payload "gains" `patient_name`/`age`/`sex`/`phone`, which is
+ambiguous on its own. Reading it as a replacement would have broken
+`patient_id`-based `create_referral` calls in five existing test files
+(`test_org_scoping.py`, `test_referral_timeline.py`,
+`test_replay_verifier.py`, `test_referral_replay.py`,
+`test_referral_transitions.py`) plus `scripts/demo_walk.py` itself — the
+exact script `docs/PHASE4_PLAN.md`'s P4.3 section calls "not disposable
+scaffolding" because it is E4's evidence. The ADR's own "Alternatives
+considered" table settled it: "`create_referral` already has to name a
+patient; giving it the data to make one itself removes an entire failure
+mode" — "already has to" names the existing `patient_id` path, "giving it
+the data to make one itself" names the new one, additively.
+`_resolve_patient` in `app/sync/push.py` tries `patient_id` first, falls
+back to `patient_name`, and every pre-Phase-4 caller kept working
+unmodified — confirmed by running the full suite and the demo walk against
+the exact commit before this session, then again after (observation 19).
+
+**19. Where `village_org_id` comes from for the new-patient match was not
+written anywhere — resolved from the design file, not the plan.** ADR-009
+says "exact match on `(normalized_name, village_org_id)`" but never says
+where `village_org_id` comes from for a *new* patient. `docs/UI_DESIGN_BRIEF.md`
+doesn't say either; `docs/design_handoff_ui_screens/Screen 2 - ASHA Create
+Referral.dc.html` does — its Village field renders read-only with a "yours"
+tag, never a picker. Read as: the actor's own `org_unit_id`, no new payload
+field. This works cleanly for ASHA (whose `org_unit_id` *is* a village) and
+is untested for ANM (whose `org_unit_id` is a sub-centre) — GUARDS[CREATED]
+permits ANM to create referrals in principle, but no screen exercises that
+path yet (P4.2 builds ASHA's Screen 2 only), so this is not yet a real gap,
+just an unverified one worth remembering before P4.2 or Phase 6 touch this
+call site.
+
+---
+
+## `docs/PHASE4_PLAN.md` names a `patient_cache` Dexie table the wire protocol gives no key to populate it with
+
+**20. Declared, deliberately left empty this sub-phase — flagged rather than
+guessed at.** The P4.1 build-order table says "Dexie `version(2)`:
+`referral_cache`, `patient_cache` added," but ADR-010's payload — the only
+new data P4.1 puts on the wire — is `patient_name`, `age`, `sex`, `reason`,
+`priority`, `target_org_name`; no `patient_id`. There is no key a
+`patient_cache` row could be written under from anything `/sync/pull`
+sends. Two readings were possible: the plan meant something (e.g. an
+optimistic write from the ASHA's own `createReferral()` call, keyed by a
+client-generated id) that never got written down, or the table is scaffolding
+for a later phase and simply has nothing to populate it yet. Took the second
+reading — `client/src/db/schema.ts` declares `PatientCacheRow` and the
+table, with a docstring stating plainly that nothing writes to it yet and
+why. If the intent was the first reading, that's a P4.2 conversation, not
+a silent gap.
+
+---
+
+## A Playwright mock that assumes call order without accounting for a lazily-initialized ID is a trap worth naming
+
+**21. `getDeviceId()` calls `crypto.randomUUID()` itself, the first time it
+runs against a fresh IndexedDB — and a Playwright test overriding
+`crypto.randomUUID` to intercept a specific call by *position* will silently
+intercept the wrong one if it doesn't account for that.** The first attempt
+at `client/tests/referral-cache-atomicity.spec.ts` assumed
+`createReferral()`'s own `op_id` generation would be the first
+`crypto.randomUUID()` call after the override was installed; it wasn't —
+`getDeviceId()`'s own lazy-init call went first, silently consuming the
+intercepted id as a *device id* instead of the *op id* the test meant to
+collide, and the test passed for the wrong reason (no exception was thrown,
+`threw` was `false`, and the assertion on it caught that — but a less
+careful assertion could have missed it entirely). Fixed by pre-seeding
+`sync_meta`'s `device_id` row before installing the override, so
+`getDeviceId()` reads a cached value instead of minting one. Same shape as
+observation 6 (Phase 2) and observation 13 (Phase 3): a thing outside the
+code path under test can still consume the exact resource the test is
+trying to control.
+
+---
+
+## The full-suite pytest run has one pre-existing failure, unrelated to this session, present on the last committed Phase 3 commit too
+
+**22. `test_concurrent_pushes_leave_no_gap_in_the_pull_cursor`
+(`tests/integration/test_pull_cursor.py`) failed on a fresh
+`nirantharseva_test` database this session — and reproduces identically on
+commit `a4c27aa` (the last commit before any P4.1 change), confirmed by
+stashing every P4.1 edit and re-running it in isolation.** Not a regression
+from this session's `push.py`/`pull.py` changes (the failing test only
+exercises the toy entity, untouched by ADR-009/ADR-010). `PROGRESS.md`
+records CI green on this exact commit on GitHub's Ubuntu runner
+(run `32240152464`), so this looks environment-specific to this Windows
+Docker Desktop setup rather than a real gap in `acquire_seq_lock`'s
+guarantee — plausibly connection-pool or scheduling timing under 20
+concurrent `asyncio.gather`ed pushes, different between this host and the
+Linux CI runner. Left unfixed and unmodified: out of P4.1's scope, and
+touching `app/db.py`'s pooling or `test_pull_cursor.py`'s concurrency
+mechanics without being asked risks the exact sequencing invariant (I2-
+adjacent, ADR-002) this phase has no reason to be near. Every other test in
+the suite — 186 of 187, plus all of P4.1's own new tests — passed clean on
+this same run.
