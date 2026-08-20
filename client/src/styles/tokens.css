@@ -1,0 +1,87 @@
+/* Design tokens — docs/design_handoff_ui_screens/Design System.dc.html,
+   values transcribed in the bundle's README.md. Colour, type, spacing and
+   the three-shape rule are final per the design brief; change them only if
+   the brief itself changes (handoff §8: "once set, stays"). */
+
+:root {
+  /* colour */
+  --ink-900: #171a1e;
+  --ink-700: #484e53;
+  --ink-500: #65686e;
+  --sheet: #ffffff;
+  --sheet-2: #f2f4f8;
+  --hairline: #dee3e4;
+  --rule: #ced1d4;
+  --accent: #32679b;
+  --accent-dark: #254e77;
+  --waiting-text: #8b5601;
+  --waiting-bg: #fef1d4;
+  --waiting-border: #e8d5a8;
+  --alert: #b33637;
+  --alert-bg: #fdeceb;
+  --alert-border: #f0c3c1;
+  --done-outline: #144432;
+  --lost-outline: #2b2f33;
+
+  /* state-family fills (three-shape rule: fine / overdue / done) */
+  --state-created-bg: #e4e9eb;
+  --state-created-text: #484e53;
+  --state-intransit-bg: #d4ebff;
+  --state-intransit-text: #254e77;
+  --state-arrived-bg: #ceeef9;
+  --state-arrived-text: #105767;
+  --state-treated-bg: #cdf3e1;
+  --state-treated-text: #0b553c;
+  --state-backreferred-bg: #ede2fe;
+  --state-backreferred-text: #5d4980;
+
+  /* type */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, Menlo, monospace;
+  --text-display: 25px;
+  --text-title: 20px;
+  --text-name: 19px;
+  --text-body: 16px;
+  --text-secondary: 14.5px;
+  --text-label: 13.5px;
+  --text-meta: 13px;
+  --text-demo-marker: 11px;
+
+  /* spacing (base unit 4) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* radii */
+  --radius-sm: 4px;
+  --radius-pill: 100px;
+
+  /* touch */
+  --touch-min: 48px;
+  --button-height: 56px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--ink-900);
+  background: var(--sheet-2);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: var(--accent);
+}
