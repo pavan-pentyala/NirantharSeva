@@ -16,6 +16,13 @@ The predicate lives inside the referral branch's own WHERE, before LIMIT —
 never applied in Python after the fetch (see ADR-005: a page filtered to
 empty in Python still advances has_more/cursor logic as if nothing more
 existed, and the client stops advancing permanently).
+
+D14/ADR-010: the referral branch's payload also carries a snapshot —
+patient_name, age, sex, reason, priority, target_org_name — joined from
+`patient` and `org_unit` inside the same subquery, before LIMIT, for the
+same reason the subtree predicate lives there and not in Python. Every
+referral event repeats this snapshot, not just the create_referral one —
+ADR-010's accepted cost, not an oversight.
 """
 
 import json
@@ -54,10 +61,15 @@ async def handle_pull(
                        e.device_id, e.lamport, e.device_time, e.server_time,
                        jsonb_build_object(
                          'from_state', e.from_state, 'to_state', e.to_state,
-                         'actor_role', e.actor_role, 'actor_user_id', e.actor_user_id
+                         'actor_role', e.actor_role, 'actor_user_id', e.actor_user_id,
+                         'patient_name', p.name, 'age', p.age, 'sex', p.sex,
+                         'reason', r.reason, 'priority', r.priority,
+                         'target_org_name', target_org.name
                        ) AS payload
                 FROM referral_event e
                 JOIN referral r ON r.id = e.referral_id
+                JOIN patient p ON p.id = r.patient_id
+                LEFT JOIN org_unit target_org ON target_org.id = r.target_org_id
                 WHERE e.seq > :since AND r.origin_org_id IN (SELECT id FROM subtree))
                ORDER BY seq ASC
                LIMIT :fetch_limit"""
