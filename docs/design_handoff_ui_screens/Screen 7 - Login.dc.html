@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+  body { margin:0; background:#eef1f4; -webkit-font-smoothing:antialiased; }
+  a { color:#32679b; }
+  a:hover { color:#254e77; }
+</style>
+</helmet>
+
+<section style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; padding:48px; display:flex; flex-direction:column; gap:20px; color:#171a1e;">
+  <div style="display:flex; flex-direction:column; gap:4px; max-width:760px;">
+    <div style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#65686e; font-weight:600;">Screen 7 · login · phone</div>
+    <div style="font-size:24px; font-weight:650;">Login</div>
+    <div style="font-size:14.5px; color:#484e53; line-height:1.5;">Plain. Phone number, PIN, and role.</div>
+  </div>
+
+  <div style="width:390px; height:844px; background:#fff; border:1px solid #ced1d4; border-radius:4px; overflow:hidden; display:flex; flex-direction:column;">
+    <div style="padding:7px 16px; text-align:center; font-size:11px; color:#65686e; background:#f2f4f8; border-bottom:1px solid #dee3e4;">Demonstration system — synthetic data only</div>
+
+    <div style="flex:1; display:flex; flex-direction:column; justify-content:center; padding:32px; gap:28px;">
+
+      <div style="display:flex; flex-direction:column; gap:4px; align-items:center;">
+        <div style="font-size:24px; font-weight:650;">NirantharSeva</div>
+        <div style="font-size:14.5px; color:#65686e;">Referral tracking</div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <div style="font-size:14.5px; font-weight:650;">Phone number</div>
+          <div style="height:56px; border-radius:4px; border:1.5px solid #32679b; background:#fff; display:flex; align-items:center; padding:0 14px; font-size:19px; letter-spacing:0.02em;">98765 43210</div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <div style="font-size:14.5px; font-weight:650;">PIN</div>
+          <div style="height:56px; border-radius:4px; border:1px solid #ced1d4; background:#fff; display:flex; align-items:center; gap:10px; padding:0 14px;">
+            <div style="width:14px; height:14px; border-radius:50%; background:#171a1e;"></div>
+            <div style="width:14px; height:14px; border-radius:50%; background:#171a1e;"></div>
+            <div style="width:14px; height:14px; border-radius:50%; background:#171a1e;"></div>
+            <div style="width:14px; height:14px; border-radius:50%; background:#171a1e;"></div>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div style="font-size:14.5px; font-weight:650;">I am a</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div style="height:52px; border-radius:4px; background:#32679b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:650;">ASHA</div>
+            <div style="height:52px; border-radius:4px; border:1px solid #ced1d4; color:#484e53; display:flex; align-items:center; justify-content:center; font-size:16px;">ANM</div>
+            <div style="height:52px; border-radius:4px; border:1px solid #ced1d4; color:#484e53; display:flex; align-items:center; justify-content:center; font-size:16px;">MO</div>
+            <div style="height:52px; border-radius:4px; border:1px solid #ced1d4; color:#484e53; display:flex; align-items:center; justify-content:center; font-size:16px;">Supervisor</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:56px; border-radius:4px; background:#32679b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:650;">Log in</div>
+
+      <div style="font-size:13.5px; color:#65686e; text-align:center;">Works without signal. You stay logged in on this phone.</div>
+    </div>
+  </div>
+</section>
+
+</x-dc>
+</body>
+</html>

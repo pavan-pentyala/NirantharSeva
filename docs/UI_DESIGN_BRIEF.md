@@ -2,25 +2,19 @@
 
 **Destination:** `docs/UI_DESIGN_BRIEF.md`
 
-**How to use this:** fill in what you have opinions about, delete or write
-"Claude decides" next to the rest. Anything left as "Claude decides" is Claude
-Code's call under §8 of the handoff. An empty brief is fine — it just means the
-design is Claude Code's to choose. A half-filled brief is better than a
-conversation about it every session.
-
-**Before Phase 4, tell Claude Code whether this file is filled in or not.**
+**Status:** Filled in and confirmed. The design bundle this brief points to has
+arrived (`docs/design_handoff_ui_screens/`) and Phase 4 is planned against it —
+see `docs/PHASE4_PLAN.md`.
 
 ---
 
 ## 1. Reference images or links
 
-Designed from scratch, no external references. The actual design files —
-`Design System.dc.html` and `Screen 1`–`Screen 7` (`.dc.html`) — are not yet
-in this repo; they arrive attached to this brief the moment it is sent to
-Claude Code via the design tool's "Send to Claude Code" button (Phase 4).
-If you're reading this before that send, treat every filename mentioned below
-as a forward reference: open the attached design files first, matching them
-up by the names given, then read the rest of this brief against them.
+Designed from scratch, no external references. The design files — `Design
+System.dc.html`, `Screen 1`–`Screen 7` (`.dc.html`), and this brief's source
+copy — have arrived and live in `docs/design_handoff_ui_screens/`. Open any
+`.dc.html` file directly in a browser to view it (each loads `support.js`
+from the same folder).
 
 ## 2. Overall feeling
 
@@ -52,8 +46,8 @@ up by the names given, then read the rest of this brief against them.
 
 ## 5. Screens you know you want
 
-Seven screens, designed and built as `.dc.html` files, arriving attached
-alongside this brief when it is sent (see §1):
+Seven screens, designed and built as `.dc.html` files in
+`docs/design_handoff_ui_screens/` (see §1):
 
 **ASHA (phone):**
 - My referrals list — 3 states shown: online/synced, offline with 3 updates

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+  body { margin:0; background:#eef1f4; -webkit-font-smoothing:antialiased; }
+  a { color:#32679b; }
+  a:hover { color:#254e77; }
+</style>
+</helmet>
+
+<section style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; padding:48px; display:flex; flex-direction:column; gap:20px; color:#171a1e;">
+  <div style="display:flex; flex-direction:column; gap:4px; max-width:800px;">
+    <div style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#65686e; font-weight:600;">Screen 6 · ANM identity review queue · tablet</div>
+    <div style="font-size:24px; font-weight:650;">Is this the same person?</div>
+    <div style="font-size:14.5px; color:#484e53; line-height:1.5;">One pair at a time. Matching fields sit in plain rows; differing fields are boxed and labelled, so the nurse never has to spot the difference herself. Two large, unambiguous decisions — no middle option, because a wrong merge is worse than a slow one.</div>
+  </div>
+
+  <div style="width:834px; background:#fff; border:1px solid #ced1d4; border-radius:4px; overflow:hidden; display:flex; flex-direction:column;">
+
+    <div style="padding:7px 24px; text-align:center; font-size:11px; color:#65686e; background:#f2f4f8; border-bottom:1px solid #dee3e4;">Demonstration system — synthetic data only</div>
+
+    <div style="padding:18px 24px; border-bottom:1px solid #dee3e4; display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex; flex-direction:column; gap:2px;">
+        <div style="font-size:22px; font-weight:650;">Possible same person</div>
+        <div style="font-size:14px; color:#65686e;">Pair 1 of 4 to review</div>
+      </div>
+      <div style="font-size:14px; color:#65686e;">Bhagwanpur sub-centre · Nurse Kalpana Devi</div>
+    </div>
+
+    <div style="padding:24px; display:flex; flex-direction:column; gap:16px;">
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div style="border:1px solid #ced1d4; border-radius:4px; padding:16px; display:flex; flex-direction:column; gap:3px;">
+          <div style="font-size:12px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase; color:#65686e;">Existing record</div>
+          <div style="font-size:20px; font-weight:650; padding-top:4px;">Lakshmi Devi</div>
+        </div>
+        <div style="border:1px solid #ced1d4; border-radius:4px; padding:16px; display:flex; flex-direction:column; gap:3px;">
+          <div style="font-size:12px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase; color:#65686e;">New referral</div>
+          <div style="font-size:20px; font-weight:650; padding-top:4px;">Laxmi Devi</div>
+        </div>
+      </div>
+
+      <div style="border:1.5px solid #b33637; border-radius:4px; overflow:hidden;">
+        <div style="padding:8px 16px; background:#fdeceb; font-size:12.5px; font-weight:650; color:#7a2a2a; letter-spacing:0.02em;">Name is spelled differently — check carefully</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1px; background:#f0c3c1;">
+          <div style="background:#fff; padding:14px 16px; font-size:19px; font-weight:650;">Lakshmi Devi</div>
+          <div style="background:#fff; padding:14px 16px; font-size:19px; font-weight:650;">Laxmi Devi</div>
+        </div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:1px; border:1px solid #dee3e4; border-radius:4px; overflow:hidden;">
+        <div style="display:grid; grid-template-columns:160px 1fr 1fr; background:#f2f4f8;">
+          <div style="padding:10px 16px; font-size:12px; font-weight:650; letter-spacing:0.05em; text-transform:uppercase; color:#65686e;">Field</div>
+          <div style="padding:10px 16px; font-size:12px; font-weight:650; letter-spacing:0.05em; text-transform:uppercase; color:#65686e;">Existing</div>
+          <div style="padding:10px 16px; font-size:12px; font-weight:650; letter-spacing:0.05em; text-transform:uppercase; color:#65686e;">New</div>
+        </div>
+        <div style="display:grid; grid-template-columns:160px 1fr 1fr; border-top:1px solid #dee3e4;">
+          <div style="padding:12px 16px; font-size:14.5px; color:#484e53; font-weight:650;">Age</div>
+          <div style="padding:12px 16px; font-size:15px;">45</div>
+          <div style="padding:12px 16px; font-size:15px;">45</div>
+        </div>
+        <div style="display:grid; grid-template-columns:160px 1fr 1fr; border-top:1px solid #dee3e4;">
+          <div style="padding:12px 16px; font-size:14.5px; color:#484e53; font-weight:650;">Village</div>
+          <div style="padding:12px 16px; font-size:15px;">Bhagwanpur</div>
+          <div style="padding:12px 16px; font-size:15px;">Bhagwanpur</div>
+        </div>
+        <div style="display:grid; grid-template-columns:160px 1fr 1fr; border-top:1px solid #dee3e4;">
+          <div style="padding:12px 16px; font-size:14.5px; color:#484e53; font-weight:650;">Husband's name</div>
+          <div style="padding:12px 16px; font-size:15px;">Ram Prasad</div>
+          <div style="padding:12px 16px; font-size:15px;">Ram Prasad</div>
+        </div>
+        <div style="display:grid; grid-template-columns:160px 1fr 1fr; border-top:1.5px solid #b33637; background:#fdeceb;">
+          <div style="padding:12px 16px; font-size:14.5px; color:#7a2a2a; font-weight:700;">Phone number</div>
+          <div style="padding:12px 16px; font-size:15px; font-weight:650; color:#7a2a2a;">98730 41122</div>
+          <div style="padding:12px 16px; font-size:15px; font-weight:650; color:#7a2a2a;">No number given</div>
+        </div>
+        <div style="display:grid; grid-template-columns:160px 1fr 1fr; border-top:1px solid #dee3e4;">
+          <div style="padding:12px 16px; font-size:14.5px; color:#484e53; font-weight:650;">Last seen</div>
+          <div style="padding:12px 16px; font-size:15px;">3 months ago, sugar check</div>
+          <div style="padding:12px 16px; font-size:15px;">Today, wound check</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:16px 24px 22px; border-top:1px solid #dee3e4; display:flex; gap:14px;">
+      <div style="flex:1; height:60px; border-radius:4px; background:#32679b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:650;">Same person — merge</div>
+      <div style="flex:1; height:60px; border-radius:4px; border:1.5px solid #ced1d4; color:#484e53; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:650;">Different people — keep both</div>
+    </div>
+  </div>
+
+  <div style="font-size:13.5px; color:#65686e; max-width:600px; line-height:1.5;">Only fields that disagree are boxed in red; everything that matches sits in plain rows so agreement is the quiet default and disagreement is the only thing that stands out.</div>
+</section>
+
+</x-dc>
+</body>
+</html>

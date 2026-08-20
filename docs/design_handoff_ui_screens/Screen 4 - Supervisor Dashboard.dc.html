@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+  body { margin:0; background:#eef1f4; -webkit-font-smoothing:antialiased; }
+  a { color:#32679b; }
+  a:hover { color:#254e77; }
+  @keyframes newrow { from { background:#fdeceb; } to { background:#fff; } }
+</style>
+</helmet>
+
+<section style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; padding:48px; display:flex; flex-direction:column; gap:20px; color:#171a1e;">
+  <div style="display:flex; flex-direction:column; gap:4px; max-width:800px;">
+    <div style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#65686e; font-weight:600;">Screen 4 · supervisor live dashboard · desktop</div>
+    <div style="font-size:24px; font-weight:650;">Block dashboard</div>
+    <div style="font-size:14.5px; color:#484e53; line-height:1.5;">A lands live, unchanged. B is the instant a new breach arrives: the row fades in from a pale red highlight over two seconds and settles to plain white — no sound, no motion elsewhere, count and banner update in place.</div>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:32px;">
+
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:14px; font-weight:650; color:#484e53;">A · Steady state</div>
+      <div style="width:1360px; background:#fff; border:1px solid #ced1d4; border-radius:4px; overflow:hidden;">
+
+        <div style="padding:8px 24px; text-align:center; font-size:11px; color:#65686e; background:#f2f4f8; border-bottom:1px solid #dee3e4;">Demonstration system — synthetic data only</div>
+
+        <div style="padding:18px 24px; border-bottom:1px solid #dee3e4; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="font-size:24px; font-weight:650;">Sonpur Block</div>
+            <div style="font-size:14.5px; color:#65686e;">Supervisor · Anita Kumari</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:10px; height:10px; border-radius:50%; background:#0b553c;"></div>
+            <div style="font-size:14.5px; font-weight:650;">Live</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">updated 12 seconds ago</div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:1px; background:#dee3e4; border-bottom:1px solid #dee3e4;">
+          <div style="background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:4px;"><div style="font-size:28px; font-weight:650;">62</div><div style="font-size:13.5px; color:#65686e;">Open referrals</div></div>
+          <div style="background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:4px;"><div style="font-size:28px; font-weight:650; color:#254e77;">21</div><div style="font-size:13.5px; color:#65686e;">On the way</div></div>
+          <div style="background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:4px;"><div style="font-size:28px; font-weight:650; color:#105767;">14</div><div style="font-size:13.5px; color:#65686e;">Reached centre</div></div>
+          <div style="background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:4px;"><div style="font-size:28px; font-weight:650; color:#0b553c;">19</div><div style="font-size:13.5px; color:#65686e;">Treated / sent back</div></div>
+          <div style="background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:4px; border-left:3px solid #b33637;"><div style="font-size:28px; font-weight:700; color:#b33637;">6</div><div style="font-size:13.5px; color:#484e53; font-weight:650;">Overdue</div></div>
+          <div style="background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:4px;"><div style="font-size:28px; font-weight:650;">238</div><div style="font-size:13.5px; color:#65686e;">Closed this month</div></div>
+        </div>
+
+        <div style="padding:16px 24px 0; display:flex; align-items:baseline; justify-content:space-between;">
+          <div style="font-size:18px; font-weight:650;">Overdue — act now</div>
+          <div style="font-size:13.5px; color:#65686e;">sorted by how overdue</div>
+        </div>
+
+        <div style="padding:12px 24px 20px; display:flex; flex-direction:column;">
+          <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr 0.8fr 1fr; gap:16px; padding:10px 16px; font-size:12px; font-weight:650; letter-spacing:0.05em; text-transform:uppercase; color:#65686e; border-bottom:1px solid #dee3e4;">
+            <div>Patient</div><div>Village</div><div>Sent to</div><div>Reason</div><div>Overdue by</div><div>ASHA</div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr 0.8fr 1fr; gap:16px; padding:14px 16px; align-items:center; border-bottom:1px solid #dee3e4; border-left:4px solid #b33637;">
+            <div style="font-size:16px; font-weight:650;">Ramesh Yadav</div>
+            <div style="font-size:14.5px; color:#484e53;">Sonpur</div>
+            <div style="font-size:14.5px; color:#484e53;">CHC Sonpur</div>
+            <div style="font-size:14.5px; color:#484e53;">Chest pain</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:14px; color:#b33637; font-weight:700;">2 days</div>
+            <div style="font-size:14.5px; color:#484e53;">Sunita Kumari</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr 0.8fr 1fr; gap:16px; padding:14px 16px; align-items:center; border-bottom:1px solid #dee3e4; border-left:4px solid #b33637;">
+            <div style="font-size:16px; font-weight:650;">Bimla Devi</div>
+            <div style="font-size:14.5px; color:#484e53;">Rustampur</div>
+            <div style="font-size:14.5px; color:#484e53;">PHC Hajipur</div>
+            <div style="font-size:14.5px; color:#484e53;">Difficult labour</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:14px; color:#b33637; font-weight:700;">19 h</div>
+            <div style="font-size:14.5px; color:#484e53;">Geeta Devi</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr 0.8fr 1fr; gap:16px; padding:14px 16px; align-items:center; border-bottom:1px solid #dee3e4; border-left:4px solid #b33637;">
+            <div style="font-size:16px; font-weight:650;">Suresh Paswan</div>
+            <div style="font-size:14.5px; color:#484e53;">Rustampur</div>
+            <div style="font-size:14.5px; color:#484e53;">CHC Sonpur</div>
+            <div style="font-size:14.5px; color:#484e53;">Snake bite</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:14px; color:#b33637; font-weight:700;">6 h</div>
+            <div style="font-size:14.5px; color:#484e53;">Geeta Devi</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr 0.8fr 1fr; gap:16px; padding:14px 16px; align-items:center; border-left:4px solid #b33637;">
+            <div style="font-size:16px; font-weight:650;">Kiran Kumari</div>
+            <div style="font-size:14.5px; color:#484e53;">Madhopur</div>
+            <div style="font-size:14.5px; color:#484e53;">CHC Sonpur</div>
+            <div style="font-size:14.5px; color:#484e53;">High fever, child</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:14px; color:#b33637; font-weight:700;">40 min</div>
+            <div style="font-size:14.5px; color:#484e53;">Sunita Kumari</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:14px; font-weight:650; color:#484e53;">B · The moment a new breach lands (row fades from pale red to white over ~2s, banner and count update with it)</div>
+      <div style="width:1360px; background:#fff; border:1px solid #ced1d4; border-radius:4px; overflow:hidden;">
+
+        <div style="padding:8px 24px; text-align:center; font-size:11px; color:#65686e; background:#f2f4f8; border-bottom:1px solid #dee3e4;">Demonstration system — synthetic data only</div>
+
+        <div style="padding:18px 24px; border-bottom:1px solid #dee3e4; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="font-size:24px; font-weight:650;">Sonpur Block</div>
+            <div style="font-size:14.5px; color:#65686e;">Supervisor · Anita Kumari</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:10px; height:10px; border-radius:50%; background:#0b553c;"></div>
+            <div style="font-size:14.5px; font-weight:650;">Live</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">updated just now</div>
+          </div>
+        </div>
+
+        <div style="padding:11px 24px; background:#fdeceb; border-bottom:1px solid #f0c3c1; display:flex; align-items:center; gap:10px;">
+          <div style="width:8px; height:8px; border-radius:50%; background:#b33637; flex:none;"></div>
+          <div style="font-size:14.5px; color:#7a2a2a;"><b>New overdue referral:</b> Manju Devi, Bhagwanpur — no update for 30 minutes past deadline.</div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:1px; background:#dee3e4; border-bottom:1px solid #dee3e4;">
+          <div style="background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:4px;"><div style="font-size:28px; font-weight:650;">62</div><div style="font-size:13.5px; color:#65686e;">Open referrals</div></div>
+          <div style="background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:4px;"><div style="font-size:28px; font-weight:650; color:#254e77;">20</div><div style="font-size:13.5px; color:#65686e;">On the way</div></div>
+          <div style="background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:4px;"><div style="font-size:28px; font-weight:650; color:#105767;">14</div><div style="font-size:13.5px; color:#65686e;">Reached centre</div></div>
+          <div style="background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:4px;"><div style="font-size:28px; font-weight:650; color:#0b553c;">19</div><div style="font-size:13.5px; color:#65686e;">Treated / sent back</div></div>
+          <div style="background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:4px; border-left:3px solid #b33637;"><div style="font-size:28px; font-weight:700; color:#b33637;">7</div><div style="font-size:13.5px; color:#484e53; font-weight:650;">Overdue</div></div>
+          <div style="background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:4px;"><div style="font-size:28px; font-weight:650;">238</div><div style="font-size:13.5px; color:#65686e;">Closed this month</div></div>
+        </div>
+
+        <div style="padding:16px 24px 0; display:flex; align-items:baseline; justify-content:space-between;">
+          <div style="font-size:18px; font-weight:650;">Overdue — act now</div>
+          <div style="font-size:13.5px; color:#65686e;">sorted by how overdue</div>
+        </div>
+
+        <div style="padding:12px 24px 20px; display:flex; flex-direction:column;">
+          <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr 0.8fr 1fr; gap:16px; padding:10px 16px; font-size:12px; font-weight:650; letter-spacing:0.05em; text-transform:uppercase; color:#65686e; border-bottom:1px solid #dee3e4;">
+            <div>Patient</div><div>Village</div><div>Sent to</div><div>Reason</div><div>Overdue by</div><div>ASHA</div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr 0.8fr 1fr; gap:16px; padding:14px 16px; align-items:center; border-bottom:1px solid #dee3e4; border-left:4px solid #b33637; animation:newrow 2s ease-out;">
+            <div style="font-size:16px; font-weight:650;">Manju Devi</div>
+            <div style="font-size:14.5px; color:#484e53;">Bhagwanpur</div>
+            <div style="font-size:14.5px; color:#484e53;">CHC Sonpur</div>
+            <div style="font-size:14.5px; color:#484e53;">Postpartum bleeding</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:14px; color:#b33637; font-weight:700;">30 min</div>
+            <div style="font-size:14.5px; color:#484e53;">Sunita Kumari</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr 0.8fr 1fr; gap:16px; padding:14px 16px; align-items:center; border-bottom:1px solid #dee3e4; border-left:4px solid #b33637;">
+            <div style="font-size:16px; font-weight:650;">Ramesh Yadav</div>
+            <div style="font-size:14.5px; color:#484e53;">Sonpur</div>
+            <div style="font-size:14.5px; color:#484e53;">CHC Sonpur</div>
+            <div style="font-size:14.5px; color:#484e53;">Chest pain</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:14px; color:#b33637; font-weight:700;">2 days</div>
+            <div style="font-size:14.5px; color:#484e53;">Sunita Kumari</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr 0.8fr 1fr; gap:16px; padding:14px 16px; align-items:center; border-bottom:1px solid #dee3e4; border-left:4px solid #b33637;">
+            <div style="font-size:16px; font-weight:650;">Bimla Devi</div>
+            <div style="font-size:14.5px; color:#484e53;">Rustampur</div>
+            <div style="font-size:14.5px; color:#484e53;">PHC Hajipur</div>
+            <div style="font-size:14.5px; color:#484e53;">Difficult labour</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:14px; color:#b33637; font-weight:700;">19 h</div>
+            <div style="font-size:14.5px; color:#484e53;">Geeta Devi</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr 0.8fr 1fr; gap:16px; padding:14px 16px; align-items:center; border-bottom:1px solid #dee3e4; border-left:4px solid #b33637;">
+            <div style="font-size:16px; font-weight:650;">Suresh Paswan</div>
+            <div style="font-size:14.5px; color:#484e53;">Rustampur</div>
+            <div style="font-size:14.5px; color:#484e53;">CHC Sonpur</div>
+            <div style="font-size:14.5px; color:#484e53;">Snake bite</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:14px; color:#b33637; font-weight:700;">6 h</div>
+            <div style="font-size:14.5px; color:#484e53;">Geeta Devi</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1.4fr 1fr 1fr 1.2fr 0.8fr 1fr; gap:16px; padding:14px 16px; align-items:center;">
+            <div style="font-size:16px; font-weight:650;">Kiran Kumari</div>
+            <div style="font-size:14.5px; color:#484e53;">Madhopur</div>
+            <div style="font-size:14.5px; color:#484e53;">CHC Sonpur</div>
+            <div style="font-size:14.5px; color:#484e53;">High fever, child</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:14px; color:#b33637; font-weight:700;">40 min</div>
+            <div style="font-size:14.5px; color:#484e53;">Sunita Kumari</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+</body>
+</html>

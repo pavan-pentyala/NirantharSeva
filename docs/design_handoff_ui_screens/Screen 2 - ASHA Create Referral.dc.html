@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+  body { margin:0; background:#eef1f4; -webkit-font-smoothing:antialiased; }
+  a { color:#32679b; }
+  a:hover { color:#254e77; }
+</style>
+</helmet>
+
+<section style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; padding:48px; display:flex; flex-direction:column; gap:20px; color:#171a1e;">
+  <div style="display:flex; flex-direction:column; gap:4px; max-width:760px;">
+    <div style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#65686e; font-weight:600;">Screen 2 · ASHA · phone</div>
+    <div style="font-size:24px; font-weight:650;">New referral</div>
+    <div style="font-size:14.5px; color:#484e53; line-height:1.5;">Fastest path: seven fields, one screen, no steps. Priority and facility are single-tap choices, not text entry. B shows the confirmation after saving with no signal.</div>
+  </div>
+
+  <div style="display:flex; gap:32px; flex-wrap:wrap; align-items:flex-start;">
+
+    <!-- A: the form -->
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:14px; font-weight:650; color:#484e53;">A · Filling the form</div>
+      <div style="width:390px; height:844px; background:#fff; border:1px solid #ced1d4; border-radius:4px; overflow:hidden; display:flex; flex-direction:column;">
+        <div style="padding:7px 16px; text-align:center; font-size:11px; color:#65686e; background:#f2f4f8; border-bottom:1px solid #dee3e4;">Demonstration system — synthetic data only</div>
+
+        <div style="padding:14px 16px; border-bottom:1px solid #dee3e4; display:flex; align-items:center; gap:12px;">
+          <div style="width:32px; height:32px; border-radius:4px; border:1px solid #ced1d4; display:flex; align-items:center; justify-content:center; font-size:18px; color:#484e53; flex:none;">←</div>
+          <div style="font-size:20px; font-weight:650;">New referral</div>
+        </div>
+
+        <div style="flex:1; overflow:hidden; padding:16px; display:flex; flex-direction:column; gap:16px;">
+
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div style="font-size:14.5px; font-weight:650;">Patient name</div>
+            <div style="height:52px; border-radius:4px; border:1.5px solid #32679b; background:#fff; display:flex; align-items:center; padding:0 14px; font-size:17px;">Ramesh Yadav</div>
+          </div>
+
+          <div style="display:flex; gap:12px;">
+            <div style="display:flex; flex-direction:column; gap:6px; flex:1;">
+              <div style="font-size:14.5px; font-weight:650;">Age</div>
+              <div style="height:52px; border-radius:4px; border:1px solid #ced1d4; background:#fff; display:flex; align-items:center; padding:0 14px; font-size:17px; color:#65686e;">Years</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px; flex:1;">
+              <div style="font-size:14.5px; font-weight:650;">Sex</div>
+              <div style="display:flex; gap:6px;">
+                <div style="flex:1; height:52px; border-radius:4px; background:#32679b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:650;">M</div>
+                <div style="flex:1; height:52px; border-radius:4px; border:1px solid #ced1d4; display:flex; align-items:center; justify-content:center; font-size:16px; color:#484e53;">F</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div style="font-size:14.5px; font-weight:650;">Phone number</div>
+            <div style="height:52px; border-radius:4px; border:1px solid #ced1d4; background:#fff; display:flex; align-items:center; padding:0 14px; font-size:17px; color:#65686e;">Optional</div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:6px;">
+            <div style="font-size:14.5px; font-weight:650;">Village</div>
+            <div style="height:52px; border-radius:4px; border:1px solid #ced1d4; background:#f2f4f8; display:flex; align-items:center; justify-content:space-between; padding:0 14px; font-size:17px;"><span>Bhagwanpur</span><span style="font-size:12px; color:#65686e;">yours</span></div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:14.5px; font-weight:650;">Reason for referral</div>
+            <div style="height:52px; border-radius:4px; border:1px solid #ced1d4; background:#fff; display:flex; align-items:center; padding:0 14px; font-size:17px; color:#65686e;">Chest pain</div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:14.5px; font-weight:650;">How urgent</div>
+            <div style="display:flex; gap:8px;">
+              <div style="flex:1; height:52px; border-radius:100px; background:#b33637; color:#fff; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:650;">Urgent</div>
+              <div style="flex:1; height:52px; border-radius:100px; border:1px solid #ced1d4; display:flex; align-items:center; justify-content:center; font-size:15px; color:#484e53;">Soon</div>
+              <div style="flex:1; height:52px; border-radius:100px; border:1px solid #ced1d4; display:flex; align-items:center; justify-content:center; font-size:15px; color:#484e53;">Routine</div>
+            </div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="font-size:14.5px; font-weight:650;">Sending to</div>
+            <div style="height:52px; border-radius:4px; border:1.5px solid #32679b; background:#d4ebff; display:flex; align-items:center; justify-content:space-between; padding:0 14px; font-size:17px; color:#171a1e; font-weight:650;"><span>CHC Sonpur</span><span style="font-size:15px; color:#254e77;">change ›</span></div>
+          </div>
+
+        </div>
+
+        <div style="padding:12px 16px 16px; border-top:1px solid #dee3e4;">
+          <div style="height:56px; border-radius:4px; background:#32679b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:650;">Save referral</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B: saved offline confirmation -->
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:14px; font-weight:650; color:#484e53;">B · Saved with no signal</div>
+      <div style="width:390px; height:844px; background:#fff; border:1px solid #ced1d4; border-radius:4px; overflow:hidden; display:flex; flex-direction:column;">
+        <div style="padding:7px 16px; text-align:center; font-size:11px; color:#65686e; background:#f2f4f8; border-bottom:1px solid #dee3e4;">Demonstration system — synthetic data only</div>
+
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:32px;">
+          <div style="width:80px; height:80px; border-radius:50%; background:#cdf3e1; display:flex; align-items:center; justify-content:center; font-size:36px; color:#0b553c;">✓</div>
+          <div style="font-size:22px; font-weight:650; text-align:center;">Referral saved</div>
+          <div style="font-size:16px; color:#484e53; text-align:center; line-height:1.55; max-width:300px;">Ramesh Yadav's referral is saved on your phone.</div>
+
+          <div style="width:100%; background:#fef1d4; border:1px solid #e8d5a8; border-radius:4px; padding:14px 16px; display:flex; gap:11px; margin-top:8px;">
+            <div style="width:12px; height:12px; border-radius:50%; background:#8b5601; margin-top:4px; flex:none;"></div>
+            <div style="display:flex; flex-direction:column; gap:2px;">
+              <div style="font-size:15px; font-weight:650;">No signal right now</div>
+              <div style="font-size:14px; line-height:1.45; color:#484e53;">It will send by itself when your phone finds signal. You do not need to do anything.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:12px 16px 16px; border-top:1px solid #dee3e4; display:flex; flex-direction:column; gap:10px;">
+          <div style="height:56px; border-radius:4px; background:#32679b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:650;">Back to my referrals</div>
+          <div style="height:52px; border-radius:4px; border:1.5px solid #32679b; color:#254e77; display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:650;">Add another referral</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+</body>
+</html>

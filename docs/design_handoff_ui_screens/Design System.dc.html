@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+  body { margin:0; background:#f2f4f8; -webkit-font-smoothing:antialiased; }
+  a { color:#32679b; }
+  a:hover { color:#254e77; }
+</style>
+</helmet>
+
+<section style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; color:#171a1e; padding:48px; display:flex; flex-direction:column; gap:40px; width:1180px;">
+
+  <div style="display:flex; flex-direction:column; gap:8px; max-width:800px;">
+    <div style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#65686e; font-weight:600;">NirantharSeva · design system v1</div>
+    <div style="font-size:30px; font-weight:650; letter-spacing:-0.015em;">Plain structure, rounded labels</div>
+    <div style="font-size:16px; line-height:1.5; color:#484e53; text-wrap:pretty;">Direction: the clinical skeleton from 1a — white sheet, hairline rules, dense rows, monospace numbers, one blue accent — with the rounded pill labels from 1b. Device fonts only, no images, no animation. Every value below is fixed; screens from here on use only these.</div>
+    <div style="font-size:13px; color:#65686e; padding-top:4px;">Colours are authored in oklch; the hex beside each is the fallback to emit for old Android WebViews.</div>
+  </div>
+
+  <div style="height:1px; background:#ced1d4;"></div>
+
+  <div style="display:flex; flex-direction:column; gap:18px;">
+    <div style="font-size:20px; font-weight:650;">1 · Colour</div>
+    <div style="font-size:15px; color:#484e53; max-width:720px; line-height:1.5;">Nine base values. Ink is a cool near-neutral; the sheet is pure white for daylight contrast. Blue is the only interface accent — it means "the app", never a patient state.</div>
+
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px;">
+      <div style="border:1px solid #dee3e4; display:flex;">
+        <div style="width:76px; background:#171a1e; flex:none;"></div>
+        <div style="padding:12px 14px; display:flex; flex-direction:column; gap:2px;">
+          <div style="font-size:15px; font-weight:650;">ink-900</div>
+          <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#484e53;">oklch(0.22 0.01 250)<br>#171a1e</div>
+          <div style="font-size:13px; color:#65686e;">names, headings, body</div>
+        </div>
+      </div>
+      <div style="border:1px solid #dee3e4; display:flex;">
+        <div style="width:76px; background:#484e53; flex:none;"></div>
+        <div style="padding:12px 14px; display:flex; flex-direction:column; gap:2px;">
+          <div style="font-size:15px; font-weight:650;">ink-700</div>
+          <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#484e53;">oklch(0.42 0.01 250)<br>#484e53</div>
+          <div style="font-size:13px; color:#65686e;">secondary lines</div>
+        </div>
+      </div>
+      <div style="border:1px solid #dee3e4; display:flex;">
+        <div style="width:76px; background:#65686e; flex:none;"></div>
+        <div style="padding:12px 14px; display:flex; flex-direction:column; gap:2px;">
+          <div style="font-size:15px; font-weight:650;">ink-500</div>
+          <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#484e53;">oklch(0.52 0.01 250)<br>#65686e</div>
+          <div style="font-size:13px; color:#65686e;">meta, timestamps</div>
+        </div>
+      </div>
+      <div style="border:1px solid #dee3e4; display:flex;">
+        <div style="width:76px; background:#ffffff; border-right:1px solid #dee3e4; flex:none;"></div>
+        <div style="padding:12px 14px; display:flex; flex-direction:column; gap:2px;">
+          <div style="font-size:15px; font-weight:650;">sheet</div>
+          <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#484e53;">#ffffff</div>
+          <div style="font-size:13px; color:#65686e;">every screen background</div>
+        </div>
+      </div>
+      <div style="border:1px solid #dee3e4; display:flex;">
+        <div style="width:76px; background:#f2f4f8; border-right:1px solid #dee3e4; flex:none;"></div>
+        <div style="padding:12px 14px; display:flex; flex-direction:column; gap:2px;">
+          <div style="font-size:15px; font-weight:650;">sheet-2</div>
+          <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#484e53;">oklch(0.97 0.004 250)<br>#f2f4f8</div>
+          <div style="font-size:13px; color:#65686e;">headers, footers, groups</div>
+        </div>
+      </div>
+      <div style="border:1px solid #dee3e4; display:flex;">
+        <div style="width:38px; background:#dee3e4; flex:none;"></div>
+        <div style="width:38px; background:#ced1d4; flex:none;"></div>
+        <div style="padding:12px 14px; display:flex; flex-direction:column; gap:2px;">
+          <div style="font-size:15px; font-weight:650;">hairline / rule</div>
+          <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#484e53;">#dee3e4 · #ced1d4</div>
+          <div style="font-size:13px; color:#65686e;">1px row / section divider</div>
+        </div>
+      </div>
+      <div style="border:1px solid #dee3e4; display:flex;">
+        <div style="width:76px; background:#32679b; flex:none;"></div>
+        <div style="padding:12px 14px; display:flex; flex-direction:column; gap:2px;">
+          <div style="font-size:15px; font-weight:650;">accent</div>
+          <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#484e53;">oklch(0.5 0.1 250)<br>#32679b</div>
+          <div style="font-size:13px; color:#65686e;">buttons, links, active tab</div>
+        </div>
+      </div>
+      <div style="border:1px solid #dee3e4; display:flex;">
+        <div style="width:76px; background:#8b5601; flex:none;"></div>
+        <div style="padding:12px 14px; display:flex; flex-direction:column; gap:2px;">
+          <div style="font-size:15px; font-weight:650;">waiting</div>
+          <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#484e53;">oklch(0.5 0.11 70)<br>#8b5601 on #fef1d4</div>
+          <div style="font-size:13px; color:#65686e;">not sent yet, no signal</div>
+        </div>
+      </div>
+      <div style="border:1px solid #dee3e4; display:flex;">
+        <div style="width:76px; background:#b33637; flex:none;"></div>
+        <div style="padding:12px 14px; display:flex; flex-direction:column; gap:2px;">
+          <div style="font-size:15px; font-weight:650;">alert</div>
+          <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#484e53;">oklch(0.52 0.16 25)<br>#b33637</div>
+          <div style="font-size:13px; color:#65686e;">overdue only — nothing else</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:1px; background:#ced1d4;"></div>
+
+  <div style="display:flex; flex-direction:column; gap:18px;">
+    <div style="font-size:20px; font-weight:650;">2 · Type scale</div>
+    <div style="font-size:15px; color:#484e53; max-width:720px; line-height:1.5;">One family: <span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">system-ui</span> (Roboto on the ASHA's phone). Numbers that must line up — times, counts, IDs, phone numbers — use <span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">ui-monospace</span>. Nothing is downloaded. Body text never goes below 14.5px; only the demo marker may be 11px.</div>
+
+    <div style="border:1px solid #dee3e4; background:#fff;">
+      <div style="display:flex; align-items:baseline; gap:24px; padding:16px 20px; border-bottom:1px solid #dee3e4;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:150px; flex:none;">display 25 / 650</div>
+        <div style="font-size:25px; font-weight:650; letter-spacing:-0.015em; line-height:1.15;">My referrals</div>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:24px; padding:16px 20px; border-bottom:1px solid #dee3e4;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:150px; flex:none;">title 20 / 650</div>
+        <div style="font-size:20px; font-weight:650; line-height:1.25;">Update this referral</div>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:24px; padding:16px 20px; border-bottom:1px solid #dee3e4;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:150px; flex:none;">name 19 / 650</div>
+        <div style="font-size:19px; font-weight:650; line-height:1.3;">Sunita Devi</div>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:24px; padding:16px 20px; border-bottom:1px solid #dee3e4;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:150px; flex:none;">body 16 / 400</div>
+        <div style="font-size:16px; line-height:1.45;">She left the village two hours ago.</div>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:24px; padding:16px 20px; border-bottom:1px solid #dee3e4;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:150px; flex:none;">secondary 14.5 / 400</div>
+        <div style="font-size:14.5px; line-height:1.45; color:#484e53;">24 F · Low blood in pregnancy · CHC Sonpur</div>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:24px; padding:16px 20px; border-bottom:1px solid #dee3e4;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:150px; flex:none;">label 13.5 / 650</div>
+        <div style="font-size:13.5px; font-weight:650;">On the way</div>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:24px; padding:16px 20px; border-bottom:1px solid #dee3e4;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:150px; flex:none;">meta 13 mono</div>
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">Last sent today 9:14 am · 2 h</div>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:24px; padding:16px 20px;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:150px; flex:none;">marker 11 / 400</div>
+        <div style="font-size:11px; color:#65686e;">Demonstration system — synthetic data only</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:1px; background:#ced1d4;"></div>
+
+  <div style="display:flex; flex-direction:column; gap:18px;">
+    <div style="font-size:20px; font-weight:650;">3 · Spacing, radius, touch</div>
+    <div style="font-size:15px; color:#484e53; max-width:720px; line-height:1.5;">Base unit 4. Only these steps. Screen edge padding is 16 on phones, 24 on tablet and desktop.</div>
+
+    <div style="display:flex; gap:28px; flex-wrap:wrap;">
+      <div style="border:1px solid #dee3e4; background:#fff; padding:20px; display:flex; flex-direction:column; gap:12px; min-width:330px;">
+        <div style="font-size:15px; font-weight:650;">Spacing steps</div>
+        <div style="display:flex; flex-direction:column; gap:9px;">
+          <div style="display:flex; align-items:center; gap:14px;"><div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:34px;">4</div><div style="height:12px; width:4px; background:#32679b;"></div><div style="font-size:13px; color:#65686e;">inside a pill</div></div>
+          <div style="display:flex; align-items:center; gap:14px;"><div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:34px;">8</div><div style="height:12px; width:8px; background:#32679b;"></div><div style="font-size:13px; color:#65686e;">pill to pill</div></div>
+          <div style="display:flex; align-items:center; gap:14px;"><div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:34px;">12</div><div style="height:12px; width:12px; background:#32679b;"></div><div style="font-size:13px; color:#65686e;">lines inside a row</div></div>
+          <div style="display:flex; align-items:center; gap:14px;"><div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:34px;">16</div><div style="height:12px; width:16px; background:#32679b;"></div><div style="font-size:13px; color:#65686e;">screen edge, row padding</div></div>
+          <div style="display:flex; align-items:center; gap:14px;"><div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:34px;">24</div><div style="height:12px; width:24px; background:#32679b;"></div><div style="font-size:13px; color:#65686e;">block to block</div></div>
+          <div style="display:flex; align-items:center; gap:14px;"><div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:34px;">32</div><div style="height:12px; width:32px; background:#32679b;"></div><div style="font-size:13px; color:#65686e;">section to section</div></div>
+          <div style="display:flex; align-items:center; gap:14px;"><div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; width:34px;">40</div><div style="height:12px; width:40px; background:#32679b;"></div><div style="font-size:13px; color:#65686e;">above a page footer</div></div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #dee3e4; background:#fff; padding:20px; display:flex; flex-direction:column; gap:14px; min-width:330px;">
+        <div style="font-size:15px; font-weight:650;">Radius — two values only</div>
+        <div style="display:flex; align-items:center; gap:16px;">
+          <div style="width:120px; height:48px; border:1px solid #ced1d4; border-radius:4px; background:#f2f4f8;"></div>
+          <div style="font-size:14px; color:#484e53;"><span style="font-family:ui-monospace,Menlo,monospace; font-size:13px;">4px</span> — sheets, rows, buttons, inputs</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:16px;">
+          <div style="width:120px; height:34px; border-radius:100px; background:#d4ebff; border:1px solid #ced1d4;"></div>
+          <div style="font-size:14px; color:#484e53;"><span style="font-family:ui-monospace,Menlo,monospace; font-size:13px;">100px</span> — state labels and filter chips only</div>
+        </div>
+        <div style="height:1px; background:#dee3e4;"></div>
+        <div style="font-size:15px; font-weight:650;">Touch targets</div>
+        <div style="font-size:14px; line-height:1.55; color:#484e53;">Minimum tappable box 48 × 48. List row height at least 72. Primary button 56 tall, full width, 16 from the screen edge. Never two buttons side by side narrower than 48.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:1px; background:#ced1d4;"></div>
+
+  <div style="display:flex; flex-direction:column; gap:18px;">
+    <div style="font-size:20px; font-weight:650;">4 · The three-shape rule</div>
+    <div style="font-size:15px; color:#484e53; max-width:800px; line-height:1.5;">In sunlight, colour is the first thing to go. So the group a referral belongs to is carried by <b>pill shape</b> first, colour second, and a word always. Three shapes, no exceptions:</div>
+
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px;">
+      <div style="border:1px solid #dee3e4; background:#fff; padding:18px; display:flex; flex-direction:column; gap:10px;">
+        <div style="padding:7px 14px; border-radius:100px; background:#d4ebff; color:#254e77; font-size:13.5px; font-weight:650; align-self:flex-start;">On the way</div>
+        <div style="font-size:16px; font-weight:650;">Fine — filled soft</div>
+        <div style="font-size:14px; line-height:1.5; color:#484e53;">Pale tinted fill, no border, dark text. Moving normally. Nothing for the worker to do today.</div>
+      </div>
+      <div style="border:1px solid #dee3e4; background:#fff; padding:18px; display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; align-items:center; gap:7px; padding:7px 14px 7px 10px; border-radius:100px; background:#b33637; color:#fff; font-size:13.5px; font-weight:700; align-self:flex-start;"><span style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#fff; color:#b33637; font-size:13px; font-weight:800;">!</span>Overdue</div>
+        <div style="font-size:16px; font-weight:650;">Overdue — solid dark</div>
+        <div style="font-size:14px; line-height:1.5; color:#484e53;">Strong solid fill, white bold text, and a round <b>!</b> mark. The row also gets a 4px bar down its left edge. Reads as the heaviest thing on the screen even in greyscale.</div>
+      </div>
+      <div style="border:1px solid #dee3e4; background:#fff; padding:18px; display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; align-items:center; gap:7px; padding:6px 14px; border-radius:100px; background:#fff; border:1.5px solid #144432; color:#144432; font-size:13.5px; font-weight:650; align-self:flex-start;"><span style="font-size:13px;">✓</span>Care finished</div>
+        <div style="font-size:16px; font-weight:650;">Done — outline only</div>
+        <div style="font-size:14px; line-height:1.5; color:#484e53;">No fill, 1.5px border, a ✓ (or ✕ for Lost). Empty shape means finished. The whole row also drops to normal weight and ink-700.</div>
+      </div>
+    </div>
+
+    <div style="font-size:14px; color:#65686e; max-width:800px; line-height:1.5;">Contrast floor: every label's text against its own fill is at least 4.5:1, and every fill against the white sheet is distinguishable at 3:1. Screen brightness is never assumed.</div>
+  </div>
+
+  <div style="height:1px; background:#ced1d4;"></div>
+
+  <div style="display:flex; flex-direction:column; gap:18px;">
+    <div style="font-size:20px; font-weight:650;">5 · One treatment per state</div>
+    <div style="font-size:15px; color:#484e53; max-width:800px; line-height:1.5;">Eight states, eight labels. The state name on the left is the value in the event log; the pill is what the worker sees. This table is the only place the two vocabularies meet.</div>
+
+    <div style="border:1px solid #dee3e4; background:#fff;">
+      <div style="display:grid; grid-template-columns:160px 210px 1fr 100px; gap:16px; padding:11px 20px; background:#f2f4f8; border-bottom:1px solid #ced1d4; font-size:12px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase; color:#65686e;">
+        <div>State in the log</div><div>Label shown</div><div>Fill / text</div><div>Group</div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:160px 210px 1fr 100px; gap:16px; padding:14px 20px; border-bottom:1px solid #dee3e4; align-items:center;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:13.5px;">Created</div>
+        <div><div style="padding:7px 14px; border-radius:100px; background:#e4e9eb; color:#484e53; font-size:13.5px; font-weight:650; display:inline-block;">Not travelled yet</div></div>
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e;">#e4e9eb / #484e53</div>
+        <div style="font-size:13.5px; font-weight:650;">Fine</div>
+      </div>
+      <div style="display:grid; grid-template-columns:160px 210px 1fr 100px; gap:16px; padding:14px 20px; border-bottom:1px solid #dee3e4; align-items:center;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:13.5px;">In transit</div>
+        <div><div style="padding:7px 14px; border-radius:100px; background:#d4ebff; color:#254e77; font-size:13.5px; font-weight:650; display:inline-block;">On the way</div></div>
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e;">#d4ebff / #254e77</div>
+        <div style="font-size:13.5px; font-weight:650;">Fine</div>
+      </div>
+      <div style="display:grid; grid-template-columns:160px 210px 1fr 100px; gap:16px; padding:14px 20px; border-bottom:1px solid #dee3e4; align-items:center;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:13.5px;">Arrived</div>
+        <div><div style="padding:7px 14px; border-radius:100px; background:#ceeef9; color:#105767; font-size:13.5px; font-weight:650; display:inline-block;">Reached the centre</div></div>
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e;">#ceeef9 / #105767</div>
+        <div style="font-size:13.5px; font-weight:650;">Fine</div>
+      </div>
+      <div style="display:grid; grid-template-columns:160px 210px 1fr 100px; gap:16px; padding:14px 20px; border-bottom:1px solid #dee3e4; align-items:center;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:13.5px;">Treated</div>
+        <div><div style="padding:7px 14px; border-radius:100px; background:#cdf3e1; color:#0b553c; font-size:13.5px; font-weight:650; display:inline-block;">Doctor has seen her</div></div>
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e;">#cdf3e1 / #0b553c</div>
+        <div style="font-size:13.5px; font-weight:650;">Fine</div>
+      </div>
+      <div style="display:grid; grid-template-columns:160px 210px 1fr 100px; gap:16px; padding:14px 20px; border-bottom:1px solid #dee3e4; align-items:center;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:13.5px;">Back referred</div>
+        <div><div style="padding:7px 14px; border-radius:100px; background:#ede2fe; color:#5d4980; font-size:13.5px; font-weight:650; display:inline-block;">Sent back to you</div></div>
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e;">#ede2fe / #5d4980</div>
+        <div style="font-size:13.5px; font-weight:650;">Fine</div>
+      </div>
+      <div style="display:grid; grid-template-columns:160px 210px 1fr 100px; gap:16px; padding:14px 20px; border-bottom:1px solid #dee3e4; align-items:center; border-left:4px solid #b33637;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:13.5px; font-weight:700;">Escalated</div>
+        <div><div style="display:inline-flex; align-items:center; gap:7px; padding:7px 14px 7px 10px; border-radius:100px; background:#b33637; color:#fff; font-size:13.5px; font-weight:700;"><span style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#fff; color:#b33637; font-size:13px; font-weight:800;">!</span>Overdue</div></div>
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e;">#b33637 / #ffffff + left bar</div>
+        <div style="font-size:13.5px; font-weight:700; color:#b33637;">Overdue</div>
+      </div>
+      <div style="display:grid; grid-template-columns:160px 210px 1fr 100px; gap:16px; padding:14px 20px; border-bottom:1px solid #dee3e4; align-items:center;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:13.5px;">Closed</div>
+        <div><div style="display:inline-flex; align-items:center; gap:7px; padding:6px 14px; border-radius:100px; background:#fff; border:1.5px solid #144432; color:#144432; font-size:13.5px; font-weight:650;"><span style="font-size:13px;">✓</span>Care finished</div></div>
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e;">no fill / 1.5px #144432</div>
+        <div style="font-size:13.5px; font-weight:650;">Done</div>
+      </div>
+      <div style="display:grid; grid-template-columns:160px 210px 1fr 100px; gap:16px; padding:14px 20px; align-items:center;">
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:13.5px;">Lost</div>
+        <div><div style="display:inline-flex; align-items:center; gap:7px; padding:6px 14px; border-radius:100px; background:#fff; border:1.5px solid #2b2f33; color:#2b2f33; font-size:13.5px; font-weight:650;"><span style="font-size:13px;">✕</span>No longer followed</div></div>
+        <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e;">no fill / 1.5px #2b2f33</div>
+        <div style="font-size:13.5px; font-weight:650;">Done</div>
+      </div>
+    </div>
+
+    <div style="font-size:14px; color:#65686e; max-width:800px; line-height:1.5;">Escalated is a warning on top of the real state, not a replacement: the row keeps its own label and gains the red pill and left bar. When the update arrives, the red goes away and the row returns to Fine.</div>
+  </div>
+
+  <div style="height:1px; background:#ced1d4;"></div>
+
+  <div style="display:flex; flex-direction:column; gap:18px;">
+    <div style="font-size:20px; font-weight:650;">6 · Sending and signal</div>
+    <div style="font-size:15px; color:#484e53; max-width:800px; line-height:1.5;">Amber is only for "saved here, not sent yet". It never means a medical problem. The header band on every worker screen carries three facts in this order: signal, how many updates are waiting, when the last one went.</div>
+
+    <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start;">
+      <div style="width:390px; border:1px solid #dee3e4;">
+        <div style="padding:12px 16px; background:#fef1d4; border-bottom:1px solid #e8d5a8; display:flex; gap:11px;">
+          <div style="width:12px; height:12px; border-radius:50%; background:#8b5601; margin-top:4px; flex:none;"></div>
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="font-size:15.5px; font-weight:650; color:#171a1e;">No signal</div>
+            <div style="font-size:14.5px; line-height:1.45; color:#484e53;">3 updates waiting to send. They will send when signal comes back.</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e; padding-top:2px;">Last sent today 9:14 am</div>
+          </div>
+        </div>
+      </div>
+      <div style="width:390px; border:1px solid #dee3e4;">
+        <div style="padding:12px 16px; background:#f2f4f8; border-bottom:1px solid #dee3e4; display:flex; gap:11px;">
+          <div style="width:12px; height:12px; border-radius:50%; background:#0b553c; margin-top:4px; flex:none;"></div>
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="font-size:15.5px; font-weight:650; color:#171a1e;">Connected</div>
+            <div style="font-size:14.5px; line-height:1.45; color:#484e53;">Everything is sent.</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e; padding-top:2px;">Last sent 2 minutes ago</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px; padding-top:2px;">
+        <div style="padding:6px 12px; border-radius:100px; background:#fef1d4; color:#8b5601; font-size:13.5px; font-weight:650; align-self:flex-start;">Waiting to send</div>
+        <div style="font-size:14px; color:#484e53; max-width:300px; line-height:1.5;">Row-level mark. Sits after the state label on any referral holding an unsent change.</div>
+      </div>
+    </div>
+
+    <div style="border:1px solid #dee3e4; background:#fff; padding:18px 20px; display:flex; flex-direction:column; gap:8px; max-width:800px;">
+      <div style="font-size:15px; font-weight:650;">Words we use, and words we never use</div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 24px; font-size:14.5px; line-height:1.5;">
+        <div style="color:#0b553c;">waiting to send · sent · no signal · connected · saved on this phone · needs a check</div>
+        <div style="color:#b33637;">sync · pending ops · conflict · operation · queue · offline mode · retry · payload</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:1px; background:#ced1d4;"></div>
+
+  <div style="display:flex; flex-direction:column; gap:18px;">
+    <div style="font-size:20px; font-weight:650;">7 · The list row, and the same row in greyscale</div>
+    <div style="font-size:15px; color:#484e53; max-width:800px; line-height:1.5;">Left: the pattern every list uses. Right: the identical markup with all colour removed — the test for bright sunlight. The overdue row still comes first by weight, the finished row still reads as an empty outline.</div>
+
+    <div style="display:flex; gap:24px; flex-wrap:wrap;">
+      <div style="width:390px; border:1px solid #ced1d4; background:#fff;">
+        <div style="padding:14px 16px 14px 12px; border-bottom:1px solid #dee3e4; border-left:4px solid #b33637; display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+            <div style="font-size:19px; font-weight:700;">Ramesh Yadav</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#b33637; font-weight:700;">2 days</div>
+          </div>
+          <div style="font-size:14.5px; color:#484e53;">51 M · Chest pain · CHC Sonpur</div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <div style="display:inline-flex; align-items:center; gap:7px; padding:7px 14px 7px 10px; border-radius:100px; background:#b33637; color:#fff; font-size:13.5px; font-weight:700;"><span style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#fff; color:#b33637; font-size:13px; font-weight:800;">!</span>Overdue</div>
+            <div style="font-size:14px; color:#484e53;">No update for 2 days</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px; border-bottom:1px solid #dee3e4; display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+            <div style="font-size:19px; font-weight:650;">Sunita Devi</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">2 h</div>
+          </div>
+          <div style="font-size:14.5px; color:#484e53;">24 F · Low blood in pregnancy · CHC Sonpur</div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <div style="padding:7px 14px; border-radius:100px; background:#d4ebff; color:#254e77; font-size:13.5px; font-weight:650;">On the way</div>
+            <div style="padding:6px 12px; border-radius:100px; background:#fef1d4; color:#8b5601; font-size:13.5px; font-weight:650;">Waiting to send</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px; display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+            <div style="font-size:19px; font-weight:400; color:#484e53;">Lalita Devi</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">4 days</div>
+          </div>
+          <div style="font-size:14.5px; color:#65686e;">60 F · Sugar check · PHC Hajipur</div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <div style="display:inline-flex; align-items:center; gap:7px; padding:6px 14px; border-radius:100px; background:#fff; border:1.5px solid #144432; color:#144432; font-size:13.5px; font-weight:650;"><span style="font-size:13px;">✓</span>Care finished</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="width:390px; border:1px solid #ced1d4; background:#fff; filter:grayscale(1) contrast(1.05);">
+        <div style="padding:14px 16px 14px 12px; border-bottom:1px solid #dee3e4; border-left:4px solid #b33637; display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+            <div style="font-size:19px; font-weight:700;">Ramesh Yadav</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#b33637; font-weight:700;">2 days</div>
+          </div>
+          <div style="font-size:14.5px; color:#484e53;">51 M · Chest pain · CHC Sonpur</div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <div style="display:inline-flex; align-items:center; gap:7px; padding:7px 14px 7px 10px; border-radius:100px; background:#b33637; color:#fff; font-size:13.5px; font-weight:700;"><span style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#fff; color:#b33637; font-size:13px; font-weight:800;">!</span>Overdue</div>
+            <div style="font-size:14px; color:#484e53;">No update for 2 days</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px; border-bottom:1px solid #dee3e4; display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+            <div style="font-size:19px; font-weight:650;">Sunita Devi</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">2 h</div>
+          </div>
+          <div style="font-size:14.5px; color:#484e53;">24 F · Low blood in pregnancy · CHC Sonpur</div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <div style="padding:7px 14px; border-radius:100px; background:#d4ebff; color:#254e77; font-size:13.5px; font-weight:650;">On the way</div>
+            <div style="padding:6px 12px; border-radius:100px; background:#fef1d4; color:#8b5601; font-size:13.5px; font-weight:650;">Waiting to send</div>
+          </div>
+        </div>
+        <div style="padding:14px 16px; display:flex; flex-direction:column; gap:6px;">
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+            <div style="font-size:19px; font-weight:400; color:#484e53;">Lalita Devi</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">4 days</div>
+          </div>
+          <div style="font-size:14.5px; color:#65686e;">60 F · Sugar check · PHC Hajipur</div>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <div style="display:inline-flex; align-items:center; gap:7px; padding:6px 14px; border-radius:100px; background:#fff; border:1.5px solid #144432; color:#144432; font-size:13.5px; font-weight:650;"><span style="font-size:13px;">✓</span>Care finished</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:1px; background:#ced1d4;"></div>
+
+  <div style="display:flex; flex-direction:column; gap:18px;">
+    <div style="font-size:20px; font-weight:650;">8 · Controls</div>
+    <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start;">
+      <div style="border:1px solid #dee3e4; background:#fff; padding:18px; display:flex; flex-direction:column; gap:12px; width:280px;">
+        <div style="font-size:15px; font-weight:650;">Primary — 56 tall</div>
+        <div style="height:56px; border-radius:4px; background:#32679b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:650;">New referral</div>
+        <div style="font-size:13.5px; color:#65686e;">One per screen, at the bottom, inside 16 padding.</div>
+      </div>
+      <div style="border:1px solid #dee3e4; background:#fff; padding:18px; display:flex; flex-direction:column; gap:12px; width:280px;">
+        <div style="font-size:15px; font-weight:650;">Secondary — 52 tall</div>
+        <div style="height:52px; border-radius:4px; border:1.5px solid #32679b; color:#254e77; display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:650;">Mark as arrived</div>
+        <div style="font-size:13.5px; color:#65686e;">Actions that change a state.</div>
+      </div>
+      <div style="border:1px solid #dee3e4; background:#fff; padding:18px; display:flex; flex-direction:column; gap:12px; width:280px;">
+        <div style="font-size:15px; font-weight:650;">Filter chips — 40 tall</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <div style="padding:10px 15px; border-radius:100px; background:#32679b; color:#fff; font-size:14.5px; font-weight:650;">All 12</div>
+          <div style="padding:10px 15px; border-radius:100px; background:#fff; border:1px solid #ced1d4; color:#484e53; font-size:14.5px;">Need a check 2</div>
+        </div>
+        <div style="font-size:13.5px; color:#65686e;">Active chip is solid accent; the count is part of the label.</div>
+      </div>
+      <div style="border:1px solid #dee3e4; background:#fff; padding:18px; display:flex; flex-direction:column; gap:12px; width:280px;">
+        <div style="font-size:15px; font-weight:650;">Text input — 52 tall</div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <div style="font-size:14.5px; font-weight:650;">Patient name</div>
+          <div style="height:52px; border-radius:4px; border:1px solid #ced1d4; background:#fff; display:flex; align-items:center; padding:0 14px; font-size:17px; color:#65686e;">Type the name</div>
+        </div>
+        <div style="font-size:13.5px; color:#65686e;">Label above, never inside. 17px input text.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:16px 0 0; font-size:11px; color:#65686e;">Demonstration system — synthetic data only</div>
+</section>
+
+</x-dc>
+</body>
+</html>

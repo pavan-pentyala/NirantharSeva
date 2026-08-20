@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+  body { margin:0; background:#eef1f4; -webkit-font-smoothing:antialiased; }
+  a { color:#32679b; }
+  a:hover { color:#254e77; }
+</style>
+</helmet>
+
+<section style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; padding:48px; display:flex; flex-direction:column; gap:20px; color:#171a1e;">
+  <div style="display:flex; flex-direction:column; gap:4px; max-width:760px;">
+    <div style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#65686e; font-weight:600;">Screen 1 · ASHA · phone</div>
+    <div style="font-size:24px; font-weight:650;">My referrals</div>
+    <div style="font-size:14.5px; color:#484e53; line-height:1.5;">Three states of the same list: synced, offline with updates waiting, and empty.</div>
+  </div>
+
+  <div style="display:flex; gap:32px; flex-wrap:wrap; align-items:flex-start;">
+
+    <!-- A: Online, synced -->
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:14px; font-weight:650; color:#484e53;">A · Online, synced</div>
+      <div style="width:390px; height:844px; background:#fff; border:1px solid #ced1d4; border-radius:4px; overflow:hidden; display:flex; flex-direction:column;">
+        <div style="padding:7px 16px; text-align:center; font-size:11px; color:#65686e; background:#f2f4f8; border-bottom:1px solid #dee3e4;">Demonstration system — synthetic data only</div>
+
+        <div style="padding:16px 16px 14px; border-bottom:1px solid #dee3e4; display:flex; flex-direction:column; gap:3px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="font-size:24px; font-weight:650; letter-spacing:-0.01em;">My referrals</div>
+            <div style="font-size:12px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase; color:#484e53; border:1px solid #ced1d4; padding:5px 8px; border-radius:4px;">ASHA</div>
+          </div>
+          <div style="font-size:14.5px; color:#65686e;">Sunita Kumari · Bhagwanpur village</div>
+        </div>
+
+        <div style="padding:12px 16px; background:#f2f4f8; border-bottom:1px solid #dee3e4; display:flex; gap:11px;">
+          <div style="width:12px; height:12px; border-radius:50%; background:#0b553c; margin-top:4px; flex:none;"></div>
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="font-size:15.5px; font-weight:650;">Connected</div>
+            <div style="font-size:14px; color:#484e53;">Everything is sent.</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; padding-top:2px;">Last sent 2 minutes ago</div>
+          </div>
+        </div>
+
+        <div style="display:flex; border-bottom:1px solid #dee3e4;">
+          <div style="flex:1; padding:13px 6px; text-align:center; font-size:14.5px; font-weight:650; border-bottom:2px solid #32679b; color:#254e77;">All 12</div>
+          <div style="flex:1; padding:13px 6px; text-align:center; font-size:14.5px; color:#65686e;">Need a check 2</div>
+          <div style="flex:1; padding:13px 6px; text-align:center; font-size:14.5px; color:#65686e;">Done 4</div>
+        </div>
+
+        <div style="flex:1; overflow:hidden;">
+          <div style="padding:14px 16px 14px 12px; border-bottom:1px solid #dee3e4; border-left:4px solid #b33637; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+              <div style="font-size:19px; font-weight:700;">Ramesh Yadav</div>
+              <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#b33637; font-weight:700;">2 days</div>
+            </div>
+            <div style="font-size:14.5px; color:#484e53;">51 M · Chest pain · Sonpur village · CHC Sonpur</div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <div style="display:inline-flex; align-items:center; gap:7px; padding:7px 14px 7px 10px; border-radius:100px; background:#b33637; color:#fff; font-size:13.5px; font-weight:700;"><span style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#fff; color:#b33637; font-size:13px; font-weight:800;">!</span>Overdue</div>
+              <div style="font-size:14px; color:#484e53;">No update since In transit</div>
+            </div>
+          </div>
+          <div style="padding:14px 16px; border-bottom:1px solid #dee3e4; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+              <div style="font-size:19px; font-weight:650;">Sunita Devi</div>
+              <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">2 h</div>
+            </div>
+            <div style="font-size:14.5px; color:#484e53;">24 F · Low blood in pregnancy · CHC Sonpur</div>
+            <div style="padding:7px 14px; border-radius:100px; background:#d4ebff; color:#254e77; font-size:13.5px; font-weight:650; display:inline-block; align-self:flex-start;">On the way</div>
+          </div>
+          <div style="padding:14px 16px; border-bottom:1px solid #dee3e4; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+              <div style="font-size:19px; font-weight:650;">Kavita Kumari</div>
+              <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">40 min</div>
+            </div>
+            <div style="font-size:14.5px; color:#484e53;">3 F · High fever · CHC Sonpur</div>
+            <div style="padding:7px 14px; border-radius:100px; background:#ceeef9; color:#105767; font-size:13.5px; font-weight:650; display:inline-block; align-self:flex-start;">Reached the centre</div>
+          </div>
+          <div style="padding:14px 16px; border-bottom:1px solid #dee3e4; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+              <div style="font-size:19px; font-weight:650;">Meena Sharma</div>
+              <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">Yesterday</div>
+            </div>
+            <div style="font-size:14.5px; color:#484e53;">29 F · Delivery check · CHC Sonpur</div>
+            <div style="padding:7px 14px; border-radius:100px; background:#ede2fe; color:#5d4980; font-size:13.5px; font-weight:650; display:inline-block; align-self:flex-start;">Sent back to you</div>
+          </div>
+          <div style="padding:14px 16px; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+              <div style="font-size:19px; font-weight:400; color:#484e53;">Lalita Devi</div>
+              <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">4 days</div>
+            </div>
+            <div style="font-size:14.5px; color:#65686e;">60 F · Sugar check · PHC Hajipur</div>
+            <div style="display:inline-flex; align-items:center; gap:7px; padding:6px 14px; border-radius:100px; background:#fff; border:1.5px solid #144432; color:#144432; font-size:13.5px; font-weight:650; align-self:flex-start;"><span style="font-size:13px;">✓</span>Care finished</div>
+          </div>
+        </div>
+
+        <div style="padding:12px 16px 16px; border-top:1px solid #dee3e4;">
+          <div style="height:56px; border-radius:4px; background:#32679b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:650;">New referral</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- B: Offline -->
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:14px; font-weight:650; color:#484e53;">B · Offline, 3 waiting to send</div>
+      <div style="width:390px; height:844px; background:#fff; border:1px solid #ced1d4; border-radius:4px; overflow:hidden; display:flex; flex-direction:column;">
+        <div style="padding:7px 16px; text-align:center; font-size:11px; color:#65686e; background:#f2f4f8; border-bottom:1px solid #dee3e4;">Demonstration system — synthetic data only</div>
+
+        <div style="padding:16px 16px 14px; border-bottom:1px solid #dee3e4; display:flex; flex-direction:column; gap:3px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="font-size:24px; font-weight:650; letter-spacing:-0.01em;">My referrals</div>
+            <div style="font-size:12px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase; color:#484e53; border:1px solid #ced1d4; padding:5px 8px; border-radius:4px;">ASHA</div>
+          </div>
+          <div style="font-size:14.5px; color:#65686e;">Sunita Kumari · Bhagwanpur village</div>
+        </div>
+
+        <div style="padding:12px 16px; background:#fef1d4; border-bottom:1px solid #e8d5a8; display:flex; gap:11px;">
+          <div style="width:12px; height:12px; border-radius:50%; background:#8b5601; margin-top:4px; flex:none;"></div>
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="font-size:15.5px; font-weight:650;">No signal</div>
+            <div style="font-size:14px; line-height:1.4; color:#484e53;">3 updates waiting to send. They will send when signal comes back.</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; padding-top:2px;">Last sent today 9:14 am</div>
+          </div>
+        </div>
+
+        <div style="display:flex; border-bottom:1px solid #dee3e4;">
+          <div style="flex:1; padding:13px 6px; text-align:center; font-size:14.5px; font-weight:650; border-bottom:2px solid #32679b; color:#254e77;">All 12</div>
+          <div style="flex:1; padding:13px 6px; text-align:center; font-size:14.5px; color:#65686e;">Need a check 2</div>
+          <div style="flex:1; padding:13px 6px; text-align:center; font-size:14.5px; color:#65686e;">Done 4</div>
+        </div>
+
+        <div style="flex:1; overflow:hidden;">
+          <div style="padding:14px 16px 14px 12px; border-bottom:1px solid #dee3e4; border-left:4px solid #b33637; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+              <div style="font-size:19px; font-weight:700;">Ramesh Yadav</div>
+              <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#b33637; font-weight:700;">2 days</div>
+            </div>
+            <div style="font-size:14.5px; color:#484e53;">51 M · Chest pain · CHC Sonpur</div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <div style="display:inline-flex; align-items:center; gap:7px; padding:7px 14px 7px 10px; border-radius:100px; background:#b33637; color:#fff; font-size:13.5px; font-weight:700;"><span style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:#fff; color:#b33637; font-size:13px; font-weight:800;">!</span>Overdue</div>
+            </div>
+          </div>
+          <div style="padding:14px 16px; border-bottom:1px solid #dee3e4; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+              <div style="font-size:19px; font-weight:650;">Sunita Devi</div>
+              <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">2 h</div>
+            </div>
+            <div style="font-size:14.5px; color:#484e53;">24 F · Low blood in pregnancy · CHC Sonpur</div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <div style="padding:7px 14px; border-radius:100px; background:#d4ebff; color:#254e77; font-size:13.5px; font-weight:650;">On the way</div>
+              <div style="padding:6px 12px; border-radius:100px; background:#fef1d4; color:#8b5601; font-size:13.5px; font-weight:650;">Waiting to send</div>
+            </div>
+          </div>
+          <div style="padding:14px 16px; border-bottom:1px solid #dee3e4; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+              <div style="font-size:19px; font-weight:650;">Kavita Kumari</div>
+              <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">40 min</div>
+            </div>
+            <div style="font-size:14.5px; color:#484e53;">3 F · High fever · CHC Sonpur</div>
+            <div style="padding:7px 14px; border-radius:100px; background:#ceeef9; color:#105767; font-size:13.5px; font-weight:650; display:inline-block; align-self:flex-start;">Reached the centre</div>
+          </div>
+          <div style="padding:14px 16px; border-bottom:1px solid #dee3e4; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+              <div style="font-size:19px; font-weight:650;">Anil Paswan</div>
+              <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">3 h</div>
+            </div>
+            <div style="font-size:14.5px; color:#484e53;">34 M · Hand injury · PHC Hajipur</div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <div style="padding:7px 14px; border-radius:100px; background:#e4e9eb; color:#484e53; font-size:13.5px; font-weight:650;">Not travelled yet</div>
+              <div style="padding:6px 12px; border-radius:100px; background:#fef1d4; color:#8b5601; font-size:13.5px; font-weight:650;">Waiting to send</div>
+            </div>
+          </div>
+          <div style="padding:14px 16px; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; gap:12px; align-items:baseline;">
+              <div style="font-size:19px; font-weight:400; color:#484e53;">Lalita Devi</div>
+              <div style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#65686e;">4 days</div>
+            </div>
+            <div style="font-size:14.5px; color:#65686e;">60 F · Sugar check · PHC Hajipur</div>
+            <div style="display:inline-flex; align-items:center; gap:7px; padding:6px 14px; border-radius:100px; background:#fff; border:1.5px solid #144432; color:#144432; font-size:13.5px; font-weight:650; align-self:flex-start;"><span style="font-size:13px;">✓</span>Care finished</div>
+          </div>
+        </div>
+
+        <div style="padding:12px 16px 16px; border-top:1px solid #dee3e4;">
+          <div style="height:56px; border-radius:4px; background:#32679b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:650;">New referral</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- C: Empty -->
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:14px; font-weight:650; color:#484e53;">C · No referrals yet</div>
+      <div style="width:390px; height:844px; background:#fff; border:1px solid #ced1d4; border-radius:4px; overflow:hidden; display:flex; flex-direction:column;">
+        <div style="padding:7px 16px; text-align:center; font-size:11px; color:#65686e; background:#f2f4f8; border-bottom:1px solid #dee3e4;">Demonstration system — synthetic data only</div>
+
+        <div style="padding:16px 16px 14px; border-bottom:1px solid #dee3e4; display:flex; flex-direction:column; gap:3px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="font-size:24px; font-weight:650; letter-spacing:-0.01em;">My referrals</div>
+            <div style="font-size:12px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase; color:#484e53; border:1px solid #ced1d4; padding:5px 8px; border-radius:4px;">ASHA</div>
+          </div>
+          <div style="font-size:14.5px; color:#65686e;">Sunita Kumari · Bhagwanpur village</div>
+        </div>
+
+        <div style="padding:12px 16px; background:#f2f4f8; border-bottom:1px solid #dee3e4; display:flex; gap:11px;">
+          <div style="width:12px; height:12px; border-radius:50%; background:#0b553c; margin-top:4px; flex:none;"></div>
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="font-size:15.5px; font-weight:650;">Connected</div>
+            <div style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#65686e; padding-top:2px;">Last sent 2 minutes ago</div>
+          </div>
+        </div>
+
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:32px;">
+          <div style="width:88px; height:88px; border-radius:50%; border:1.5px dashed #ced1d4; display:flex; align-items:center; justify-content:center; font-family:ui-monospace,Menlo,monospace; font-size:11px; color:#65686e; text-align:center; line-height:1.3;">no<br>referrals</div>
+          <div style="font-size:18px; font-weight:650; text-align:center;">No referrals yet</div>
+          <div style="font-size:14.5px; color:#484e53; text-align:center; line-height:1.5; max-width:270px;">When you send a patient to a health centre, add it here so everyone can follow up.</div>
+        </div>
+
+        <div style="padding:12px 16px 16px; border-top:1px solid #dee3e4;">
+          <div style="height:56px; border-radius:4px; background:#32679b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:650;">New referral</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+</body>
+</html>

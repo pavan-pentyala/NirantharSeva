@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+  body { margin:0; background:#eef1f4; -webkit-font-smoothing:antialiased; }
+  a { color:#32679b; }
+  a:hover { color:#254e77; }
+</style>
+</helmet>
+
+<section style="font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; padding:48px; display:flex; flex-direction:column; gap:20px; color:#171a1e;">
+  <div style="display:flex; flex-direction:column; gap:4px; max-width:800px;">
+    <div style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:#65686e; font-weight:600;">Screen 5 · MO incoming referrals · tablet</div>
+    <div style="font-size:24px; font-weight:650;">Incoming referrals — CHC Sonpur</div>
+    <div style="font-size:14.5px; color:#484e53; line-height:1.5;">One tap per state change, right on the card. Built for thirty seconds between patients: no navigating into a detail screen to log arrival.</div>
+  </div>
+
+  <div style="width:834px; background:#fff; border:1px solid #ced1d4; border-radius:4px; overflow:hidden; display:flex; flex-direction:column;">
+
+    <div style="padding:7px 24px; text-align:center; font-size:11px; color:#65686e; background:#f2f4f8; border-bottom:1px solid #dee3e4;">Demonstration system — synthetic data only</div>
+
+    <div style="padding:18px 24px; border-bottom:1px solid #dee3e4; display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex; flex-direction:column; gap:2px;">
+        <div style="font-size:22px; font-weight:650;">Incoming referrals</div>
+        <div style="font-size:14px; color:#65686e;">Dr. Neha Sinha · CHC Sonpur</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px;">
+        <div style="width:10px; height:10px; border-radius:50%; background:#0b553c;"></div>
+        <div style="font-size:14px; color:#484e53;">Connected · synced 1 min ago</div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:8px; padding:14px 24px; border-bottom:1px solid #dee3e4;">
+      <div style="padding:9px 16px; border-radius:100px; background:#32679b; color:#fff; font-size:14.5px; font-weight:650;">On the way 3</div>
+      <div style="padding:9px 16px; border-radius:100px; border:1px solid #ced1d4; color:#484e53; font-size:14.5px;">At the centre 2</div>
+      <div style="padding:9px 16px; border-radius:100px; border:1px solid #ced1d4; color:#484e53; font-size:14.5px;">Treated today 5</div>
+    </div>
+
+    <div style="display:flex; flex-direction:column;">
+
+      <div style="padding:18px 24px; border-bottom:1px solid #dee3e4; display:flex; align-items:center; gap:20px; border-left:4px solid #b33637;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:5px;">
+          <div style="display:flex; gap:10px; align-items:baseline;">
+            <div style="font-size:19px; font-weight:700;">Ramesh Yadav</div>
+            <div style="font-size:14px; color:#484e53;">51 M</div>
+          </div>
+          <div style="font-size:14.5px; color:#484e53;">Chest pain · from Sunita Kumari, Sonpur village</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="display:inline-flex; align-items:center; gap:6px; padding:5px 12px 5px 8px; border-radius:100px; background:#b33637; color:#fff; font-size:12.5px; font-weight:700;"><span style="display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; background:#fff; color:#b33637; font-size:11px; font-weight:800;">!</span>Overdue 2 days</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div style="height:52px; padding:0 22px; border-radius:4px; background:#32679b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:650; white-space:nowrap;">Arrived</div>
+        </div>
+      </div>
+
+      <div style="padding:18px 24px; border-bottom:1px solid #dee3e4; display:flex; align-items:center; gap:20px;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:5px;">
+          <div style="display:flex; gap:10px; align-items:baseline;">
+            <div style="font-size:19px; font-weight:650;">Sunita Devi</div>
+            <div style="font-size:14px; color:#484e53;">24 F</div>
+          </div>
+          <div style="font-size:14.5px; color:#484e53;">Low blood in pregnancy · from Sunita Kumari, Bhagwanpur village</div>
+          <div style="padding:6px 13px; border-radius:100px; background:#d4ebff; color:#254e77; font-size:13px; font-weight:650; display:inline-block; align-self:flex-start;">On the way · left 2 h ago</div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div style="height:52px; padding:0 22px; border-radius:4px; background:#32679b; color:#fff; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:650; white-space:nowrap;">Arrived</div>
+        </div>
+      </div>
+
+      <div style="padding:18px 24px; border-bottom:1px solid #dee3e4; display:flex; align-items:center; gap:20px;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:5px;">
+          <div style="display:flex; gap:10px; align-items:baseline;">
+            <div style="font-size:19px; font-weight:650;">Kavita Kumari</div>
+            <div style="font-size:14px; color:#484e53;">3 F</div>
+          </div>
+          <div style="font-size:14.5px; color:#484e53;">High fever · from Sunita Kumari, Bhagwanpur village</div>
+          <div style="padding:6px 13px; border-radius:100px; background:#ceeef9; color:#105767; font-size:13px; font-weight:650; display:inline-block; align-self:flex-start;">Reached the centre · 40 min ago</div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div style="height:52px; padding:0 22px; border-radius:4px; border:1.5px solid #32679b; color:#254e77; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:650; white-space:nowrap;">Treated</div>
+        </div>
+      </div>
+
+      <div style="padding:18px 24px; display:flex; align-items:center; gap:20px;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:5px;">
+          <div style="display:flex; gap:10px; align-items:baseline;">
+            <div style="font-size:19px; font-weight:650;">Anita Devi</div>
+            <div style="font-size:14px; color:#484e53;">45 F</div>
+          </div>
+          <div style="font-size:14.5px; color:#484e53;">Wound check · from Geeta Devi, Rustampur village</div>
+          <div style="padding:6px 13px; border-radius:100px; background:#ceeef9; color:#105767; font-size:13px; font-weight:650; display:inline-block; align-self:flex-start;">Reached the centre · 10 min ago</div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div style="height:52px; padding:0 22px; border-radius:4px; border:1.5px solid #32679b; color:#254e77; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:650; white-space:nowrap;">Treated</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="font-size:13.5px; color:#65686e; max-width:600px; line-height:1.5;">The row's own button always matches its next state, so the doctor never chooses from a menu — arrived cases show "Arrived", treated cases show "Treated". After "Treated" a second tap offers "Sent back to ASHA".</div>
+</section>
+
+</x-dc>
+</body>
+</html>
