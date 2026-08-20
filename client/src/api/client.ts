@@ -31,8 +31,9 @@ export interface PushResponse {
  * engine itself reads stay flat; everything only the domain reads is in
  * `payload`, discriminated by `entity_type`. For entity_type "toy": payload
  * is {old_value, new_value}. For "referral": payload is {from_state,
- * to_state, actor_role, actor_user_id} — referral events are not yet
- * applied to any client cache (D1: the referral UI lands at Phase 4). */
+ * to_state, actor_role, actor_user_id, patient_name, age, sex, reason,
+ * priority, target_org_name} (D14/ADR-010) — folded into referral_cache by
+ * client/src/sync/engine.ts's applyPulledEvents. */
 export interface EventOut {
   seq: number;
   entity_type: string;
@@ -57,7 +58,7 @@ function authHeader(): Record<string, string> {
 }
 
 /** Dev-only: the harness auto-logs in as a fixed user. Real auth/session
- * management is out of scope until the real UI lands (Phase 2+). */
+ * management is out of scope until the real UI lands (Phase 4). */
 export async function login(username: string, password: string): Promise<void> {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",

@@ -41,6 +41,106 @@ export async function createOp(entityId: string, value: number): Promise<void> {
   void syncNow();
 }
 
+export interface CreateReferralInput {
+  patientName: string;
+  age?: number;
+  sex?: string;
+  phone?: string;
+  reason?: string;
+  priority?: string;
+  targetOrgId?: string;
+}
+
+/** ADR-009: the payload names a patient by what the ASHA typed, not an id
+ * she never gets to pick from — the server resolves-or-creates the patient
+ * row. Returns the client-generated referral id (the op's entity_id). */
+export async function createReferral(input: CreateReferralInput): Promise<string> {
+  const deviceId = await getDeviceId();
+  const lamport = await nextLamport();
+  const deviceTime = new Date().toISOString();
+  const opId = crypto.randomUUID();
+  const entityId = crypto.randomUUID();
+
+  const payload: Record<string, unknown> = { patient_name: input.patientName };
+  if (input.age !== undefined) payload.age = input.age;
+  if (input.sex !== undefined) payload.sex = input.sex;
+  if (input.phone !== undefined) payload.phone = input.phone;
+  if (input.reason !== undefined) payload.reason = input.reason;
+  if (input.priority !== undefined) payload.priority = input.priority;
+  if (input.targetOrgId !== undefined) payload.target_org_id = input.targetOrgId;
+
+  await db.transaction("rw", db.outbox, db.referral_cache, async () => {
+    await db.outbox.add({
+      op_id: opId,
+      entity: "referral",
+      entity_id: entityId,
+      operation: "create_referral",
+      payload,
+      lamport,
+      device_time: deviceTime,
+      status: "pending",
+    });
+    // Optimistic — the server may resolve this to an existing patient row
+    // rather than create one, but the referral itself is new and always
+    // wins locally until told otherwise. target_org_name isn't known
+    // locally (only target_org_id was typed); it fills in once this
+    // create_referral event is pulled back (ADR-010).
+    await db.referral_cache.put({
+      id: entityId,
+      current_state: "CREATED",
+      patient_name: input.patientName,
+      age: input.age ?? null,
+      sex: input.sex ?? null,
+      reason: input.reason ?? null,
+      priority: input.priority ?? null,
+      target_org_name: null,
+      lamport,
+      device_id: deviceId,
+      updated_at: deviceTime,
+    });
+  });
+
+  void syncNow();
+  return entityId;
+}
+
+/** Same left-to-right advancement rule app/domain/states.py's replay_steps
+ * encodes server-side (D14): only write the cache when the transition is
+ * coherent with what's cached now. A transition requested against a state
+ * that has already moved on locally leaves the cache untouched — the
+ * outbox entry is still queued and the server will decide for real. */
+export async function transitionReferral(entityId: string, fromState: string, toState: string): Promise<void> {
+  const deviceId = await getDeviceId();
+  const lamport = await nextLamport();
+  const deviceTime = new Date().toISOString();
+  const opId = crypto.randomUUID();
+
+  await db.transaction("rw", db.outbox, db.referral_cache, async () => {
+    await db.outbox.add({
+      op_id: opId,
+      entity: "referral",
+      entity_id: entityId,
+      operation: "transition",
+      payload: { from_state: fromState, to_state: toState },
+      lamport,
+      device_time: deviceTime,
+      status: "pending",
+    });
+    const cached = await db.referral_cache.get(entityId);
+    if (cached && cached.current_state === fromState) {
+      await db.referral_cache.put({
+        ...cached,
+        current_state: toState,
+        lamport,
+        device_id: deviceId,
+        updated_at: deviceTime,
+      });
+    }
+  });
+
+  void syncNow();
+}
+
 export async function flush(): Promise<void> {
   if (flushing || !navigator.onLine) return;
   flushing = true;
@@ -135,27 +235,64 @@ export async function pullAndApply(): Promise<void> {
   }
 }
 
-async function applyPulledEvents(events: api.EventOut[]): Promise<void> {
+export async function applyPulledEvents(events: api.EventOut[]): Promise<void> {
   for (const e of events) {
-    // D1: the toy model is the only thing this client caches through
-    // Phase 4. Referral events already flow through /sync/pull (D3) but
-    // have no client-side cache to land in yet.
-    if (e.entity_type !== "toy") continue;
-
-    const newValue = e.payload.new_value as number;
-    const cached = await db.toy_cache.get(e.entity_id);
-    const isWinner =
-      !cached || e.lamport > cached.lamport || (e.lamport === cached.lamport && e.device_id >= cached.device_id);
-    if (isWinner) {
-      await db.toy_cache.put({
-        id: e.entity_id,
-        value: newValue,
-        updated_at: e.server_time,
-        lamport: e.lamport,
-        device_id: e.device_id,
-      });
+    if (e.entity_type === "toy") {
+      await applyPulledToyEvent(e);
+    } else if (e.entity_type === "referral") {
+      await applyPulledReferralEvent(e);
     }
   }
+}
+
+async function applyPulledToyEvent(e: api.EventOut): Promise<void> {
+  const newValue = e.payload.new_value as number;
+  const cached = await db.toy_cache.get(e.entity_id);
+  const isWinner =
+    !cached || e.lamport > cached.lamport || (e.lamport === cached.lamport && e.device_id >= cached.device_id);
+  if (isWinner) {
+    await db.toy_cache.put({
+      id: e.entity_id,
+      value: newValue,
+      updated_at: e.server_time,
+      lamport: e.lamport,
+      device_id: e.device_id,
+    });
+  }
+}
+
+/** D14/ADR-010: the same left-to-right advancement rule
+ * app/domain/states.py's replay_steps encodes server-side — an event
+ * advances the cached state only when its from_state matches the state
+ * already folded in from earlier pulled events, read back from
+ * referral_cache itself (events for many referrals interleave in one
+ * pull page, so "state so far" has to be per-referral, not a variable
+ * carried across the loop). A losing or stale event is received here —
+ * pull is a full log, nothing is filtered out — but never overwrites the
+ * cache; this is the client's mirror of a decision the server already
+ * made, not a second one. Do not add a lamport comparison here: unlike
+ * the toy model's LWW register, referral state coherence is decided by
+ * from_state alone (see replay_steps's own docstring). */
+async function applyPulledReferralEvent(e: api.EventOut): Promise<void> {
+  const cached = await db.referral_cache.get(e.entity_id);
+  const stateSoFar = cached?.current_state ?? null;
+  const fromState = (e.payload.from_state as string | null) ?? null;
+  const advanced = fromState === stateSoFar;
+  if (!advanced) return;
+
+  await db.referral_cache.put({
+    id: e.entity_id,
+    current_state: e.payload.to_state as string,
+    patient_name: e.payload.patient_name as string,
+    age: (e.payload.age as number | null | undefined) ?? null,
+    sex: (e.payload.sex as string | null | undefined) ?? null,
+    reason: (e.payload.reason as string | null | undefined) ?? null,
+    priority: (e.payload.priority as string | null | undefined) ?? null,
+    target_org_name: (e.payload.target_org_name as string | null | undefined) ?? null,
+    lamport: e.lamport,
+    device_id: e.device_id,
+    updated_at: e.server_time,
+  });
 }
 
 async function syncNow(): Promise<void> {
