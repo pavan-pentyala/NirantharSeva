@@ -30,3 +30,6 @@ client/blob-report/
 
 # others
 temp.txt
+
+# Generated experiment output — reproducible from a seed, not source.
+results/

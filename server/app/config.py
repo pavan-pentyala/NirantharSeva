@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     # 10s in demo config (docs/IMPLEMENTATION_PLAN.md §9.1).
     sweep_interval_seconds: int = 300
 
+    # See docs/PHASE6_PLAN.md P6.1 build order #2 and
+    # docs/IMPLEMENTATION_PLAN.md §10.1 — env vars, not constants, because
+    # E3 sweeps both. Compared in Python inside app/linkage/pipeline.py,
+    # never pushed into a query (see that module's docstring).
+    identity_auto_accept: float = 92.0
+    identity_review_floor: float = 80.0
+
 
 @lru_cache
 def get_settings() -> Settings:

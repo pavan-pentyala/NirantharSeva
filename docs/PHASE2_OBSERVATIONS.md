@@ -935,3 +935,101 @@ in-process ASGI transport hangs on something that works fine in the real
 running container, suspect the transport before suspecting the code, and
 confirm with the smallest possible repro before restructuring anything
 around a guess.
+
+# Phase 6 — implementation observations
+
+## Git Bash on Windows silently rewrote a container path argument, and `--rm` erased the evidence
+
+**41. `docker compose run --rm api python -m generator.gold_set --seed 42
+--out /app/results/e3_draft/` printed a success message naming the file it
+wrote — but the path in that message was
+`C:/Program Files/Git/app/results/e3_draft/ground_truth_identity.json`,
+not `/app/results/e3_draft/ground_truth_identity.json`.** MSYS2's Git Bash
+rewrites any argument that *looks* like an absolute POSIX path before
+handing it to a Windows executable (`docker.exe` here), including
+arguments meant for a process running *inside* a Linux container, which
+has no relationship to the host's filesystem at all. `Path("/app/...")`
+inside the container had genuinely been constructed from the mangled
+string, so the file was written somewhere real but useless, inside a
+container that was about to remove itself (`--rm`) the moment the command
+returned — by the time the mistake was visible, the only copy was already
+gone. Nothing crashed; the exit code was 0.
+
+**Caught by:** checking for the file at its expected bind-mounted host
+location (`server/results/e3_draft/`) after the run, instead of trusting
+the tool's own printed confirmation — the same "don't trust the hit count,
+read the match" discipline observations 13/29/30 already established for
+grep now applies to a program's own stdout too.
+
+**Resolved by:** prefixing the command with `MSYS_NO_PATHCONV=1`, which
+disables MSYS2's path rewriting for that invocation. Needed on **every**
+`docker compose run` (or `exec`) call in this environment that passes a
+path argument meant for the container, not the host — `--out`, `--gold`,
+bind-mount-relative paths typed by hand, anything starting with `/`. A
+path argument that happens to also exist on the host (or partially
+resolves, as `/app/...` did here by picking up the *nearest* Windows
+`app/` directory it could find) is the dangerous case, because the command
+still "succeeds."
+
+## `:param IS NULL` gives asyncpg nothing to infer a type from — the loud cousin of observation 37
+
+**42. `app/linkage/blocking.py`'s first draft of the phone predicate —
+`(:phone IS NULL OR phone IS NULL OR left(phone, 4) = left(:phone, 4))` —
+raised `asyncpg.exceptions.AmbiguousParameterError: could not determine
+data type of parameter $2` the first time it actually ran with
+`phone=None`,** which is the common case per ADR-014, not the rare one.
+asyncpg's prepared-statement protocol infers a bind parameter's type from
+its first usage in the query; `:phone IS NULL` is a comparison against
+NULL, which carries no type information at all. Observation 37
+(`SLA_SCALE` inside `make_interval`) is the same root cause — a bind
+parameter's type inferred from an ambiguous first use — but that one
+failed *silently*, resolving to a wrong-but-valid type (integer) and
+corrupting results without an error. This one simply refuses to run,
+which is the easier failure to have, but the fix is identical: `CAST(:phone
+AS text)` on the parameter's first appearance, load-bearing, not
+decoration, exactly per the plan's own warning in "Traps" not to let a
+threshold — or, it turns out, any bind parameter compared against NULL —
+reach SQL uncast.
+
+## A synthetic gold set that inserts both spellings of a duplicate pair lets a query find itself
+
+**43. The first draft of `generator/gold_set.py` inserted BOTH records of
+each duplicate pair into `patient` before scoring — the existing record
+and the record meant to be the "incoming query."** That would have let
+`app/linkage/blocking.py`'s candidate scan return the query's own row
+alongside the real match, and since a string always scores 100 against
+itself, every duplicate pair would report a perfect match for a reason
+that has nothing to do with the fuzzy matcher actually working — not a
+crash, not a wrong number, a number that looks *better* than the truth.
+Caught before it was ever run, by noticing that `app/sync/push.py`'s real
+call site (ADR-009) never resolves a patient against itself — a referral
+always names an incoming person against rows that already exist. Resolved
+by splitting `generate()`'s output into `GeneratedPatient` rows (written to
+the database) and separate `Query` records (name/phone/village only, never
+written) — the same asymmetry the real pipeline has. Worth remembering
+when Phase 7's full cohort generator extends this module: any new record
+type it adds needs the same "who gets written, who only gets queried"
+question asked explicitly, not inherited by copying the pattern without
+re-deriving why it's shaped that way.
+
+## Fuzzy-matching integration tests sharing one un-rolled-back database need names with no shared words, not just unique full strings
+
+**44. A draft `test_new_patient_when_no_candidate_exists_at_all` failed
+intermittently-looking but actually deterministically: the query
+`"Test Pipeline Nobody Like This Exists Yet"` matched a candidate at
+`review_queue`, not `new_patient`, because five other tests in the same
+file had already inserted patients named `"Test Pipeline Auto ..."`,
+`"Test Pipeline Review ..."`, etc.** — into the same live database, with
+no per-test transaction rollback (the established pattern in this test
+suite, e.g. `tests/integration/test_patient_resolution.py`). Uniquely-named
+test fixtures are not enough once `rapidfuzz.fuzz.token_set_ratio` is in
+the loop: it scores on the *set of shared words*, so a common English
+prefix used purely for human readability ("Test Pipeline …") is itself
+enough signal to cross a review-floor threshold, regardless of how
+different the "real" name content is. Resolved by giving every fixture
+name in `tests/integration/test_linkage_pipeline.py` zero word overlap
+with every other name in that file *and* with `app.seed`'s fixture
+patients ("Lakshmi Devi", "Ramesh Kumar" — both in Village A). Worth
+remembering for P6.2's identity-review tests and Phase 7's integration
+tests generally: a scoring-based matcher makes "give it a unique string"
+a weaker isolation guarantee than it is everywhere else in this codebase.

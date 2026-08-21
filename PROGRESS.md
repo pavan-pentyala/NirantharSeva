@@ -9,15 +9,14 @@
 > those here just gives a future session more text to read for the same
 > information, at lower quality.
 
-**Last updated:** 2026-08-20
-**Last session model:** Opus 5 (Phase 6 planning). Implementation is Sonnet.
+**Last updated:** 2026-08-21
+**Last session model:** Sonnet 5 (P6.1 implementation).
 
 ## Current phase
 
-**Phase 5 is complete and verified.** **Phase 6 is planned, not started** —
-`docs/PHASE6_PLAN.md`, D23–D27, ADR-013, ADR-014. Waiting for a go-ahead
-to start P6.1. A ready-to-use starting prompt is in `temp.txt` (gitignored
-scratch file).
+**P6.1 is complete and verified.** Waiting for a go-ahead to start P6.2 —
+migration `0007`, wiring `pipeline.resolve()` into `push.py`, the
+`/identity/reviews` endpoints, and Screen 6 (`docs/PHASE6_PLAN.md`).
 
 ## Done
 
@@ -61,11 +60,35 @@ scratch file).
 - Phase 6 planning: D23–D27 decided with the user, ADR-013 (identity merge
   is REST, not a sync op) and ADR-014 (blocking with a missing phone)
   written. P6.1/P6.2 split approved.
+- **P6.1** (`docs/PHASE6_PLAN.md` build order): `rapidfuzz` dependency;
+  `IDENTITY_AUTO_ACCEPT`/`IDENTITY_REVIEW_FLOOR` config (D-shape of D17);
+  `app/linkage/normalize.py` (NFKD + diacritic strip + whitespace
+  collapse, no DB imports), `scoring.py` (`max(token_set_ratio, WRatio)`,
+  no DB imports), `blocking.py` (ADR-014's predicate, with a marked seam
+  for P6.2's `merged_into_id`), `pipeline.py`'s `resolve()` returning the
+  four-field `Resolution` from "Contracts fixed now" (alias lookup
+  compares `normalize()`d `raw_name` in Python, since
+  `patient_alias.normalized_alias` doesn't exist until migration 0007);
+  `generator/names.py` (15 hand-written Indian name-variant groups + 20
+  filler names, no random noise) and `generator/gold_set.py` (seeded,
+  reproducible — writes "existing" patient rows to `patient` and a
+  separate, never-written `Query` per duplicate group, deliberately
+  spanning all four blocking-relevant categories: same-village-same-phone,
+  same-village-no-phone, cross-village, phone-changed); `docker-compose.yml`
+  mounts `./generator:/app/generator` on `api`; `server/scripts/
+  e3_draft_sweep.py` (blocks + scores each query once, classifies at six
+  thresholds without re-querying, plus the naive-exact-match baseline and
+  a normalize/blocking/scoring/threshold failure taxonomy). 30 new tests
+  (`tests/unit/test_linkage_normalize.py`, `test_linkage_scoring.py`,
+  `test_gold_set.py`; `tests/integration/test_linkage_blocking.py`,
+  `test_linkage_pipeline.py`). Two real bugs found and fixed during
+  verification, not just written and trusted — see observations 41–44 in
+  `docs/PHASE2_OBSERVATIONS.md`'s new Phase 6 section.
 
 ## Not done / in progress
 
-- P6.1: not started, needs the user's go-ahead (handoff R1). Starting
-  prompt ready in `temp.txt`.
+- P6.2 not started: needs the user's go-ahead (handoff R1). Migration
+  `0007`, the `push.py` wiring, `/identity/reviews` endpoints, Screen 6.
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
 - No known open bugs.
@@ -122,6 +145,34 @@ Two small decisions made without asking, flagged here per handoff §7:
   role can view the dashboard for their own subtree, same as `GET
   /referrals`.
 
+P6.1: every criterion in `docs/PHASE6_PLAN.md` checked against real
+commands — `alembic heads` is still `0006`; `grep -rnE
+'^from app\.db|^from sqlalchemy|import sqlalchemy'
+app/linkage/normalize.py app/linkage/scoring.py` is empty; the same seed
+(42) produces a byte-identical `ground_truth_identity.json` and identical
+`e3_draft_sweep.json`, run twice in a row, diffed, not just reasoned about
+— and a different seed (7) produces different patient ids, ruling out a
+generator that ignores its seed; the gold set's `cross_village` (4 pairs)
+and `phone_changed` (3 pairs) categories are non-empty and asserted so in
+`tests/unit/test_gold_set.py`, giving `blocking_recall=0.533` on the P6.1
+run — a real number below 100%, not a tautology; the sweep table over
+{80,85,88,90,92,95} plus the naive exact-match baseline
+(precision=recall=f1=0.000 — expected, since every query is a genuine
+spelling variant of its match by construction) both write to
+`results/e3_draft/` (gitignored, generated); the failure taxonomy
+attributes all 7 misses to `blocking` and none to `scoring`/`threshold` on
+this draft cohort, honestly — see observation 43's note on why
+`normalize` stays empty too; `datetime.now()`/`time.time()` grep clean
+outside `app/clock.py`, checked across `app/`, `generator/`, and
+`scripts/`; `ruff check`, `ruff format --check`, full suite (235 passed,
+up from 205) all green; `python -m app.verify_replay` clean after. Two
+real bugs found and fixed while verifying, not just written and trusted —
+`app/linkage/blocking.py`'s `:phone IS NULL` needed the same `CAST` shape
+as observation 37's `SLA_SCALE` (observation 42), and `--out`/`--gold`
+path arguments need `MSYS_NO_PATHCONV=1` on this Windows/Git-Bash setup or
+the path silently mangles and a `--rm` container erases the evidence
+(observation 41).
+
 ## Open item for the user
 
 **The real-phone clip** (plan §8.5, the Review-III fallback) is still
@@ -132,11 +183,15 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Start P6.1** on the user's go-ahead, in a new session, using the prompt
-in `temp.txt`. P6.1 is the normalise/block/score pipeline + the name-variant
-generator + the gold set + the threshold sweep: server only, no migration
-(`alembic heads` stays `0006`), no `push.py` wiring, no API, no client
-file. Model: Sonnet.
+**Start P6.2** on the user's go-ahead: migration `0007`
+(`patient.merged_into_id`, `patient_alias.normalized_alias`, the
+`identity_review` table), the `patient.normalized_name` backfill (old
+rows were written with `name.strip().lower()`, not the new `normalize()`),
+`blocking.py` gains `merged_into_id IS NULL`, wire `pipeline.resolve()`
+into `push.py::_resolve_patient` (ADR-009's one named call site),
+`GET /identity/reviews` + `POST /identity/reviews/{id}/decide` (ADR-013),
+Screen 6. Model: Sonnet, per handoff R2 — this is still implementation,
+not design.
 
 ## Verify the current state yourself
 
@@ -179,7 +234,27 @@ docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS nirantharsev
 docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
   api sh -c "alembic upgrade head && python -m app.seed && ruff check . && ruff format --check . && pytest -q && python -m app.verify_replay"
 ```
-Expect `205 passed`, clean.
+Expect `235 passed`, clean.
+
+Identity resolution draft sweep (Phase 6's headline number), against the
+same isolated test DB set up above — **on Windows/Git-Bash,
+`MSYS_NO_PATHCONV=1` is required on both commands below or the `--out`/
+`--gold` path silently mangles (observation 41)**:
+
+```bash
+MSYS_NO_PATHCONV=1 docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
+  api python -m generator.gold_set --seed 42 --out /app/results/e3_draft/
+MSYS_NO_PATHCONV=1 docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
+  api python scripts/e3_draft_sweep.py --gold /app/results/e3_draft/
+```
+Expect `blocking_recall=0.533`, a naive-baseline precision/recall/f1 of
+`0.000` (every gold-set query is a genuine spelling variant, so exact
+match should find nothing), and a threshold-sweep table with precision
+reaching `1.000` by threshold 85. Run both commands twice with the same
+`--seed` and diff `server/results/e3_draft/*.json` — byte-identical, or
+the numbers are not reproducible (P6.1 exit criterion). Writes to
+`server/results/e3_draft/` via the bind mount — gitignored, safe to
+delete and regenerate.
 
 Escalation sweep + dashboard, specifically (Phase 5's headline, without
 waiting for a real SLA window):
@@ -233,6 +308,20 @@ To see the screens by hand: open `http://localhost:5173/login`, log in as
 
 ## Known problems and workarounds
 
+- **Git Bash on Windows rewrites `/app/...`-style path arguments before
+  `docker compose run`/`exec` ever sees them** — a `--out`/`--gold` value
+  meant for the container's own filesystem gets reinterpreted as a host
+  path, the command still exits 0, and a `--rm` container erases the only
+  copy of whatever it wrote to the wrong place (observation 41). Prefix
+  any such command with `MSYS_NO_PATHCONV=1`.
+- **`asyncpg.exceptions.AmbiguousParameterError` on a bind parameter whose
+  first use in a query is `:param IS NULL`** — asyncpg's prepared-statement
+  protocol has no type to infer from a NULL comparison. Same root cause as
+  the `SLA_SCALE` entry below (observation 37), but this one raises
+  instead of silently corrupting; fix is the same shape, `CAST(:param AS
+  <type>)` on first use. Hit in `app/linkage/blocking.py`'s phone
+  predicate (observation 42) — worth checking for in any future query with
+  a nullable bind parameter.
 - **`app/domain/escalation.py`'s breach query needs `SLA_SCALE` explicitly
   cast to `double precision` — without it, any scale strictly between 0
   and 1 is silently truncated to integer 0 by asyncpg's prepared-statement
