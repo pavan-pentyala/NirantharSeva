@@ -69,6 +69,18 @@ Update `PROGRESS.md`: what is done, what is not, the exact next step, open
 questions. Commit. Screenshot any screen that worked for the first time into
 `docs/screenshots/`.
 
+Whenever a phase or sub-phase is reported complete (the same moment
+`PROGRESS.md` gets a new "Done" entry for it), also add a section to
+`docs/LEARNING_PLAN.md` covering it, in the same shape as its existing
+sections: the problem it solves, a concrete trace-it-yourself exercise
+through the real code, where the plan bent and why (check
+`docs/PHASE2_OBSERVATIONS.md` and the phase's ADRs for real drift, don't
+invent any), and self-check questions. Update `docs/PROJECT_REFERENCE.md`'s
+tables (ADR index, directory map, data flow, "bugs that taught the most")
+if the phase added any. Append one line to each file's own Update log.
+Both files are gitignored — this update is for the user's own understanding,
+not for the commit.
+
 ## Talking to the user
 
 He is a student working alone, and not a native English speaker. Use plain words.

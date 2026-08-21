@@ -33,3 +33,7 @@ temp.txt
 
 # Generated experiment output — reproducible from a seed, not source.
 results/
+
+# Personal learning aids — not a deliverable, not for the panel.
+docs/LEARNING_PLAN.md
+docs/PROJECT_REFERENCE.md

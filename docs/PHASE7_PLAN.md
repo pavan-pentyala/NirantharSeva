@@ -83,6 +83,11 @@ everything Phase 8 blocks on. **P7.2 is the two test-layer gaps** plus the
 fixture-collision guard. Each ends committed, CI-green and independently
 verifiable. No sub-phase starts without an explicit go-ahead (R1).
 
+A third sub-phase, **P7.3**, was added on 2026-08-21 after a panel-rehearsal
+session — see "P7.3 — review-hardening backlog" below. It is gated behind
+P7.1/P7.2, is not part of P7's exit criteria, and nothing in Phase 8 depends on
+it, so it is the piece to cut if this phase overruns.
+
 ### D31 — the default cohort targets ~200 patients / ~600 referrals
 
 Big enough that per-cell rates are not noise, small enough that E1's 54
@@ -129,6 +134,9 @@ faults.
 ---
 
 ## Build order
+
+P7.1 and P7.2 are Phase 7 proper. **P7.3 is a separate, cuttable backlog** with
+its own section further down — it does not gate this phase.
 
 ### P7.1 — the generator, the configs, the loader. No new screen, no schema change.
 
@@ -299,6 +307,112 @@ which is what P7.1 itself uses and tests.
   problems"). `MSYS_NO_PATHCONV=1` is needed on any `docker compose run`
   passing a container path (observation 41) — the CLI's `--out` and
   `--config` are exactly that shape.
+
+---
+
+## P7.3 — review-hardening backlog
+
+**Where this came from.** A panel-rehearsal session on 2026-08-21 (Opus, no code
+written) walked five likely examiner questions against the plan, the ADRs and
+the running code. Most of the answers already existed and were defensible. The
+items below are the ones where the answer exposed a real defect, a stale claim,
+or a UI element that does not do what it looks like it does. They are recorded
+here so they get fixed deliberately rather than discovered at Review-II.
+
+**Rule for this sub-phase.** P7.3 is gated behind P7.1 and P7.2 and starts only
+on an explicit go-ahead, like every other sub-phase (R1). It is also the one
+sub-phase in this plan that is **cuttable**: nothing in Phase 8 depends on it,
+and P7's own exit criteria do not include it. If P7.1 or P7.2 overrun, P7.3
+moves to Phase 9 and that is not a failure. Do not let it dilute the answer to
+"is Phase 7 done?".
+
+### A — decided alone (handoff §2), build without asking
+
+| # | Change | Where | Why |
+|-|-|-|-|
+| A1 | Remove the four role chips from the login screen | `client/src/pages/LoginPage.tsx`, the `ROLES` grid | They are `<div>`s that look like a segmented picker and do nothing. The role is resolved server-side from `app_user` on every request (ADR-006) and must never be asserted by the device. A dead control on the first screen a panel sees is a UI defect, not an architecture one — delete it. |
+| A2 | Show the resolved role and village in each worker home screen's header | Screens 1, 4, 5, 6 | Replaces what A1 removes with something true: the identity the server actually resolved. Reads `getSession()`, display only. |
+| A3 | Deterministic order and a sensible default for the "Sending to" facility list | `client/src/pages/CreateReferralPage.tsx:20,31` | Today it is `where("type").equals("PHC").toArray()` defaulted to `facilities[0]` — whatever Postgres returned first. Invisible with one seeded PHC, arbitrary with two. Order by name; default to the ASHA's own parent facility when it is in the list. |
+| A4 | Render `reason` and `asha_name` on the supervisor's overdue rows | `client/src/pages/SupervisorDashboardPage.tsx:145-149` | `_OVERDUE_QUERY` already selects both (`app/api/dashboard.py:56-69`) and the client already carries them. They are fetched and thrown away. Showing them answers "who do I call, and about what" with no new query. |
+| A5 | Move the 15-second sync interval into config | `client/src/sync/engine.ts:305` | `setInterval(..., 15_000)` is hardcoded, unlike `SLA_SCALE` and `SWEEP_INTERVAL_SECONDS`, which are env vars precisely so demo and field differ without a code change. Same reasoning, same treatment. Also turns the E5 poll load into a tunable rather than a constant. |
+| A6 | Fix the overdue-duration copy on the dashboard | `SupervisorDashboardPage.tsx:71,101-102` | The banner reads "no update for {overdueBy} past deadline", where `overdueBy` is `relativeTimeSince(triggered_at)` — time since the escalation was *raised*, not time past the deadline. Under a compressed demo clock the two differ visibly. Either fix the wording or compute the real overshoot; do not ship both meanings under one label. |
+
+### B — needs the user's approval before any code (handoff §2)
+
+| # | Change | Touches | The decision being asked for |
+|-|-|-|-|
+| B1 | **Validate `target_org_id` on push** | Push contract, `app/sync/push.py:427` | Today the target comes straight from the client payload, unvalidated — the same shape of trust ADR-006 removed from `origin_org_id`. Nothing leaks (visibility filters on `origin_org_id`, which is derived), but a referral can point at a village, or at a facility that does not exist. **The check must be facility-type-and-exists, or ancestor-of-origin — and which one depends entirely on B2.** |
+| B2 | **Seed a second PHC, a CHC and a District Hospital** | `app/seed.py`, `tests/integration/test_org_scoping.py:189` | Makes `DOMAIN_PRIMER.md`'s ladder visible and turns the facility picker from a fake mapping into a real choice. **This is not a seed tweak — in its full form it supersedes ADR-005.** See the section below. |
+| B3 | **Add a phone column to `app_user`** | Migration `0008`, `app/seed.py`, dashboard query and row | `app_user` has no phone: `0003` creates `id/name/role/org_unit_id/password_hash`, `0005` adds `display_name`. The supervisor's "call someone about this overdue referral" needs the *ASHA's* number, not the patient's — `patient.phone` is nullable by design and often absent, which is the entire premise of ADR-014. New column, new migration, never an edit to a shipped one. |
+| B4 | **Add logout** | `client/src/auth/session.ts` (no `clearSession` exists today), header | Deliberately absent — one worker, one device, and the JWT expires in 480 min, after which `getSession()` returns null and `RequireAuth` redirects. Worth adding anyway so it is not asked. **The decision that needs recording is the dangerous half: logout clears the token and must NOT clear Dexie.** Clearing the outbox on logout silently destroys unsent referrals — the exact failure this project exists to prevent. |
+
+### The one B-item that is architectural, not cosmetic
+
+**B2's full form supersedes ADR-005, and that has to be faced before the row is
+written, not after.**
+
+ADR-005 filters visibility on `origin_org_id` alone, and its own "cost, stated
+plainly" paragraph says why that is safe *today*: referrals travel up the tree,
+so the receiving facility always contains the origin in its subtree. It then
+says exactly what breaks — *"a lateral referral — one whose target is not an
+ancestor of its origin, say Village A to a PHC in a different block — would be
+invisible to the facility receiving it… If a later phase introduces cross-branch
+referral, this rule must be revisited, and this ADR superseded."*
+
+A second PHC is precisely that. Two PHCs cannot both be ancestors of Village A.
+The moment an ASHA can genuinely choose between them, the referral she sends to
+the non-parent PHC is invisible to the MO who is supposed to receive it — and
+the UI looks completely correct, which is the failure mode ADR-005 and plan §6.4
+both warn about by name.
+
+So B2 is three decisions, and they must be taken together:
+
+1. **Do lateral referrals exist in this system at all?** If no, B2 shrinks to
+   seeding a CHC and a District Hospital *above* PHC Ramnagar — real ladder
+   depth, no laterality, ADR-005 untouched, `test_org_scoping.py:189`'s ancestor
+   property still true.
+2. **If yes:** the visibility predicate becomes
+   `origin_org_id IN subtree OR target_org_id IN subtree`, applied identically at
+   all seven call sites `app/api/scoping.py` tracks. That is an ADR-016
+   superseding ADR-005, plus a re-run of every scoping test.
+3. **B1's rule follows from the answer** — ancestor-of-origin if (1) is no,
+   facility-type-and-exists if (1) is yes.
+
+**Recommendation: take option (1).** Seed CHC and District Hospital above the
+PHC, keep referrals travelling upward, keep ADR-005 intact, and answer the
+two-PHC question verbally: the picker lists every facility, the constraint is
+recorded in ADR-005, and cross-block referral is named as future work. A
+superseding ADR in the week before Review-II, touching the one rule three
+separate documents call the most consequential thing in the codebase, is a bad
+trade for a demo detail.
+
+### C — documentation and report only, no code
+
+| # | Change | Where and what |
+|-|-|-|
+| C1 | Stop implying 120 h is *the* SLA window | Report, and any doc repeating it. Seeded windows are 24/48/24/48/72 h per state (`app/seed.py:136-170`). 120 h is **one cell of E2's sweep** over {24, 48, 72, 120}, not a configured value. |
+| C2 | Write `SLA_SCALE` up as an experiment mechanism, not a demo hack | Report Ch. 3/4. Real hours stay in the column; the multiplier applies at query time (`app/domain/escalation.py:67`); the committed default is `1.0` (`.env:23`). Pair it with ADR-001 — same problem, same answer: E2 across three seeds cannot run against wall time. |
+| C3 | Name single-hop referral as an explicit limitation | Report. `origin_org_id → target_org_id` is one hop. A PHC→district onward referral is not a modelled transition; it would be a second referral. Multi-hop chains change what E1's loop-closure rate means, which is why they are out. |
+| C4 | Name admin / master-data provisioning as an explicit scope boundary | Report, citing **D29** — *"there is no API for creating an `org_unit` or an `app_user`, and this phase does not add one."* State the mechanism that exists instead (idempotent `app/seed.py`, UUIDv5 stable ids, argon2id hashes; the P7.1 generator's `district.csv` / `users.csv` at scale) and name the future work concretely: a `village → facility` catchment table with an `is_default` flag — the table an admin screen would exist to edit. |
+| C5 | Document the three offline-demo paths in `make demo`'s printed script | DevTools offline (the same switch the Playwright suite uses, `context.setOffline(true)`); `docker compose stop api` (the browser still believes it is online, so the retry path runs — and it is how E4's `docker kill api` fault works); a real phone in airplane mode via add-to-home-screen. Plan §14 already ranks them; the script should say so out loud so the sequence is not improvised while being watched. |
+| C6 | Record the decision **not** to build a "simulate offline" button | Here and in the report. Offline is read from `navigator.onLine` at three call sites (`engine.ts:120,194,284`); a global fake-offline flag would have to be threaded through all of them, and the moment a fake-offline switch exists a panel can reasonably ask whether the offline demo is real. Cutting the actual network costs one keystroke and is unarguable. |
+
+### P7.3 exit criteria
+
+- [ ] Every A-item built, existing suites still green.
+- [ ] Every B-item either built **or** explicitly declined by the user, with the
+      decline recorded here. A B-item left in "not discussed" is the failure
+      state for this sub-phase.
+- [ ] Every C-item is a paragraph that exists in a file, not an intention.
+- [ ] `alembic heads` prints `0007`, unless B3 was approved — then `0008`.
+
+### Not in P7.3
+
+An admin role, an admin screen, or any user/org-creation API — D29 stands. A
+catchment or distance model. Multi-hop referral. Shared-device session
+management beyond B4's single button. Any restyling beyond the named items:
+`UI_DESIGN_BRIEF.md` §8 says the direction stays once set, and these are
+corrections to elements that lie, not a new direction.
 
 ---
 
