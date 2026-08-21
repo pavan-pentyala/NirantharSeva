@@ -10,17 +10,18 @@
 > information, at lower quality.
 
 **Last updated:** 2026-08-21
-**Last session model:** Sonnet 5 (P6.1 + P6.2 implementation, one session).
+**Last session model:** Opus 5 (Phase 7 planning). Implementation is Sonnet.
 
 ## Current phase
 
 **Phase 6 is complete and verified — both P6.1 and P6.2.** Identity
 resolution is wired into the real referral-creation path, the review
 queue is a real screen, and Screen 6 works end to end in a live browser
-(screenshot in `docs/screenshots/screen6-identity-review.png`). Phase 7
-(generator + integration/property/E2E tests, `docs/IMPLEMENTATION_PLAN.md`
-§11) has not been planned yet — that's an Opus planning session before any
-Sonnet implementation starts (handoff R2).
+(screenshot in `docs/screenshots/screen6-identity-review.png`).
+
+**Phase 7 is planned, not started** — `docs/PHASE7_PLAN.md`, D28–D33,
+ADR-015. Waiting for a go-ahead to start P7.1. A ready-to-use starting
+prompt is in `temp.txt` (gitignored scratch file).
 
 ## Done
 
@@ -121,12 +122,15 @@ Sonnet implementation starts (handoff R2).
   person" fixtures turned out to be near-subset or near-duplicate names
   under `rapidfuzz` — all renamed, not worked around; see observations
   45–46.
+- Phase 7 planning: D28–D33 decided (D28–D31 with the user, D32–D33 taken
+  alone under handoff §2 and flagged in the plan for override), ADR-015
+  (a cohort loads by replay through `/sync/push`) written. P7.1/P7.2
+  split approved.
 
 ## Not done / in progress
 
-- Phase 7 not planned yet: needs an Opus planning session before any
-  implementation (handoff R2). Full cohort generator, integration +
-  property + E2E tests, `docs/IMPLEMENTATION_PLAN.md` §11.
+- P7.1: not started, needs the user's go-ahead (handoff R1). Starting
+  prompt ready in `temp.txt`.
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
 - No known open bugs.
@@ -266,14 +270,15 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-Phase 6 is done. **Phase 7 needs an Opus planning session first**
-(generator + integration/property/E2E tests, `docs/IMPLEMENTATION_PLAN.md`
-§11) — do not start writing Phase 7 code on Sonnet before that plan
-exists (handoff R2). Note for that planning session: `generator/names.py` already exists
-(§2.2's own file list) and `generator/gold_set.py` was P6.1's addition to
-that list (D23) — Phase 7 builds the rest of the cohort generator
-(§2.2 names `cohort.py`, `timeline.py`, `cli.py`) on top of them, not from
-scratch.
+**Start P7.1** on the user's go-ahead, in a new session, using the prompt
+in `temp.txt`. P7.1 is the cohort generator + the configs + the loader:
+`generator/cohort.py`, `timeline.py`, `cli.py` (building on P6.1's
+`names.py`/`gold_set.py`, not replacing them), `configs/`, and
+`server/scripts/load_cohort.py`. No migration (`alembic heads` stays
+`0007`), no new screen, no test-layer work — that is P7.2. Model: Sonnet.
+
+**P7.1 owes one number back:** the measured wall-clock time of a single
+cohort load. Phase 8's E1 budget is fifty-four of them (ADR-015).
 
 ## Verify the current state yourself
 
@@ -403,12 +408,20 @@ around changes what that spec exercises. Clean up by deleting from
   needed.
 - The real-phone offline clip stays on the list. Do not propose dropping
   it again.
-- All decisions D1–D27: settled — see the relevant `PHASE*_PLAN.md` / ADR.
+- All decisions D1–D33: settled — see the relevant `PHASE*_PLAN.md` / ADR.
   Phase 5's four (SSE query-token auth, LISTEN/NOTIFY, `SLA_SCALE`,
   P5.1/P5.2 split) and Phase 6's five (gold set sliced forward from the
   Phase 7 generator, P6.1/P6.2 split, identity merge over REST rather than
   the outbox, no "not sure" third button on Screen 6, blocking with a
   missing phone) were answered 2026-08-20; do not re-ask them.
+- Phase 7's four (D28 cohort loads by replay through `/sync/push` —
+  ADR-015; D29 the generator builds its own district; D30 P7.1/P7.2
+  split; D31 default cohort ~200 patients / ~600 referrals) were answered
+  2026-08-21. D32 (the property layer proves idempotency-under-retry, not
+  permutation invariance — the latter is false by design under ADR-003)
+  and D33 (`connectivity_profile` = device→server delay distribution)
+  were taken alone under handoff §2 and are flagged in
+  `docs/PHASE7_PLAN.md` for override.
 
 ## Known problems and workarounds
 
