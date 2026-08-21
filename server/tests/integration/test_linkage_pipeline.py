@@ -18,8 +18,10 @@ shared "Devi" or "Kumar" is exactly the kind of accidental overlap that
 would make one test's fixture a false-positive candidate for another's
 query.
 
-Not wired into app/sync/push.py in P6.1 — these tests call resolve()
-directly, the same way scripts/e3_draft_sweep.py does.
+These tests call resolve() directly, the same way
+scripts/e3_draft_sweep.py does — tests/integration/
+test_push_identity_resolution.py exercises the same pipeline through the
+real /sync/push wiring (P6.2).
 """
 
 import uuid
@@ -63,10 +65,15 @@ async def _insert_alias(patient_id: uuid.UUID, raw_name: str) -> None:
     async with async_session_factory() as s, s.begin():
         await s.execute(
             text(
-                """INSERT INTO patient_alias (id, patient_id, raw_name)
-                   VALUES (:id, :patient_id, :raw_name)"""
+                """INSERT INTO patient_alias (id, patient_id, raw_name, normalized_alias)
+                   VALUES (:id, :patient_id, :raw_name, :normalized_alias)"""
             ),
-            {"id": uuid.uuid4(), "patient_id": patient_id, "raw_name": raw_name},
+            {
+                "id": uuid.uuid4(),
+                "patient_id": patient_id,
+                "raw_name": raw_name,
+                "normalized_alias": normalize(raw_name),
+            },
         )
 
 

@@ -54,7 +54,15 @@ async def test_same_batch_posted_five_times_creates_row_once(client, auth_header
 async def test_five_identical_pushes_result_in_one_referral_row(client, auth_headers):
     op_id = uuid.uuid4()
     entity_id = uuid.uuid4()
-    body = _batch(op_id, entity_id, patient_name="Idempotent Test Patient Two")
+    # A name with no word in common with test_same_batch_posted_five_times_
+    # creates_row_once's "Idempotent Test Patient" — sharing three of four
+    # words (as "... Two" would) scores 100 via rapidfuzz's
+    # token_set_ratio (a subset of tokens is a perfect match under that
+    # metric), which — now that create_referral resolves patients through
+    # the real fuzzy pipeline (P6.2) rather than an exact match — would
+    # silently reuse that other test's patient instead of creating this
+    # test's own. See observation 44, docs/PHASE2_OBSERVATIONS.md.
+    body = _batch(op_id, entity_id, patient_name="Repeat Push Second Patient")
 
     for _ in range(5):
         await client.post("/sync/push", json=body, headers=auth_headers)
@@ -67,7 +75,7 @@ async def test_five_identical_pushes_result_in_one_referral_row(client, auth_hea
             ),
             {"id": entity_id},
         )
-        assert result.scalar_one() == "Idempotent Test Patient Two"
+        assert result.scalar_one() == "Repeat Push Second Patient"
 
         referral_count = await session.execute(
             text("SELECT COUNT(*) FROM referral WHERE id = :id"), {"id": entity_id}

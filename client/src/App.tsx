@@ -2,9 +2,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./auth/RequireAuth";
 import { getSession, isAuthenticated } from "./auth/session";
 import CreateReferralPage from "./pages/CreateReferralPage";
+import IdentityReviewPage from "./pages/IdentityReviewPage";
 import IncomingReferralsPage from "./pages/IncomingReferralsPage";
 import LoginPage from "./pages/LoginPage";
-import PlaceholderPage from "./pages/PlaceholderPage";
 import ReferralDetailPage from "./pages/ReferralDetailPage";
 import ReferralListPage from "./pages/ReferralListPage";
 import SupervisorDashboardPage from "./pages/SupervisorDashboardPage";
@@ -35,10 +35,7 @@ export default function App() {
         <Route path="/referrals/:id" element={<ReferralDetailPage />} />
         <Route path="/mo/incoming" element={<IncomingReferralsPage />} />
         <Route path="/supervisor" element={<SupervisorDashboardPage />} />
-        <Route
-          path="/identity-review"
-          element={<PlaceholderPage title="Identity review" comingIn="Phase 6" />}
-        />
+        <Route path="/identity-review" element={<IdentityReviewPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/login" replace />} />

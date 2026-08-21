@@ -7,11 +7,11 @@ when both records carry one: `patient.phone` is nullable and a blank phone
 is the common case, not the edge case (ADR-014). A candidate from another
 village is never returned, at any phone value, at any threshold.
 
-Seam for P6.2: once migration 0007 adds `patient.merged_into_id`, this
-query needs `AND merged_into_id IS NULL` — the column does not exist yet,
-so it cannot be written here. Marked below; do not work around its absence
-by filtering merged rows out in Python, since that would silently drop the
-predicate the moment the column arrives and nobody remembers to wire it in.
+P6.2 (migration 0007): `merged_into_id IS NULL` is part of the same
+predicate, not a separate concern — a record already merged away is not a
+candidate for anything, and without this clause the same resolved
+duplicate is re-suggested to the nurse on every subsequent referral,
+forever (ADR-014).
 """
 
 import uuid
@@ -37,9 +37,9 @@ _BLOCK_QUERY = """
     SELECT id, normalized_name
     FROM patient
     WHERE village_org_id = :village_org_id
+      AND merged_into_id IS NULL
       AND (CAST(:phone AS text) IS NULL OR phone IS NULL
            OR left(phone, 4) = left(CAST(:phone AS text), 4))
-      -- P6.2 (migration 0007) adds: AND merged_into_id IS NULL
 """
 
 

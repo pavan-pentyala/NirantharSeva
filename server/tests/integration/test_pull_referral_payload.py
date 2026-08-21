@@ -75,7 +75,15 @@ async def test_pulled_transition_event_payload_repeats_the_same_snapshot(client,
         "entity_id": str(entity_id),
         "operation": "create_referral",
         "payload": {
-            "patient_name": "Test Pull Payload Patient Two",
+            # No word in common with the previous test's "Test Pull
+            # Payload Patient" — sharing three of four words (as "... Two"
+            # would) scores 100 via rapidfuzz's token_set_ratio (a subset
+            # of tokens is a perfect match under that metric), which would
+            # silently reuse that test's patient via fuzzy_auto instead of
+            # creating this test's own, now that create_referral resolves
+            # patients through the real fuzzy pipeline (P6.2). See
+            # observation 44, docs/PHASE2_OBSERVATIONS.md.
+            "patient_name": "Transition Snapshot Person",
             "reason": "cough",
             "priority": "routine",
         },
@@ -103,7 +111,7 @@ async def test_pulled_transition_event_payload_repeats_the_same_snapshot(client,
 
     # Append-only stream — a transition event repeats the patient snapshot
     # it never carried in its own payload (ADR-010's accepted cost).
-    assert transitioned["payload"]["patient_name"] == "Test Pull Payload Patient Two"
+    assert transitioned["payload"]["patient_name"] == "Transition Snapshot Person"
     assert transitioned["payload"]["reason"] == "cough"
     assert transitioned["payload"]["priority"] == "routine"
     assert transitioned["payload"]["age"] is None

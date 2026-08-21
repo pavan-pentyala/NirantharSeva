@@ -75,7 +75,14 @@ test("a new breach appears on the supervisor dashboard without a page refresh", 
   context,
 }) => {
   test.setTimeout(150_000);
-  const patientName = `P5.2 Dashboard Test Patient ${Date.now()}`;
+  // Random hex, not Date.now() (two runs would otherwise create near-
+  // identical names that clear AUTO_ACCEPT against each other), and no
+  // "Test Patient" boilerplate shared with other spec files' fixture
+  // names (that alone still scores in the review band and would queue a
+  // spurious identity_review pair, cluttering a live demo of Screen 6) —
+  // now that create_referral resolves patients through the real fuzzy
+  // pipeline (P6.2). See docs/PHASE2_OBSERVATIONS.md.
+  const patientName = `Breach Watch Fixture ${crypto.randomUUID().slice(0, 8)}`;
 
   await login(page, "asha_a");
   await expect(page).toHaveURL(/\/referrals$/);
@@ -138,7 +145,8 @@ test("an IN_TRANSIT breach still shows on MO's board with a working action butto
   page,
 }) => {
   test.setTimeout(150_000);
-  const patientName = `P5.2 MO Overlay Test Patient ${Date.now()}`;
+  // Random hex, no shared boilerplate — see the first test in this file.
+  const patientName = `Overlay Relay Fixture ${crypto.randomUUID().slice(0, 8)}`;
 
   await login(page, "asha_a");
   await expect(page).toHaveURL(/\/referrals$/);

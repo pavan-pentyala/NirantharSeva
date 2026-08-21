@@ -31,7 +31,13 @@ test("offline: create three referrals, advance one, reload, data survives, then 
 
   await context.setOffline(true);
 
-  const patientNames = [0, 1, 2].map((i) => `Offline Fault Test Patient ${Date.now()}-${i}`);
+  // Random hex per name, not Date.now(), and no "Test Patient"
+  // boilerplate shared with other spec files' fixture names — both would
+  // score high enough via rapidfuzz (once create_referral resolves
+  // patients through the real fuzzy pipeline, P6.2) to either silently
+  // reuse another patient's identity or queue a spurious identity_review
+  // pair. See docs/PHASE2_OBSERVATIONS.md.
+  const patientNames = [0, 1, 2].map(() => `Airplane Mode Fixture ${crypto.randomUUID().slice(0, 8)}`);
   for (const name of patientNames) {
     await page.getByTestId("new-referral-button").click();
     await page.getByTestId("patient-name-input").fill(name);

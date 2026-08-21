@@ -10,13 +10,17 @@
 > information, at lower quality.
 
 **Last updated:** 2026-08-21
-**Last session model:** Sonnet 5 (P6.1 implementation).
+**Last session model:** Sonnet 5 (P6.1 + P6.2 implementation, one session).
 
 ## Current phase
 
-**P6.1 is complete and verified.** Waiting for a go-ahead to start P6.2 —
-migration `0007`, wiring `pipeline.resolve()` into `push.py`, the
-`/identity/reviews` endpoints, and Screen 6 (`docs/PHASE6_PLAN.md`).
+**Phase 6 is complete and verified — both P6.1 and P6.2.** Identity
+resolution is wired into the real referral-creation path, the review
+queue is a real screen, and Screen 6 works end to end in a live browser
+(screenshot in `docs/screenshots/screen6-identity-review.png`). Phase 7
+(generator + integration/property/E2E tests, `docs/IMPLEMENTATION_PLAN.md`
+§11) has not been planned yet — that's an Opus planning session before any
+Sonnet implementation starts (handoff R2).
 
 ## Done
 
@@ -84,11 +88,45 @@ migration `0007`, wiring `pipeline.resolve()` into `push.py`, the
   `test_linkage_pipeline.py`). Two real bugs found and fixed during
   verification, not just written and trusted — see observations 41–44 in
   `docs/PHASE2_OBSERVATIONS.md`'s new Phase 6 section.
+- **P6.2** (`docs/PHASE6_PLAN.md` build order): migration `0007`
+  (`patient.merged_into_id`, `patient_alias.normalized_alias` — no
+  backfill needed, table was empty — the `identity_review` table +
+  `uq_identity_review_open`, and a Python row-by-row `normalized_name`
+  backfill for every pre-existing patient); `blocking.py` and
+  `pipeline.py`'s exact/alias steps all gained `merged_into_id IS NULL`
+  (the plan's exit-criteria table only named blocking explicitly — the
+  exact/alias extension was my own call, flagged then, repeated here);
+  `push.py::_resolve_patient` now calls `pipeline.resolve()` (ADR-009's
+  one named call site) — `fuzzy_auto` writes a `patient_alias` row,
+  `review_queue` creates a provisional patient AND queues an
+  `identity_review` row (`_insert_identity_review`'s `ON CONFLICT ...
+  WHERE status='pending' DO NOTHING` is the actual dedup gate, I5's
+  sibling); `GET /identity/reviews` + `POST /identity/reviews/{id}/decide`
+  (`app/api/identity.py`, ADR-013 — the conditional `UPDATE ... WHERE
+  status='pending'` decide-once mechanism, 404-not-403 scoping, merge
+  repoints referrals + writes an alias + sets `merged_into_id`);
+  `scoping.py`'s call-site list updated (site 7). Client: Dexie v6
+  (`identity_review_cache`), `client/src/sync/identityReviews.ts` (fetch +
+  wholesale rewrite, no SSE — ADR-013 is plain REST), `IdentityReviewPage`
+  (replaces the `PlaceholderPage`, now deleted) — offline shows an explicit
+  "needs a connection" message and no queue at all, per ADR-013.
+  15 new/changed server tests (`test_normalized_name_backfill.py`,
+  `test_push_identity_resolution.py` — the three threshold bands through
+  the real `/sync/push`, `test_identity_review_dedup.py`,
+  `test_identity_api.py`) plus one new Playwright spec
+  (`client/tests/identity-review.spec.ts`) verified against a real running
+  browser twice — once by hand (screenshots), once as a committed,
+  repeatable test. Wiring in the real fuzzy pipeline broke five
+  *pre-existing* tests (two server, three client) whose "different
+  person" fixtures turned out to be near-subset or near-duplicate names
+  under `rapidfuzz` — all renamed, not worked around; see observations
+  45–46.
 
 ## Not done / in progress
 
-- P6.2 not started: needs the user's go-ahead (handoff R1). Migration
-  `0007`, the `push.py` wiring, `/identity/reviews` endpoints, Screen 6.
+- Phase 7 not planned yet: needs an Opus planning session before any
+  implementation (handoff R2). Full cohort generator, integration +
+  property + E2E tests, `docs/IMPLEMENTATION_PLAN.md` §11.
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
 - No known open bugs.
@@ -173,6 +211,51 @@ path arguments need `MSYS_NO_PATHCONV=1` on this Windows/Git-Bash setup or
 the path silently mangles and a `--rm` container erases the evidence
 (observation 41).
 
+P6.2: every criterion in `docs/PHASE6_PLAN.md` checked against real
+commands — `alembic heads` prints `0007`, `0006` unmodified; a
+pre-existing (simulated pre-migration) patient row is matched by the new
+exact step only after the backfill runs, not before
+(`test_normalized_name_backfill.py`); the three threshold bands
+(`fuzzy_auto` reuses + writes an alias, `review_queue` creates a
+provisional patient + queues exactly one review + `push` still returns
+`accepted`, below-floor creates a provisional patient with no review) all
+verified through the real `/sync/push`, at the real
+`IDENTITY_AUTO_ACCEPT=92.0`/`IDENTITY_REVIEW_FLOOR=80.0` defaults, not an
+adjusted `Settings` object; two calls to `_insert_identity_review` with
+the same pair produce one row, and the test asserts this against the bare
+SQL mechanism directly (push.py's own call site can never trigger the
+collision naturally — see that function's docstring); `decide` merge
+repoints referrals, writes an alias, sets `merged_into_id`, and a second
+identical POST returns the same outcome with no second alias or repoint;
+`decide` keep-separate repoints nothing, and a `kept_separate` pair is not
+re-queued by a later identical push (it resolves via `exact` against its
+own already-created provisional patient); a merged-away patient is
+provably absent from `block()`'s own candidate list afterward; an ANM
+sees only her own sub-centre's pairs, a two-branch test using PHC
+Ramnagar (her org's *parent*) as the "outside" branch rather than a new
+fixture org, since `test_org_units.py`/`test_scoping.py` both assert the
+seeded org tree's *exact* name set; `tsc --noEmit`, `npm run build`, both
+suites (server 245, client 10) green; `python -m app.verify_replay` clean
+on both the isolated test DB and the dev DB. Screen 6 checked against a
+real running browser via a manual Playwright script (screenshots) *and*
+a committed, repeatable spec — both independently confirmed the pair
+renders, only disagreeing fields box, and both buttons work end to end.
+No banned word (brief §6: sync, pending ops, conflict, operation, queue,
+offline mode, retry, payload) in Screen 6's own copy — read by hand, and
+"review queue" specifically avoided in the page title/heading for
+exactly this reason.
+
+Wiring the real fuzzy pipeline into `create_referral` broke five
+pre-existing tests whose "make it a different patient" fixtures assumed
+exact-match-only resolution — two server-side (`test_pull_referral_
+payload.py`, `test_push_idempotent.py`, a subset-name collision scoring
+literally 100.0) and three client-side Playwright specs using `` `<fixed
+prefix> ${Date.now()}` `` names, which collide with their own previous run
+at ~93 once two runs happen against the same persistent dev database. All
+renamed, not worked around — see observations 45–46 for the mechanism and
+why "unique-looking" wasn't unique enough twice over (once for the exact
+name pattern, again for the boilerplate words shared across files).
+
 ## Open item for the user
 
 **The real-phone clip** (plan §8.5, the Review-III fallback) is still
@@ -183,15 +266,14 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Start P6.2** on the user's go-ahead: migration `0007`
-(`patient.merged_into_id`, `patient_alias.normalized_alias`, the
-`identity_review` table), the `patient.normalized_name` backfill (old
-rows were written with `name.strip().lower()`, not the new `normalize()`),
-`blocking.py` gains `merged_into_id IS NULL`, wire `pipeline.resolve()`
-into `push.py::_resolve_patient` (ADR-009's one named call site),
-`GET /identity/reviews` + `POST /identity/reviews/{id}/decide` (ADR-013),
-Screen 6. Model: Sonnet, per handoff R2 — this is still implementation,
-not design.
+Phase 6 is done. **Phase 7 needs an Opus planning session first**
+(generator + integration/property/E2E tests, `docs/IMPLEMENTATION_PLAN.md`
+§11) — do not start writing Phase 7 code on Sonnet before that plan
+exists (handoff R2). Note for that planning session: `generator/names.py` already exists
+(§2.2's own file list) and `generator/gold_set.py` was P6.1's addition to
+that list (D23) — Phase 7 builds the rest of the cohort generator
+(§2.2 names `cohort.py`, `timeline.py`, `cli.py`) on top of them, not from
+scratch.
 
 ## Verify the current state yourself
 
@@ -214,10 +296,10 @@ its real PWA precache — `offline-sync.spec.ts` only).
 docker compose up -d --build
 docker compose exec client npx tsc --noEmit && docker compose exec client npm run build
 docker compose exec -d client npm run preview        # starts :4173
-cd client && npx playwright test                     # expect 9 passed, ~2 min (see below)
+cd client && npx playwright test                     # expect 10 passed, ~2 min (see below)
 ```
 
-Two of those 9 tests need a demo-scale scheduler running first, or they'll
+Two of those 10 tests need a demo-scale scheduler running first, or they'll
 sit at their real-SLA pace instead of failing fast — start one before the
 `npx playwright test` above:
 
@@ -227,14 +309,14 @@ docker compose run --rm -d --name demo-scheduler -e SLA_SCALE=0.0004 -e SWEEP_IN
 docker stop demo-scheduler   # started with --rm, so this also removes it
 ```
 
-Server (`alembic heads` should print `0006`):
+Server (`alembic heads` should print `0007`):
 
 ```bash
 docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS nirantharseva_test;" -c "CREATE DATABASE nirantharseva_test;"
 docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
   api sh -c "alembic upgrade head && python -m app.seed && ruff check . && ruff format --check . && pytest -q && python -m app.verify_replay"
 ```
-Expect `235 passed`, clean.
+Expect `245 passed`, clean.
 
 Identity resolution draft sweep (Phase 6's headline number), against the
 same isolated test DB set up above — **on Windows/Git-Bash,
@@ -280,9 +362,30 @@ fine, but do not remove the `CAST(:sla_scale AS double precision)` from
 becomes 0 and everything escalates instantly.**
 
 To see the screens by hand: open `http://localhost:5173/login`, log in as
-`asha_a`/`dev`, `mo1`/`dev` for Screen 5, or `supervisor1`/`dev` for Screen
-4 (`/supervisor`, now a real live dashboard, not a placeholder).
-`/identity-review` is still a Phase 6 placeholder.
+`asha_a`/`dev`, `mo1`/`dev` for Screen 5, `supervisor1`/`dev` for Screen 4
+(`/supervisor`), or `anm1`/`dev` for Screen 6 (`/identity-review`) — every
+screen is real now; no placeholders remain.
+
+Screen 6 needs a pending pair to show anything. To make one by hand:
+push a `create_referral` as `asha_a` naming a close misspelling of an
+existing Village A patient — `"Lakshmy Devi"` against the seeded
+`"Lakshmi Devi"` scores 91.67, just inside the review band under the
+default 92/80 thresholds:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/login -H "content-type: application/json" \
+  -d '{"username":"asha_a","password":"dev"}' | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+curl -s -X POST http://localhost:8000/sync/push -H "content-type: application/json" \
+  -H "authorization: Bearer $TOKEN" -d "{\"device_id\":\"demo\",\"ops\":[{\"op_id\":\"$(python -c 'import uuid;print(uuid.uuid4())')\",\"entity\":\"referral\",\"entity_id\":\"$(python -c 'import uuid;print(uuid.uuid4())')\",\"operation\":\"create_referral\",\"payload\":{\"patient_name\":\"Lakshmy Devi\",\"reason\":\"demo\",\"priority\":\"routine\"},\"lamport\":1,\"device_time\":\"2026-08-21T09:00:00Z\"}]}"
+```
+Then log in as `anm1`/`dev`. **This writes real rows to the dev
+database** — the patient, its referral, and the `identity_review` pair
+survive until deleted, and `client/tests/identity-review.spec.ts` decides
+every pending pair it finds as a precondition, so leaving one lying
+around changes what that spec exercises. Clean up by deleting from
+`identity_review`, `patient_alias`, `referral_event`, `referral`, then
+`patient`, in that order (FK dependencies), and re-run
+`docker compose exec api python -m app.verify_replay` afterward.
 
 ## Settled decisions (do not re-ask)
 
@@ -294,7 +397,8 @@ To see the screens by hand: open `http://localhost:5173/login`, log in as
 - `react-router-dom`: yes. `dexie-react-hooks`: no. `vite-plugin-pwa`: yes.
 - GitHub Actions minutes: not a concern.
 - Screenshots: either way is fine (user's answer) — `docs/screenshots/`
-  currently holds one per screen plus the PWA offline-reload proof.
+  currently holds one per screen (all six real now) plus the PWA
+  offline-reload proof.
 - Review-I is a literature review/survey, not a live demo — no rehearsal
   needed.
 - The real-phone offline clip stays on the list. Do not propose dropping
@@ -308,6 +412,22 @@ To see the screens by hand: open `http://localhost:5173/login`, log in as
 
 ## Known problems and workarounds
 
+- **Any test that creates a patient needs a name sharing NO words with
+  any other test's patient name, in any file, server or client — and a
+  random differentiator, never `Date.now()`.** Since P6.2,
+  `create_referral` resolves patients through the real fuzzy pipeline, so
+  `rapidfuzz` decides whether two fixtures are "the same person":
+  `token_set_ratio` scores a subset name against its superset as exactly
+  100 (`"X Patient"` vs `"X Patient Two"`), two millisecond timestamps
+  inside an otherwise identical name score ~93, and two words of shared
+  boilerplate ("Test Patient") score 75–89 — the last one is below
+  `AUTO_ACCEPT` so it doesn't corrupt identity, but it queues a junk
+  `identity_review` pair that clutters a live demo of Screen 6. Use
+  `crypto.randomUUID().slice(0, 8)` (client) or a distinct phrase
+  (server), and scan any new name against the existing ones with
+  `app.linkage.scoring.score` before committing it. Observations 44–46;
+  this cost five broken pre-existing tests in P6.2, in two separate
+  rounds.
 - **Git Bash on Windows rewrites `/app/...`-style path arguments before
   `docker compose run`/`exec` ever sees them** — a `--out`/`--gold` value
   meant for the container's own filesystem gets reinterpreted as a host

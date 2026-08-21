@@ -12,9 +12,11 @@ compared here, in Python, never pushed into a query — see scripts on
 observation 37 in docs/PHASE2_OBSERVATIONS.md for what happens to a float
 threshold that migrates into SQL.
 
-Not wired into app/sync/push.py in P6.1 (docs/PHASE6_PLAN.md build order,
-P6.2 item 4) — that is the one call site ADR-009 named, and it stays
-untouched until migration 0007 exists.
+Wired into app/sync/push.py's `_resolve_patient` in P6.2 — ADR-009's one
+named call site. Every read here filters `merged_into_id IS NULL`
+(migration 0007): an exact or alias hit on a row that has already been
+merged into another would reuse a dead id instead of the canonical one,
+silently undoing the merge the next time someone types the old spelling.
 """
 
 import uuid
@@ -45,6 +47,7 @@ async def _exact_match(
         text(
             """SELECT id FROM patient
                WHERE normalized_name = :norm AND village_org_id = :village_org_id
+                     AND merged_into_id IS NULL
                ORDER BY created_at ASC LIMIT 1"""
         ),
         {"norm": norm, "village_org_id": village_org_id},
@@ -56,25 +59,25 @@ async def _exact_match(
 async def _alias_lookup(
     session: AsyncSession, norm: str, village_org_id: uuid.UUID
 ) -> uuid.UUID | None:
-    """patient_alias has no normalized_alias column until migration 0007
-    (P6.2) — normalize()d comparison happens in Python here instead of
-    anticipating that column. The table is empty until P6.2 wires a write
-    path to it (docs/PHASE6_PLAN.md "Traps"), so this is a cheap no-op scan
-    today and becomes a real lookup once P6.2 starts writing aliases; P6.2
-    may replace this loop with a direct SQL comparison against the new
-    column as an optimisation, but is not required to."""
+    """Direct comparison against `patient_alias.normalized_alias`
+    (migration 0007) — populated by app/sync/push.py's `_resolve_patient`
+    on every `fuzzy_auto` resolution and by a `merge` decision
+    (app/api/identity.py). Before 0007, P6.1's draft of this function
+    compared `normalize()`d `raw_name` in a Python loop, since the column
+    didn't exist yet and the table was always empty; this is that draft's
+    promised replacement, not a new decision."""
     result = await session.execute(
         text(
-            """SELECT pa.raw_name, pa.patient_id FROM patient_alias pa
+            """SELECT pa.patient_id FROM patient_alias pa
                JOIN patient p ON p.id = pa.patient_id
-               WHERE p.village_org_id = :village_org_id"""
+               WHERE pa.normalized_alias = :norm AND p.village_org_id = :village_org_id
+                     AND p.merged_into_id IS NULL
+               LIMIT 1"""
         ),
-        {"village_org_id": village_org_id},
+        {"norm": norm, "village_org_id": village_org_id},
     )
-    for row in result.all():
-        if normalize(row.raw_name) == norm:
-            return row.patient_id
-    return None
+    row = result.first()
+    return row.patient_id if row is not None else None
 
 
 async def resolve(

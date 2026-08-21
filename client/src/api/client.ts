@@ -111,3 +111,52 @@ export async function listOrgUnits(): Promise<OrgUnit[]> {
   const body = (await res.json()) as { org_units: OrgUnit[] };
   return body.org_units;
 }
+
+/** Mirrors server/app/schemas/identity.py. Screen 6 — docs/decisions/
+ * ADR-013.md: a plain REST pair, never the outbox. */
+export interface IdentityReviewPatient {
+  id: string;
+  name: string;
+  age: number | null;
+  sex: string | null;
+  phone: string | null;
+  village_name: string | null;
+  last_seen_reason: string | null;
+  last_seen_at: string | null;
+}
+
+export interface IdentityReviewRow {
+  id: string;
+  score: number;
+  method: string;
+  created_at: string;
+  existing: IdentityReviewPatient;
+  new: IdentityReviewPatient;
+}
+
+export async function listIdentityReviews(): Promise<IdentityReviewRow[]> {
+  const res = await fetch(`${API_BASE}/identity/reviews`, { headers: authHeader() });
+  if (!res.ok) throw new Error(`identity reviews failed: ${res.status}`);
+  const body = (await res.json()) as { reviews: IdentityReviewRow[] };
+  return body.reviews;
+}
+
+export type IdentityDecision = "merge" | "keep_separate";
+
+export interface IdentityDecisionResult {
+  id: string;
+  status: "merged" | "kept_separate";
+}
+
+export async function decideIdentityReview(
+  reviewId: string,
+  decision: IdentityDecision,
+): Promise<IdentityDecisionResult> {
+  const res = await fetch(`${API_BASE}/identity/reviews/${reviewId}/decide`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...authHeader() },
+    body: JSON.stringify({ decision }),
+  });
+  if (!res.ok) throw new Error(`decide failed: ${res.status}`);
+  return res.json();
+}

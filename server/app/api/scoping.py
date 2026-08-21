@@ -14,6 +14,11 @@ count drifts and a list can be checked — if you add one, add it here:
 6. GET /dashboard and GET /dashboard/stream (app/api/dashboard.py::_fetch_snapshot,
    docs/PHASE5_PLAN.md P5.2) — both queries in that one function, stats and
    the overdue list alike
+7. GET /identity/reviews and POST /identity/reviews/{id}/decide
+   (app/api/identity.py, docs/decisions/ADR-013.md) — scoped on the
+   pending review's new_patient_id village, which always equals its
+   candidate_patient_id's village (app/linkage/blocking.py only offers
+   same-village candidates)
 
 Returns a SQL fragment plus params — never a materialised Python list of
 ids (ADR-005: a second round trip, a silent truncation risk, and a

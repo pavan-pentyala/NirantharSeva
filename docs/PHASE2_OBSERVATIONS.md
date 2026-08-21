@@ -1033,3 +1033,64 @@ patients ("Lakshmi Devi", "Ramesh Kumar" — both in Village A). Worth
 remembering for P6.2's identity-review tests and Phase 7's integration
 tests generally: a scoring-based matcher makes "give it a unique string"
 a weaker isolation guarantee than it is everywhere else in this codebase.
+
+## `token_set_ratio` scores a name against "that name plus one more word" as a perfect 100 — not just "high"
+
+**45. Two pre-existing server tests broke the moment `push.py` started
+resolving patients through the real pipeline (P6.2): `"Test Pull Payload
+Patient"` and `"Test Pull Payload Patient Two"` were written to be two
+different patients (Phase 2/4, exact-match-only era), and under the new
+pipeline the second one silently reused the first one's identity —
+`score(normalize("Test Pull Payload Patient"), normalize("Test Pull
+Payload Patient Two"))` is exactly **100.0**, not merely high.** The
+mechanism: `token_set_ratio` computes similarity from the intersection of
+each string's token *set*; when one name's words are a strict subset of
+the other's, the shorter one matches "perfectly" against the longer one by
+that metric's own definition, regardless of how many extra words the
+longer one carries. This is a sharper trap than ordinary spelling-variant
+overlap (observation 44) — it doesn't taper off with length the way a
+typo's effect does, and "append a distinguishing word" is exactly the
+naming habit this codebase already used for "make two fixtures different."
+`tests/integration/test_push_idempotent.py` had the identical shape
+("Idempotent Test Patient" / "...Two"). **Resolved** by renaming the
+second fixture in each pair to share zero words with the first, rather
+than extending it. Worth remembering the next time a fixture needs a
+sibling: appending, not substituting, is the dangerous move.
+
+## A timestamp-suffixed "unique" name collides with its own earlier run once fuzzy matching is live
+
+**46. `client-kill-resume.spec.ts` and three other Playwright specs
+generated their patient's name as `` `<fixed prefix> ${Date.now()}` ``,
+and a second run of the same spec against the same persistent dev
+database silently reused the first run's patient:
+`score("P5.2 MO Overlay Test Patient 1787293488925", "P5.2 MO Overlay
+Test Patient 1787294374245")` is **92.86** — comfortably above
+`AUTO_ACCEPT` (92.0) — even though every digit of the millisecond
+timestamp differs.** Five of six words are identical; the timestamp is
+just one more word to `token_set_ratio`; a suffix's *sole job* being
+uniqueness doesn't make the matcher treat it any differently from a real
+word. This produced a real, non-obvious test failure: `dashboard.spec.ts`
+timed out clicking a referral row that didn't exist, because the
+`create_referral` push had silently attached to a *previous run's*
+patient instead of creating a new one — a wrong-identity bug wearing a
+timeout's clothes. **Resolved** by generating the differentiator as
+`crypto.randomUUID().slice(0, 8)` instead of `Date.now()` — a random
+value has no systematic reason to overlap with a previous run's, where a
+millisecond clock reading from a suite run minutes later still shares a
+long digit prefix, compounding the problem even before the "one word
+different" issue above. **A second pass was still needed after that fix**:
+four fixture names across four different spec files shared the two words
+"Test Patient" as boilerplate, and that alone scored 75–89 against each
+other — not enough to reuse an identity (below `AUTO_ACCEPT`), but enough
+to land in the review band and queue a spurious `identity_review` pair
+per test run, which would clutter Screen 6 in a live demo with pairs no
+human ever created. Every Playwright fixture patient name in this
+codebase now shares zero words with every other one, the same discipline
+observation 44 established server-side. The general lesson, stated once
+for both: **once a "different name" fixture is scored by a real matcher
+instead of compared for exact equality, "looks different to a human" and
+"scores as different" are no longer the same claim, at any distance —
+even two names differing in every digit of a random-looking suffix — and
+every place that manufactures a "this is a different person" fixture
+needs to be re-audited when fuzzy matching goes live, not just the ones
+touched by the current diff.**

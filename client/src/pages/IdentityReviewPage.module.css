@@ -1,0 +1,233 @@
+/* Screen 6 — tablet (docs/design_handoff_ui_screens/Screen 6 - ANM
+   Identity Review.dc.html). Values transcribed from that bundle. */
+
+.page {
+  min-height: 100vh;
+  background: var(--sheet-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-8) var(--space-4);
+  gap: var(--space-4);
+}
+
+.pageHeader {
+  width: 100%;
+  max-width: 834px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pageTitle {
+  font-size: var(--text-display);
+  font-weight: 650;
+}
+.pageSubtitle {
+  font-size: var(--text-secondary);
+  color: var(--ink-700);
+  line-height: 1.5;
+}
+
+.card {
+  width: 100%;
+  max-width: 834px;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.cardHeader {
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cardHeaderTitle {
+  font-size: var(--text-title);
+  font-weight: 650;
+}
+.cardHeaderMeta {
+  font-size: var(--text-secondary);
+  color: var(--ink-500);
+}
+
+.cardBody {
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.namePair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+.nameBox {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.nameBoxLabel {
+  font-size: var(--text-meta);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+.nameBoxValue {
+  font-size: var(--text-name);
+  font-weight: 650;
+  padding-top: 4px;
+}
+
+.disagreeBanner {
+  border: 1.5px solid var(--alert);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.disagreeBannerLabel {
+  padding: var(--space-2) var(--space-4);
+  background: var(--alert-bg);
+  font-size: var(--text-meta);
+  font-weight: 650;
+  color: #7a2a2a;
+  letter-spacing: 0.02em;
+}
+.disagreeBannerValues {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--alert-border);
+}
+.disagreeBannerValue {
+  background: var(--sheet);
+  padding: 14px var(--space-4);
+  font-size: var(--text-name);
+  font-weight: 650;
+}
+
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.tableHeaderRow {
+  display: grid;
+  grid-template-columns: 140px 1fr 1fr;
+  background: var(--sheet-2);
+}
+.tableHeaderCell {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-meta);
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-500);
+}
+.tableRow {
+  display: grid;
+  grid-template-columns: 140px 1fr 1fr;
+  border-top: 1px solid var(--hairline);
+}
+.tableRowDisagree {
+  border-top: 1.5px solid var(--alert);
+  background: var(--alert-bg);
+}
+.tableCellLabel {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-secondary);
+  color: var(--ink-700);
+  font-weight: 650;
+}
+.tableRowDisagree .tableCellLabel {
+  color: #7a2a2a;
+  font-weight: 700;
+}
+.tableCellValue {
+  padding: var(--space-3) var(--space-4);
+  font-size: 15px;
+}
+.tableRowDisagree .tableCellValue {
+  font-weight: 650;
+  color: #7a2a2a;
+}
+
+.actions {
+  padding: var(--space-4) var(--space-6) 22px;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  gap: 14px;
+}
+.actionButton {
+  flex: 1;
+  height: var(--button-height);
+  border-radius: var(--radius-sm);
+  font-size: 18px;
+  font-weight: 650;
+  border: none;
+}
+.mergeButton {
+  background: var(--accent);
+  color: #fff;
+}
+.mergeButton:hover {
+  background: var(--accent-dark);
+}
+.keepSeparateButton {
+  background: var(--sheet);
+  border: 1.5px solid var(--rule);
+  color: var(--ink-700);
+}
+
+.footnote {
+  width: 100%;
+  max-width: 600px;
+  font-size: var(--text-label);
+  color: var(--ink-500);
+  line-height: 1.5;
+}
+
+.empty {
+  width: 100%;
+  max-width: 834px;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--ink-500);
+}
+
+.offlineCard {
+  width: 100%;
+  max-width: 834px;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+.offlineTitle {
+  font-size: var(--text-title);
+  font-weight: 650;
+}
+.offlineBody {
+  font-size: var(--text-secondary);
+  color: var(--ink-700);
+  max-width: 420px;
+}

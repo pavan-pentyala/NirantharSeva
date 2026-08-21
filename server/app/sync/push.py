@@ -17,6 +17,13 @@ Phase 4.3: the toy model (Phase 1's one-field scaffold, D1/D7) is dropped —
 migration 0006, docs/PHASE4_PLAN.md's P4.3. `entity="referral"` is the only
 entity this module has ever handled since; `actor` is no longer optional,
 since every op now needs one.
+
+Phase 6 (P6.2, ADR-009): `_resolve_patient`'s `patient_name` path now
+calls app/linkage/pipeline.py's `resolve()` instead of a bare exact match.
+A `review_queue` outcome still creates the referral and a provisional
+patient in this same transaction — an ASHA's offline write never blocks on
+a nurse's decision (docs/PHASE6_PLAN.md "Traps"). The identity-review
+queue itself is decided over REST, not through this module (ADR-013).
 """
 
 import json
@@ -30,10 +37,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.api.scoping import SUBTREE_CTE, subtree_params
 from app.clock import Clock
+from app.config import get_settings
 from app.db import acquire_seq_lock
 from app.domain.actor import Actor
 from app.domain.states import State, may
 from app.instrumentation.logging import get_logger
+from app.linkage.normalize import normalize
+from app.linkage.pipeline import resolve
 from app.schemas.sync import Op, OpResult, OpStatus
 from app.sync.conflicts import decide
 from app.sync.event_log import insert_referral_event, replay_referral
@@ -211,24 +221,95 @@ def _warn_if_payload_claims_org_identity(op: Op, actor: Actor) -> None:
         )
 
 
+async def _insert_patient_alias(
+    session: AsyncSession,
+    *,
+    patient_id: uuid.UUID,
+    raw_name: str,
+    match_method: str,
+    match_score: float,
+) -> None:
+    await session.execute(
+        text(
+            """INSERT INTO patient_alias
+                 (id, patient_id, raw_name, normalized_alias, match_method, match_score)
+               VALUES
+                 (:id, :patient_id, :raw_name, :normalized_alias, :match_method, :match_score)"""
+        ),
+        {
+            "id": uuid.uuid4(),
+            "patient_id": patient_id,
+            "raw_name": raw_name,
+            "normalized_alias": normalize(raw_name),
+            "match_method": match_method,
+            "match_score": match_score,
+        },
+    )
+
+
+async def _insert_identity_review(
+    session: AsyncSession,
+    *,
+    new_patient_id: uuid.UUID,
+    candidate_patient_id: uuid.UUID,
+    score: float,
+    method: str,
+    now: Any,
+    run_id: str | None,
+) -> None:
+    """`ON CONFLICT (new_patient_id, candidate_patient_id) WHERE status =
+    'pending' DO NOTHING` is the actual gate against a duplicate open pair
+    — `uq_identity_review_open` (migration 0007), I5's sibling for
+    identity. This call site can never exercise a real collision on its
+    own: `new_patient_id` is always freshly INSERTed by the caller a few
+    lines above, so no two calls from here ever share one. The mechanism
+    is proven directly instead, by calling this function itself twice with
+    the same ids — see tests/integration/test_identity_review_dedup.py,
+    the same shape as P5.1's uq_escalation_open proof."""
+    await session.execute(
+        text(
+            """INSERT INTO identity_review
+                 (id, new_patient_id, candidate_patient_id, score, method, created_at, run_id)
+               VALUES
+                 (:id, :new_patient_id, :candidate_patient_id, :score, :method, :now, :run_id)
+               ON CONFLICT (new_patient_id, candidate_patient_id) WHERE status = 'pending'
+               DO NOTHING"""
+        ),
+        {
+            "id": uuid.uuid4(),
+            "new_patient_id": new_patient_id,
+            "candidate_patient_id": candidate_patient_id,
+            "score": score,
+            "method": method,
+            "now": now,
+            "run_id": run_id,
+        },
+    )
+
+
 async def _resolve_patient(
     session: AsyncSession,
     op: Op,
     actor: Actor,
     now: Any,
+    run_id: str | None,
 ) -> uuid.UUID | Outcome:
     """Resolve the patient a create_referral op names, or say why it can't
-    be. ADR-009: this is the one call site Phase 6 replaces with a blocked
-    fuzzy-match pipeline — nothing else in this function pre-empts that.
+    be. ADR-009's one named call site; app/linkage/pipeline.py's resolve()
+    replaces the old bare exact match as of P6.2.
 
     Two payload shapes, tried in order:
     - `patient_id`: the patient must already exist (pre-Phase-4 behaviour,
       still supported — ADR-009 adds a second path, it does not remove
       this one).
-    - `patient_name` (+ optional age, sex, phone): exact match on
-      (normalized_name, village_org_id), scoped to the actor's own org
-      unit — the design's Screen 2 shows "Village: yours", never a picked
-      village. Reuse the match if found, otherwise insert a new row.
+    - `patient_name` (+ optional age, sex, phone): resolved via the
+      blocked fuzzy-match pipeline, scoped to the actor's own org unit —
+      the design's Screen 2 shows "Village: yours", never a picked
+      village. `exact`/`alias` reuse the match. `fuzzy_auto` reuses the
+      match too, and records the spelling as a new alias. `review_queue`
+      and `new_patient` both create a new provisional patient row — the
+      former also queues an identity_review row; the write is never
+      blocked on a nurse's decision either way.
     """
     patient_id = op.payload.get("patient_id")
     if patient_id:
@@ -243,20 +324,27 @@ async def _resolve_patient(
     if not name:
         return Outcome("rejected", None, {"reason": "patient_id or patient_name is required"})
 
-    normalized_name = name.strip().lower()
     village_org_id = actor.org_unit_id
-    match = await session.execute(
-        text(
-            """SELECT id FROM patient
-               WHERE normalized_name = :normalized_name AND village_org_id = :village_org_id
-               ORDER BY created_at ASC LIMIT 1"""
-        ),
-        {"normalized_name": normalized_name, "village_org_id": village_org_id},
+    phone = op.payload.get("phone")
+    resolution = await resolve(
+        session, get_settings(), raw_name=name, phone=phone, village_org_id=village_org_id
     )
-    row = match.first()
-    if row is not None:
-        return row.id
 
+    if resolution.method in ("exact", "alias"):
+        return resolution.patient_id
+
+    if resolution.method == "fuzzy_auto":
+        await _insert_patient_alias(
+            session,
+            patient_id=resolution.patient_id,
+            raw_name=name,
+            match_method=resolution.method,
+            match_score=resolution.score,
+        )
+        return resolution.patient_id
+
+    # review_queue or new_patient: neither has an existing patient to
+    # reuse, so a new provisional row is created either way.
     new_patient_id = uuid.uuid4()
     await session.execute(
         text(
@@ -270,8 +358,8 @@ async def _resolve_patient(
         {
             "id": new_patient_id,
             "name": name,
-            "normalized_name": normalized_name,
-            "phone": op.payload.get("phone"),
+            "normalized_name": normalize(name),
+            "phone": phone,
             "village_org_id": village_org_id,
             "age": op.payload.get("age"),
             "sex": op.payload.get("sex"),
@@ -279,6 +367,18 @@ async def _resolve_patient(
             "now": now,
         },
     )
+
+    if resolution.method == "review_queue":
+        await _insert_identity_review(
+            session,
+            new_patient_id=new_patient_id,
+            candidate_patient_id=resolution.candidate_id,
+            score=resolution.score,
+            method=resolution.method,
+            now=now,
+            run_id=run_id,
+        )
+
     return new_patient_id
 
 
@@ -304,7 +404,7 @@ async def _apply_create_referral(
     _warn_if_payload_claims_org_identity(op, actor)
 
     now = clock.now()
-    resolved_patient = await _resolve_patient(session, op, actor, now)
+    resolved_patient = await _resolve_patient(session, op, actor, now, run_id)
     if isinstance(resolved_patient, Outcome):
         return resolved_patient
     patient_id = resolved_patient

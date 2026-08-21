@@ -115,6 +115,31 @@ export interface DashboardOverdueCacheRow {
   triggered_at: string;
 }
 
+/** P6.2: Screen 6's queue — fetched over REST (never SSE, ADR-013),
+ * written wholesale on every fetch/refetch, read only from here (brief
+ * §8). Mirrors app/schemas/identity.py's IdentityReviewRow field-for-field,
+ * nested patient snapshots included — Dexie stores them as-is, no need to
+ * flatten since nothing indexes into them. */
+export interface IdentityReviewPatientSnapshot {
+  id: string;
+  name: string;
+  age: number | null;
+  sex: string | null;
+  phone: string | null;
+  village_name: string | null;
+  last_seen_reason: string | null;
+  last_seen_at: string | null;
+}
+
+export interface IdentityReviewCacheRow {
+  id: string;
+  score: number;
+  method: string;
+  created_at: string;
+  existing: IdentityReviewPatientSnapshot;
+  new: IdentityReviewPatientSnapshot;
+}
+
 class NirantharSevaDB extends Dexie {
   outbox!: Table<OutboxOp, string>;
   sync_meta!: Table<SyncMetaRow, string>;
@@ -124,6 +149,7 @@ class NirantharSevaDB extends Dexie {
   org_cache!: Table<OrgCacheRow, string>;
   dashboard_stats_cache!: Table<DashboardStatsCacheRow, string>;
   dashboard_overdue_cache!: Table<DashboardOverdueCacheRow, string>;
+  identity_review_cache!: Table<IdentityReviewCacheRow, string>;
 
   constructor() {
     super("nirantharseva");
@@ -171,6 +197,11 @@ class NirantharSevaDB extends Dexie {
     this.version(5).stores({
       dashboard_stats_cache: "key",
       dashboard_overdue_cache: "escalation_id, referral_id",
+    });
+    // v6 (Phase 6, P6.2): Screen 6's review queue — client/src/sync/
+    // identityReviews.ts writes it, IdentityReviewPage reads it.
+    this.version(6).stores({
+      identity_review_cache: "id",
     });
   }
 }
