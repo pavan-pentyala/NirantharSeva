@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { getSession } from "../auth/session";
 import { DemoMarker } from "../components/DemoMarker";
+import { LogoutButton } from "../components/LogoutButton";
 import { StatePill } from "../components/StatePill";
 import { db } from "../db/schema";
 import { displayStatesFor } from "../domain/displayState";
@@ -65,13 +66,15 @@ export default function IncomingReferralsPage() {
         <div className={styles.headerLeft}>
           <div className={styles.title}>Incoming referrals</div>
           <div className={styles.subtitle}>
-            {session?.username ?? ""}
-            {org ? ` · ${org.name}` : ""}
+            {[session?.role, session?.username, org?.name].filter(Boolean).join(" · ")}
           </div>
         </div>
-        <div className={styles.syncInline}>
-          <span className={`${styles.dot} ${syncStatus.online ? styles.dotOnline : styles.dotOffline}`} />
-          {syncStatus.online ? "Connected" : "No signal"}
+        <div className={styles.headerRight}>
+          <div className={styles.syncInline}>
+            <span className={`${styles.dot} ${syncStatus.online ? styles.dotOnline : styles.dotOffline}`} />
+            {syncStatus.online ? "Connected" : "No signal"}
+          </div>
+          <LogoutButton />
         </div>
       </div>
 

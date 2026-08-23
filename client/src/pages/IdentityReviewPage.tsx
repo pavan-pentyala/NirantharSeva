@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { decideIdentityReview, type IdentityDecision } from "../api/client";
 import { getSession } from "../auth/session";
 import { DemoMarker } from "../components/DemoMarker";
+import { LogoutButton } from "../components/LogoutButton";
 import { db, type IdentityReviewCacheRow, type IdentityReviewPatientSnapshot } from "../db/schema";
 import { relativeTimeSince } from "../domain/relativeTime";
 import { useLiveQuery } from "../hooks/useLiveQuery";
@@ -103,7 +104,10 @@ export default function IdentityReviewPage() {
       <DemoMarker />
 
       <div className={styles.pageHeader}>
-        <div className={styles.pageTitle}>Is this the same person?</div>
+        <div className={styles.pageTitleRow}>
+          <div className={styles.pageTitle}>Is this the same person?</div>
+          <LogoutButton />
+        </div>
         <div className={styles.pageSubtitle}>
           One pair at a time. Fields that match sit in plain rows; fields that differ are boxed,
           so you never have to spot the difference yourself. Two clear choices — no middle option,
@@ -121,7 +125,7 @@ export default function IdentityReviewPage() {
               <div className={styles.cardHeaderMeta}>Pair 1 of {reviews.length} to review</div>
             </div>
             <div className={styles.cardHeaderMeta}>
-              {org?.name ?? ""} · {session?.username ?? ""}
+              {[session?.role, session?.username, org?.name].filter(Boolean).join(" · ")}
             </div>
           </div>
 

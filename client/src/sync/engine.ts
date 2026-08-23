@@ -14,6 +14,11 @@ import { getCursor, getDeviceId, getLamport, mergeLamport, markSyncedNow, nextLa
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_MAX_MS = 30_000;
 
+// Env var, not a constant, for the same reason SLA_SCALE/SWEEP_INTERVAL_SECONDS
+// are (docker-compose.yml) — demo and field cadence differ without a code
+// change, and it turns the E5 poll load into a tunable rather than a fixed cost.
+const SYNC_INTERVAL_MS = Number(import.meta.env.VITE_SYNC_INTERVAL_MS) || 15_000;
+
 let flushing = false;
 
 export interface CreateReferralInput {
@@ -302,7 +307,7 @@ export function startAutoFlush(): () => void {
   if (autoFlushStarted) return () => {};
   autoFlushStarted = true;
 
-  const interval = setInterval(() => void syncNow(), 15_000);
+  const interval = setInterval(() => void syncNow(), SYNC_INTERVAL_MS);
   const onOnline = () => void syncNow();
   const onVisibility = () => {
     if (document.visibilityState === "visible") void syncNow();

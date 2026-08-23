@@ -26,6 +26,7 @@ class DashboardOverdueRow(BaseModel):
     target_org_name: str | None
     reason: str | None
     asha_name: str | None
+    asha_phone: str | None
     triggered_at: datetime
 
 

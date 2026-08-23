@@ -37,6 +37,7 @@ interface DashboardOverdueRowPayload {
   target_org_name: string | null;
   reason: string | null;
   asha_name: string | null;
+  asha_phone: string | null;
   triggered_at: string;
 }
 

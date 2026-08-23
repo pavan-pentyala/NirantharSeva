@@ -186,6 +186,71 @@ async def test_transition_outside_actors_subtree_is_rejected_and_writes_zero_eve
     assert await _event_count(entity_id) == 1  # only the create; nothing appended by the reject
 
 
+async def test_create_referral_rejects_a_target_org_that_does_not_exist(
+    client, auth_headers, patient_id
+):
+    """P7.3 B1 — a target that isn't a real org unit at all."""
+    entity_id = uuid.uuid4()
+    result = await _push(
+        client,
+        auth_headers,
+        "d-asha-a",
+        _create_op(entity_id, patient_id, 1, target_org_id=str(uuid.uuid4())),
+    )
+    assert result["status"] == "rejected"
+    assert result["detail"]["reason"] == "invalid_target_org_id"
+    assert await _event_count(entity_id) == 0
+
+
+async def test_create_referral_rejects_a_lateral_target_org(client, auth_headers, patient_id):
+    """P7.3 B1 — Village B is a real org unit but not an ancestor of
+    asha_a's own org (Village A): referrals only travel up (ADR-005)."""
+    async with async_session_factory() as session:
+        village_b_id = (
+            await session.execute(text("SELECT id FROM org_unit WHERE name = 'Village B'"))
+        ).scalar_one()
+
+    entity_id = uuid.uuid4()
+    result = await _push(
+        client,
+        auth_headers,
+        "d-asha-a",
+        _create_op(entity_id, patient_id, 1, target_org_id=str(village_b_id)),
+    )
+    assert result["status"] == "rejected"
+    assert result["detail"]["reason"] == "invalid_target_org_id"
+    assert await _event_count(entity_id) == 0
+
+
+async def test_create_referral_accepts_a_target_org_above_the_immediate_parent(
+    client, auth_headers, patient_id
+):
+    """P7.3 B1/B2 — CHC Bishunpur is two levels above Village A (via
+    Sub-centre Kotwali and PHC Ramnagar), not the immediate parent, and is
+    still a valid target since the ancestor check walks the whole chain."""
+    async with async_session_factory() as session:
+        chc_id = (
+            await session.execute(text("SELECT id FROM org_unit WHERE name = 'CHC Bishunpur'"))
+        ).scalar_one()
+
+    entity_id = uuid.uuid4()
+    result = await _push(
+        client,
+        auth_headers,
+        "d-asha-a",
+        _create_op(entity_id, patient_id, 1, target_org_id=str(chc_id)),
+    )
+    assert result["status"] == "accepted"
+
+    async with async_session_factory() as session:
+        row = (
+            await session.execute(
+                text("SELECT target_org_id FROM referral WHERE id=:id"), {"id": entity_id}
+            )
+        ).one()
+    assert row.target_org_id == chc_id
+
+
 async def test_seeded_target_org_is_always_an_ancestor_of_origin_org(client):
     """Machine-checks ADR-005's assumption that origin-only filtering is
     correct for the D4 fixture: the target is always reached by ordinary

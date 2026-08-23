@@ -10,17 +10,14 @@
 > information, at lower quality.
 
 **Last updated:** 2026-08-23
-**Last session model:** Sonnet (P7.1 + P7.2 implementation).
+**Last session model:** Sonnet (P7.3 implementation).
 
 ## Current phase
 
-**Phase 7 is complete and verified — both P7.1 and P7.2.** The cohort
-generator, the loader, the property-idempotency test, the two-device
-conflict Playwright spec, and the fixture-collision guard all exist and
-are checked against real commands (see below). **P7.3 (the cuttable
-review-hardening backlog, `docs/PHASE7_PLAN.md`) has not been started and
-is not required for Phase 7 to be done — it needs its own go-ahead,
-separately, per handoff R1, same as Phase 8.**
+**Phase 7 is complete, including the cuttable P7.3 backlog.** P7.1, P7.2,
+and now P7.3 (the review-hardening backlog, `docs/PHASE7_PLAN.md`) are all
+done and verified (see below). **Phase 8 has not been started — it needs
+its own go-ahead, per handoff R1.**
 
 ## Done
 
@@ -190,11 +187,61 @@ separately, per handoff R1, same as Phase 8.**
   repeated full-suite runs. See observations 52-53 in
   `docs/OBSERVATIONS.md`'s Phase 7 section.
 
+- **P7.3** (`docs/PHASE7_PLAN.md`'s review-hardening backlog, 2026-08-23
+  session): all six A-items, all four B-items (all approved by the user —
+  see "Settled decisions" below), and all six C-items.
+  **A-items** (`client/src/`, no schema/contract change): A1 removed the
+  four dead role chips from `LoginPage.tsx`; A2 added the resolved role +
+  village to the header of Screens 1, 4, 5, 6 (Screen 1 already had it —
+  the other three gained a `[session?.role, session?.username, org?.name]
+  .filter(Boolean).join(" · ")` line); A3 (`CreateReferralPage.tsx`) sorts
+  the facility list by name and defaults to the ASHA's nearest PHC ancestor
+  via a parent-chain walk (`nearestPhcAncestor`), not `facilities[0]`; A4
+  turned out to be **already built** — `SupervisorDashboardPage.tsx` already
+  rendered `reason`/`asha_name` on overdue rows (P5.2's own work; the plan's
+  line reference was stale) — flagged, not silently skipped; A5 moved the
+  hardcoded 15000ms sync interval into `VITE_SYNC_INTERVAL_MS`
+  (`client/src/sync/engine.ts`, `docker-compose.yml`, `.env.example`),
+  matching `SLA_SCALE`/`SWEEP_INTERVAL_SECONDS`'s own precedent; A6 fixed
+  the overdue banner's copy ("no update for X past deadline" →
+  "flagged overdue X ago") rather than compute a real deadline-overshoot
+  number the client has no data for.
+  **B-items:** B2 seeded CHC Bishunpur and District Hospital Munger
+  **above** the existing PHC Ramnagar only (`app/seed.py`) — deepens the
+  ladder, no lateral choice, ADR-005 untouched, `test_org_units.py`'s exact
+  name-set assertions updated for the 6-node tree. B1 added
+  target_org_id validation to `_apply_create_referral`
+  (`app/sync/push.py`) — a new `_target_org_is_ancestor_of_origin`
+  recursive-CTE check, self-inclusive like `SUBTREE_CTE`; an invalid or
+  non-ancestor target is rejected with `reason: invalid_target_org_id`
+  before the patient-resolution side effects run; 3 new tests in
+  `test_org_scoping.py`. B3 added migration `0008` (`app_user.phone`,
+  nullable, same shape as `0005`'s `display_name`), seeded phone numbers
+  for all 5 fixture users, and wired `asha_phone` through
+  `dashboard.py`'s `_OVERDUE_QUERY` → `DashboardOverdueRow` →
+  `dashboardStream.ts` → `DashboardOverdueCacheRow` →
+  `SupervisorDashboardPage.tsx`'s overdue rows (shown under the ASHA's
+  name, not a new grid column). B4 added `clearSession()`
+  (`client/src/auth/session.ts`, clears the token only, never touches
+  Dexie — deliberately) and a `LogoutButton` component wired into the
+  header of Screens 1, 4, 5, 6.
+  **C-items:** all six are now paragraphs in the new
+  `docs/Observations_for_report.md` (not gitignored — committed); C5's
+  three ranked offline-demo paths are also now printed by `make demo`
+  itself (`Makefile`).
+  Verified: `tsc --noEmit` and `npm run build` clean; full server suite
+  **262 passed** (up from 259 — the 3 new B1 tests), `ruff check`/
+  `ruff format --check` clean, `python -m app.verify_replay` clean;
+  `alembic heads` is `0008` (B3 approved); full client Playwright suite
+  (11 specs) green against the rebuilt app; `GET /org_units` checked by
+  hand against a real running server — the 6-node tree resolves correctly
+  end to end. Six screenshots added to `docs/screenshots/` (login with no
+  chips, Screen 1/4 headers with role+village+logout, the facility
+  default, the fixed banner copy).
+
 ## Not done / in progress
 
-- P7.3 (the review-hardening backlog — role-chip removal, org-list
-  ordering, phone-column-on-app_user, etc.): not started, cuttable, needs
-  its own go-ahead. Phase 8: not started, needs its own go-ahead.
+- Phase 8: not started, needs its own go-ahead.
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
 - **A pre-existing, unrelated flake was observed, not fixed:**
@@ -392,6 +439,23 @@ heads` still `0007` (no migration); full server suite 259 passed (up from
 256), `ruff check`/`ruff format --check` clean; client `tsc --noEmit` and
 `npm run build` clean.
 
+P7.3: every criterion in `docs/PHASE7_PLAN.md`'s "P7.3 exit criteria" met.
+
+- Every A-item built (or, for A4, found already built and said so) and
+  every existing suite still green — server 262/262, client 11/11
+  Playwright specs, `tsc --noEmit` clean, `npm run build` clean.
+- Every B-item was explicitly approved by the user before any code was
+  touched (see "Settled decisions" below for the four answers) and all
+  four are built: B2 (org-tree depth), B1 (target_org_id validation, 3 new
+  tests), B3 (`app_user.phone`, migration `0008`), B4 (logout, token-only).
+  None declined.
+- Every C-item is a real paragraph in `docs/Observations_for_report.md`
+  (new, not gitignored), not a TODO; C5's ranked list is also printed by
+  `make demo` itself.
+- `alembic heads` prints `0008` — B3 was approved, so this is the expected
+  value per the plan's own exit criterion ("0007, unless B3 was approved —
+  then 0008").
+
 ## Open item for the user
 
 **The real-phone clip** (plan §8.5, the Review-III fallback) is still
@@ -402,10 +466,33 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Phase 7 is done.** Next is either P7.3 (cuttable review-hardening
-backlog) or Phase 8 (`experiments/runner.py`, E1–E6) — wait for the user
-to say which, and when. Do not start either without an explicit
-go-ahead (handoff R1).
+**Phase 7 is done, all of it, including P7.3.** Next is Phase 8
+(`experiments/runner.py`, E1–E6) — wait for the user to say to start it.
+Do not start without an explicit go-ahead (handoff R1).
+
+To verify P7.3 yourself:
+
+```bash
+docker compose up -d --build
+docker compose run --rm api sh -c "alembic upgrade head && python -m app.seed"
+docker compose run --rm api alembic heads                     # expect 0008 (head)
+docker compose exec client npx tsc --noEmit && docker compose exec client npm run build
+
+docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS nirantharseva_test;" -c "CREATE DATABASE nirantharseva_test;"
+docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
+  api sh -c "alembic upgrade head && python -m app.seed && ruff check . && ruff format --check . && pytest -q && python -m app.verify_replay"
+# expect 262 passed, clean
+
+TOKEN=$(curl -s -X POST http://localhost:8000/auth/login -H "content-type: application/json" \
+  -d '{"username":"asha_a","password":"dev"}' | python -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+curl -s http://localhost:8000/org_units -H "authorization: Bearer $TOKEN" | python -m json.tool
+# expect 6 org units: District Hospital Munger -> CHC Bishunpur -> PHC Ramnagar
+#   -> Sub-centre Kotwali -> Village A / Village B
+```
+Then log in as `asha_a`/`dev` at `http://localhost:5173/login` by hand —
+no role chips on the login screen, the header shows `ASHA` and a
+`Log out` link, and `/referrals/new`'s "Sending to" defaults to
+"PHC Ramnagar". `docker compose down -v` afterward.
 
 To verify P7.1 yourself:
 
@@ -490,14 +577,14 @@ time out intermittently (Playwright's 5s default) under a full-suite run
 with many parallel workers on this machine, unrelated to the above and
 not chased further — see observation 53.
 
-Server (`alembic heads` should print `0007`):
+Server (`alembic heads` should print `0008`):
 
 ```bash
 docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS nirantharseva_test;" -c "CREATE DATABASE nirantharseva_test;"
 docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
   api sh -c "alembic upgrade head && python -m app.seed && ruff check . && ruff format --check . && pytest -q && python -m app.verify_replay"
 ```
-Expect `259 passed`, clean.
+Expect `262 passed`, clean.
 
 Identity resolution draft sweep (Phase 6's headline number), against the
 same isolated test DB set up above — **on Windows/Git-Bash,
@@ -598,6 +685,20 @@ around changes what that spec exercises. Clean up by deleting from
   and D33 (`connectivity_profile` = device→server delay distribution)
   were taken alone under handoff §2 and are flagged in
   `docs/PHASE7_PLAN.md` for override.
+- P7.3's four B-items were all answered 2026-08-23, all approved, none
+  declined: **B2** — seed CHC Bishunpur + District Hospital Munger *above*
+  PHC Ramnagar only (the plan's own recommendation; no second PHC, no
+  lateral referral, ADR-005 untouched). **B1** — build target_org_id
+  validation, ancestor-of-origin shape (follows from B2). **B3** — add
+  `app_user.phone`, migration `0008`. **B4** — add logout, token-only,
+  Dexie untouched. Do not re-ask any of these.
+- **New standing instruction (2026-08-23, applies going forward):**
+  `docs/Observations_for_report.md` (new file, not gitignored) collects
+  results/framing/discussion material for the final written report, one
+  dated section per session. Update it at the end of every session
+  alongside `PROGRESS.md`, whenever the session produced anything
+  report-worthy — this is now in `CLAUDE.md`'s "End of every session"
+  section too.
 
 ## Known problems and workarounds
 

@@ -66,6 +66,7 @@ services:
     build: ./client
     environment:
       VITE_API_URL: http://localhost:8000
+      VITE_SYNC_INTERVAL_MS: ${VITE_SYNC_INTERVAL_MS:-15000}
     ports:
       - "5173:5173"
       - "4173:4173"  # vite preview — real PWA precache, see pwa-offline-reload.spec.ts

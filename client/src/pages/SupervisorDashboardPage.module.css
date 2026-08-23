@@ -31,6 +31,11 @@
   font-size: var(--text-secondary);
   color: var(--ink-500);
 }
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
 .liveIndicator {
   display: flex;
   align-items: center;
@@ -191,4 +196,9 @@
   font-size: 14px;
   color: var(--alert);
   font-weight: 700;
+}
+.ashaPhone {
+  font-family: var(--font-mono);
+  font-size: var(--text-meta);
+  color: var(--ink-500);
 }

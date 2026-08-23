@@ -142,6 +142,7 @@ async def test_dashboard_stats_and_overdue_row_shape(
     assert row["target_org_name"] == "PHC Ramnagar"
     assert row["reason"] == "fever"
     assert row["asha_name"] == "Sunita Kumari"  # seed.py's display_name for asha_a
+    assert row["asha_phone"] == "9811100001"  # seed.py's phone for asha_a
 
 
 async def test_overdue_list_sorted_worst_first(

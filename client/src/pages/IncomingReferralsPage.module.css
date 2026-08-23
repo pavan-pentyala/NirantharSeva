@@ -27,6 +27,11 @@
   font-size: 14px;
   color: var(--ink-500);
 }
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
 .syncInline {
   display: flex;
   align-items: center;

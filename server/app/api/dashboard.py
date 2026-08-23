@@ -56,7 +56,7 @@ _OVERDUE_QUERY = f"""
     {SUBTREE_CTE}
     SELECT e.id AS escalation_id, e.referral_id, p.name AS patient_name,
            origin_org.name AS village_name, target_org.name AS target_org_name,
-           r.reason, asha.display_name AS asha_name, e.triggered_at
+           r.reason, asha.display_name AS asha_name, asha.phone AS asha_phone, e.triggered_at
     FROM escalation e
     JOIN referral r ON r.id = e.referral_id
     JOIN patient p ON p.id = r.patient_id

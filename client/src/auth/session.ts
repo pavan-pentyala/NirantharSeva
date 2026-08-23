@@ -1,4 +1,4 @@
-import { getToken } from "../api/client";
+import { clearToken, getToken } from "../api/client";
 
 export interface Session {
   username: string;
@@ -41,4 +41,11 @@ export function getSession(): Session | null {
 
 export function isAuthenticated(): boolean {
   return getSession() !== null;
+}
+
+/** P7.3 B4: clears the token only. Deliberately does not touch Dexie — the
+ * outbox and every cache table survive a logout untouched, so a referral
+ * queued but not yet sent is never lost by logging out. */
+export function clearSession(): void {
+  clearToken();
 }

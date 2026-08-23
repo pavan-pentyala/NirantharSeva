@@ -18,6 +18,12 @@
   flex-direction: column;
   gap: 4px;
 }
+.pageTitleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
 .pageTitle {
   font-size: var(--text-display);
   font-weight: 650;

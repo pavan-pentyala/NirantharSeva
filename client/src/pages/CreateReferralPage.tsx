@@ -2,13 +2,26 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSession } from "../auth/session";
 import { DemoMarker } from "../components/DemoMarker";
-import { db } from "../db/schema";
+import { db, type OrgCacheRow } from "../db/schema";
 import { useLiveQuery } from "../hooks/useLiveQuery";
 import { createReferral } from "../sync/engine";
 import styles from "./CreateReferralPage.module.css";
 
 type Urgency = "urgent" | "soon" | "routine";
 type Sex = "M" | "F";
+
+/** Walks the org tree up from `startId` (an ASHA's own village) looking for
+ * the nearest PHC ancestor, so the facility picker can default to it — the
+ * facility she'd send to on the ordinary path, not whichever row Postgres
+ * happened to return first. */
+function nearestPhcAncestor(startId: string | undefined, orgById: Map<string, OrgCacheRow>): string | undefined {
+  let current = startId ? orgById.get(startId) : undefined;
+  while (current) {
+    if (current.type === "PHC") return current.id;
+    current = current.parent_id ? orgById.get(current.parent_id) : undefined;
+  }
+  return undefined;
+}
 
 export default function CreateReferralPage() {
   const navigate = useNavigate();
@@ -17,7 +30,11 @@ export default function CreateReferralPage() {
   const village = useLiveQuery(() => (session ? db.org_cache.get(session.orgUnitId) : undefined), [
     session?.orgUnitId,
   ]);
-  const facilities = useLiveQuery(() => db.org_cache.where("type").equals("PHC").toArray(), []) ?? [];
+  const allOrgs = useLiveQuery(() => db.org_cache.toArray(), []) ?? [];
+  const orgById = new Map(allOrgs.map((o) => [o.id, o]));
+  const facilities = [...(useLiveQuery(() => db.org_cache.where("type").equals("PHC").toArray(), []) ?? [])].sort(
+    (a, b) => a.name.localeCompare(b.name),
+  );
 
   const [patientName, setPatientName] = useState("");
   const [age, setAge] = useState("");
@@ -28,7 +45,8 @@ export default function CreateReferralPage() {
   const [targetOrgId, setTargetOrgId] = useState<string>("");
   const [saved, setSaved] = useState<{ patientName: string; savedOffline: boolean } | null>(null);
 
-  const effectiveTargetOrgId = targetOrgId || facilities[0]?.id || "";
+  const defaultFacilityId = nearestPhcAncestor(session?.orgUnitId, orgById) ?? facilities[0]?.id ?? "";
+  const effectiveTargetOrgId = targetOrgId || defaultFacilityId;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

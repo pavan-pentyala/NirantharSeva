@@ -2,10 +2,19 @@
 big enough to prove org scoping. Replaced wholesale by the P7 cohort
 generator.
 
-    PHC Ramnagar            (mo1 . supervisor1)
-     `-- Sub-centre Kotwali (anm1)
-          |-- Village A     (asha_a)
-          `-- Village B     (asha_b)
+    District Hospital Munger
+     `-- CHC Bishunpur
+          `-- PHC Ramnagar            (mo1 . supervisor1)
+               `-- Sub-centre Kotwali (anm1)
+                    |-- Village A     (asha_a)
+                    `-- Village B     (asha_b)
+
+CHC Bishunpur and District Hospital Munger were added in P7.3 (B2) to make
+the ladder's full depth visible for the panel — see docs/PHASE7_PLAN.md's
+"The one B-item that is architectural, not cosmetic" and ADR-005. Nothing
+is seeded laterally: every org unit here still has exactly one path to the
+root, so ADR-005's origin-only visibility filter stays correct. No user is
+seeded at either new level — nobody logs in above the PHC yet.
 
 Idempotent: every row uses a deterministic id derived from a stable key
 (org_unit/app_user names, patient names), so re-running never duplicates
@@ -47,7 +56,24 @@ def _stable_id(key: str) -> uuid.UUID:
 
 
 ORG_UNITS = [
-    {"key": "org:PHC Ramnagar", "name": "PHC Ramnagar", "type": "PHC", "parent": None},
+    {
+        "key": "org:District Hospital Munger",
+        "name": "District Hospital Munger",
+        "type": "DISTRICT_HOSPITAL",
+        "parent": None,
+    },
+    {
+        "key": "org:CHC Bishunpur",
+        "name": "CHC Bishunpur",
+        "type": "CHC",
+        "parent": "org:District Hospital Munger",
+    },
+    {
+        "key": "org:PHC Ramnagar",
+        "name": "PHC Ramnagar",
+        "type": "PHC",
+        "parent": "org:CHC Bishunpur",
+    },
     {
         "key": "org:Sub-centre Kotwali",
         "name": "Sub-centre Kotwali",
@@ -69,25 +95,40 @@ ORG_UNITS = [
 ]
 
 USERS = [
-    {"name": "asha_a", "role": Role.ASHA, "org": "org:Village A", "display_name": "Sunita Kumari"},
-    {"name": "asha_b", "role": Role.ASHA, "org": "org:Village B", "display_name": "Meena Devi"},
+    {
+        "name": "asha_a",
+        "role": Role.ASHA,
+        "org": "org:Village A",
+        "display_name": "Sunita Kumari",
+        "phone": "9811100001",
+    },
+    {
+        "name": "asha_b",
+        "role": Role.ASHA,
+        "org": "org:Village B",
+        "display_name": "Meena Devi",
+        "phone": "9811100002",
+    },
     {
         "name": "anm1",
         "role": Role.ANM,
         "org": "org:Sub-centre Kotwali",
         "display_name": "Radha Singh",
+        "phone": "9811100003",
     },
     {
         "name": "mo1",
         "role": Role.MO,
         "org": "org:PHC Ramnagar",
         "display_name": "Dr. Arvind Sharma",
+        "phone": "9811100004",
     },
     {
         "name": "supervisor1",
         "role": Role.SUPERVISOR,
         "org": "org:PHC Ramnagar",
         "display_name": "Vikram Rathore",
+        "phone": "9811100005",
     },
 ]
 DEV_PASSWORD = "dev"
@@ -232,11 +273,12 @@ async def seed(
             result = await s.execute(
                 text(
                     """INSERT INTO app_user
-                         (id, name, role, org_unit_id, password_hash, display_name)
-                       VALUES (:id, :name, :role, :org_unit_id, :password_hash, :display_name)
+                         (id, name, role, org_unit_id, password_hash, display_name, phone)
+                       VALUES
+                         (:id, :name, :role, :org_unit_id, :password_hash, :display_name, :phone)
                        ON CONFLICT (name) DO UPDATE
                          SET role = EXCLUDED.role, org_unit_id = EXCLUDED.org_unit_id,
-                             display_name = EXCLUDED.display_name
+                             display_name = EXCLUDED.display_name, phone = EXCLUDED.phone
                        RETURNING id"""
                 ),
                 {
@@ -246,6 +288,7 @@ async def seed(
                     "org_unit_id": org_ids[user["org"]],
                     "password_hash": password_hash,
                     "display_name": user["display_name"],
+                    "phone": user["phone"],
                 },
             )
             user_ids[user["name"]] = result.scalar_one()
@@ -353,6 +396,6 @@ async def seed(
 if __name__ == "__main__":
     asyncio.run(seed())
     print(
-        "Seeded PHC Ramnagar district: 4 org units, 5 users, 4 patients, "
+        "Seeded PHC Ramnagar district: 6 org units, 5 users, 4 patients, "
         "2 referrals, 5 SLA profiles."
     )

@@ -69,6 +69,12 @@ Update `PROGRESS.md`: what is done, what is not, the exact next step, open
 questions. Commit. Screenshot any screen that worked for the first time into
 `docs/screenshots/`.
 
+Append or update `docs/Observations_for_report.md` with anything from this
+session that belongs in the final written report — results, framing
+decisions, limitations, things worth a paragraph in Chapter 3/4/5 — as its
+own dated section. Not gitignored; this one goes in the commit, unlike
+`docs/LEARNING_PLAN.md`/`docs/PROJECT_REFERENCE.md` below.
+
 Whenever a phase or sub-phase is reported complete (the same moment
 `PROGRESS.md` gets a new "Done" entry for it), also add a section to
 `docs/LEARNING_PLAN.md` covering it, in the same shape as its existing

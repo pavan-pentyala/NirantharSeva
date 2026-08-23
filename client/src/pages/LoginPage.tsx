@@ -7,8 +7,6 @@ import { refreshOrgCache, startAutoFlush } from "../sync/engine";
 import { homeRouteFor } from "../routes";
 import styles from "./LoginPage.module.css";
 
-const ROLES = ["ASHA", "ANM", "MO", "Supervisor"];
-
 export default function LoginPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
@@ -70,19 +68,6 @@ export default function LoginPage() {
               data-testid="password-input"
             />
           </label>
-
-          <div className={styles.field}>
-            <span className={styles.label}>I am a</span>
-            {/* Display-only — the authenticated role always comes from the
-                server (ADR-006), never chosen here. Not clickable. */}
-            <div className={styles.roleGrid}>
-              {ROLES.map((role) => (
-                <div key={role} className={styles.roleChip}>
-                  {role}
-                </div>
-              ))}
-            </div>
-          </div>
 
           {error && (
             <div className={styles.error} role="alert">

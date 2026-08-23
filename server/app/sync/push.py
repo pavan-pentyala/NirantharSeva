@@ -403,6 +403,16 @@ async def _apply_create_referral(
 
     _warn_if_payload_claims_org_identity(op, actor)
 
+    raw_target_org_id = op.payload.get("target_org_id")
+    target_org_id: uuid.UUID | None = None
+    if raw_target_org_id is not None:
+        try:
+            target_org_id = uuid.UUID(str(raw_target_org_id))
+        except ValueError:
+            return Outcome("rejected", None, {"reason": "invalid_target_org_id"})
+        if not await _target_org_is_ancestor_of_origin(session, target_org_id, actor.org_unit_id):
+            return Outcome("rejected", None, {"reason": "invalid_target_org_id"})
+
     now = clock.now()
     resolved_patient = await _resolve_patient(session, op, actor, now, run_id)
     if isinstance(resolved_patient, Outcome):
@@ -424,7 +434,7 @@ async def _apply_create_referral(
             "patient_id": patient_id,
             "origin_user_id": actor.user_id,
             "origin_org_id": actor.org_unit_id,
-            "target_org_id": op.payload.get("target_org_id"),
+            "target_org_id": target_org_id,
             "reason": op.payload.get("reason"),
             "priority": op.payload.get("priority"),
             "now": now,
@@ -444,6 +454,28 @@ async def _apply_create_referral(
         run_id=run_id,
     )
     return Outcome("accepted", seq, None)
+
+
+async def _target_org_is_ancestor_of_origin(
+    session: AsyncSession, target_org_id: uuid.UUID, origin_org_id: uuid.UUID
+) -> bool:
+    """P7.3 B1: referrals travel up the tree (ADR-005 point 1), so a
+    target that is not a real ancestor of the origin — a nonexistent org,
+    a lateral facility, or anything downward — is invalid. Self-inclusive
+    (origin_org_id counts as its own ancestor here), same convention as
+    SUBTREE_CTE."""
+    query = """
+        WITH RECURSIVE ancestors AS (
+          SELECT id, parent_id FROM org_unit WHERE id = :origin_org_id
+          UNION ALL
+          SELECT o.id, o.parent_id FROM org_unit o JOIN ancestors a ON o.id = a.parent_id
+        )
+        SELECT 1 FROM ancestors WHERE id = :target_org_id
+    """
+    result = await session.execute(
+        text(query), {"origin_org_id": origin_org_id, "target_org_id": target_org_id}
+    )
+    return result.first() is not None
 
 
 async def _actor_can_see_referral_origin(

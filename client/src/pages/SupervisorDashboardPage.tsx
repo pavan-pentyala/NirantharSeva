@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getSession } from "../auth/session";
 import { DemoMarker } from "../components/DemoMarker";
+import { LogoutButton } from "../components/LogoutButton";
 import { db, type DashboardOverdueCacheRow } from "../db/schema";
 import { relativeTimeSince } from "../domain/relativeTime";
 import { useLiveQuery } from "../hooks/useLiveQuery";
@@ -85,12 +86,17 @@ export default function SupervisorDashboardPage() {
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <div className={styles.blockName}>{org?.name ?? ""}</div>
-          <div className={styles.subtitle}>Supervisor · {session?.username ?? ""}</div>
+          <div className={styles.subtitle}>
+            {[session?.role, session?.username].filter(Boolean).join(" · ")}
+          </div>
         </div>
-        <div className={styles.liveIndicator}>
-          <span className={`${styles.dot} ${live ? styles.dotLive : styles.dotConnecting}`} />
-          <span className={styles.liveLabel}>{live ? "Live" : "Connecting…"}</span>
-          {stats && <span className={styles.updatedAt}>updated {relativeTimeSince(stats.updated_at)} ago</span>}
+        <div className={styles.headerRight}>
+          <div className={styles.liveIndicator}>
+            <span className={`${styles.dot} ${live ? styles.dotLive : styles.dotConnecting}`} />
+            <span className={styles.liveLabel}>{live ? "Live" : "Connecting…"}</span>
+            {stats && <span className={styles.updatedAt}>updated {relativeTimeSince(stats.updated_at)} ago</span>}
+          </div>
+          <LogoutButton />
         </div>
       </div>
 
@@ -99,7 +105,7 @@ export default function SupervisorDashboardPage() {
           <span className={styles.bannerDot} />
           <div className={styles.bannerText}>
             <b>New overdue referral:</b> {banner.patientName}
-            {banner.village ? `, ${banner.village}` : ""} — no update for {banner.overdueBy} past deadline.
+            {banner.village ? `, ${banner.village}` : ""} — flagged overdue {banner.overdueBy} ago.
           </div>
           <button className={styles.bannerDismiss} onClick={() => setBanner(null)} aria-label="Dismiss">
             ✕
@@ -147,7 +153,10 @@ export default function SupervisorDashboardPage() {
               <div>{row.target_org_name ?? ""}</div>
               <div>{row.reason ?? ""}</div>
               <div className={styles.overdueBy}>{relativeTimeSince(row.triggered_at)}</div>
-              <div>{row.asha_name ?? ""}</div>
+              <div className={styles.asha}>
+                <div>{row.asha_name ?? ""}</div>
+                {row.asha_phone && <div className={styles.ashaPhone}>{row.asha_phone}</div>}
+              </div>
             </div>
           ))}
         </div>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSession } from "../auth/session";
 import { DemoMarker } from "../components/DemoMarker";
+import { LogoutButton } from "../components/LogoutButton";
 import { StatePill } from "../components/StatePill";
 import { SyncBand } from "../components/SyncBand";
 import { WaitingToSendPill } from "../components/WaitingToSendPill";
@@ -65,7 +66,10 @@ export default function ReferralListPage() {
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.title}>My referrals</div>
-          <div className={styles.roleChip}>{session?.role ?? ""}</div>
+          <div className={styles.headerActions}>
+            <div className={styles.roleChip}>{session?.role ?? ""}</div>
+            <LogoutButton />
+          </div>
         </div>
         <div className={styles.subtitle}>
           {session?.username ?? ""}

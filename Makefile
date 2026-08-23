@@ -23,8 +23,16 @@ test:
 		api sh -c "alembic upgrade head && pytest"
 
 # Seeds the D4 fixture district (docs/PHASE2_PLAN.md) — idempotent.
+# P7.3 C5: prints the three offline-demo paths, ranked, so the sequence is
+# not improvised while being watched. docs/IMPLEMENTATION_PLAN.md §14 ranks
+# them; docs/Observations_for_report.md has the write-up for the report.
 demo:
 	docker compose run --rm api sh -c "alembic upgrade head && python -m app.seed"
+	@echo ""
+	@echo "Offline demo paths, ranked:"
+	@echo "  1. Browser DevTools 'offline' checkbox — primary path, instant, reliable."
+	@echo "  2. docker compose stop api — exercises the retry path (E4's fault injection)."
+	@echo "  3. Real phone, airplane mode, added to home screen — fallback of last resort."
 
 experiments:
 	@echo "make experiments: not implemented until Phase 8."

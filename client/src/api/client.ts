@@ -65,6 +65,10 @@ function authHeader(): Record<string, string> {
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
 export async function login(username: string, password: string): Promise<void> {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
