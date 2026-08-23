@@ -26,6 +26,18 @@ from app.db import async_session_factory
 CONCURRENCY = 20
 
 
+def _patient_name() -> str:
+    # A shared "Cursor Test Patient {i}" prefix across all CONCURRENCY
+    # pushes shares 3 of 4 tokens between any two of them — rapidfuzz's
+    # token_set_ratio scores several pairs above IDENTITY_AUTO_ACCEPT
+    # (found while building docs/PHASE7_PLAN.md P7.2's fixture-collision
+    # guard: 191 same-village pairs scored >= REVIEW_FLOOR, several above
+    # AUTO_ACCEPT). This test only cares that 20 referrals land, not what
+    # their patients are named, so a UUID (no shared tokens at all, unlike
+    # a shared boilerplate prefix) removes the risk instead of narrowing it.
+    return str(uuid.uuid4())
+
+
 def _op(entity_id, patient_name):
     return {
         "op_id": str(uuid.uuid4()),
@@ -53,7 +65,7 @@ async def test_concurrent_pushes_leave_no_gap_in_the_pull_cursor(client, auth_he
     entity_ids = [uuid.uuid4() for _ in range(CONCURRENCY)]
     push_results = await asyncio.gather(
         *[
-            _push_one(client, auth_headers, f"d-{i}", entity_ids[i], f"Cursor Test Patient {i}")
+            _push_one(client, auth_headers, f"d-{i}", entity_ids[i], _patient_name())
             for i in range(CONCURRENCY)
         ]
     )

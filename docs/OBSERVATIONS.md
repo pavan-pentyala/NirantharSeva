@@ -1,13 +1,15 @@
-# Phase 2 — implementation observations
+# Implementation observations
 
-**Status:** Phase 2 complete (P2.1 `4dd737b`, P2.2 `5802b13`+`03fdbcf`), CI green.
-**What this file is for:** engineering memory. Things learned by building P2.1
-and P2.2 that are not derivable from the code, the ADRs, or the git history.
+**What this file is for:** engineering memory. Things learned by building
+each phase that are not derivable from the code, the ADRs, or the git
+history. Started at Phase 2 (hence the file's git history and its own
+early section headers); nothing below the Phase 2 section is Phase-2-
+specific.
 **Who it is for:** the next session. Read it before touching `server/`.
 
-**This file is append-only per phase.** Phase 3 adds its own section at the
-bottom; it never rewrites Phase 2's. `PROGRESS.md` is overwritten every session
-and cannot hold any of this.
+**This file is append-only per phase.** Each new phase adds its own section
+at the bottom; it never rewrites an earlier phase's. `PROGRESS.md` is
+overwritten every session and cannot hold any of this.
 
 **Where this sits relative to the other documents.** `docs/PHASE2_PLAN.md`'s
 "Traps specific to this phase" was written *before* the code, from reasoning —
@@ -1254,3 +1256,71 @@ migrated, freshly loaded database (`SELECT count(*) FROM referral_event
 WHERE to_state='ESCALATED'` → 0), and every loaded referral's
 `origin_org_id` equals its own generated ASHA's `org_unit_id` (joined and
 compared row by row, not sampled).
+
+## `server_lamport` is a GLOBAL max, not scoped to a referral or an org — a test that assumes otherwise gets an unpredictable tie
+
+**52. `client/tests/two-device-conflict.spec.ts`'s first draft relied on
+two devices "naturally" landing on the identical lamport for the same
+transition — device 2 pulls device 1's create event, merges its local
+lamport up to that event's lamport, then both independently compute
+`nextLamport()` for the same next transition. That only produces a real
+tie in isolation.** `app/sync/push.py::handle_push` computes
+`server_lamport` as `merge_lamport(SELECT MAX(lamport) FROM
+referral_event, [op.lamport for op in ops])` — a single number over the
+**entire table**, not filtered by referral, entity, or org — and
+`client/src/sync/engine.ts`'s `flush()` merges that global number into the
+device's own local counter after every push, while `pullAndApply()`
+separately merges in the max lamport among whatever it pulled (which is
+org-scoped, not global, a second and different channel). Under a
+full-suite Playwright run, device 1 and device 2 pick up noise from every
+other concurrently-running spec's ops through these two different
+channels, by different amounts, and the intended tie silently becomes an
+ordinary race — this spec passed 5/5 in isolation and failed roughly half
+the time as part of the full suite, with device 2 coming back
+`accepted_stale` (ADR-003 row 4) instead of the intended `conflict` (row
+5). **Fixed** by forcing device 2's local lamport, via direct `sync_meta`
+manipulation, to something guaranteed to be no less than
+`current_lamport` regardless of noise — the same deterministic technique
+`server/scripts/demo_walk.py` already uses server-side (hand-picked
+lamport values 5/10/11/20 to hit specific ADR-003 rows on purpose) — so
+row 5 holds by construction rather than by hoping two independently-noisy
+counters happen to agree.
+
+**A second, sharper version of the same bug bit the fix itself.** The
+first attempt forced device 2's lamport to a hardcoded constant
+(1,000,000). That passed for a while, then started failing again — not
+because the fix was wrong in kind, but because `server_lamport` being
+GLOBAL and PERSISTENT means every earlier run of this exact spec, against
+this same never-reset dev database, had already pushed the shared ceiling
+above 1,000,000 too, so device 1's own baseline (merged from that same
+climbing ceiling on its own create push) eventually caught up to and
+passed the constant. **Fixed for real** by reading device 1's actual
+current lamport at the moment device 2's value is set, and adding the
+margin to *that* live number instead of to a fixed constant — a hardcoded
+"big enough" number decays on a persistent shared counter; a live-relative
+margin does not, no matter how many times the spec (or the whole suite)
+has already run against the same database.
+
+## `identity-review.spec.ts` (pre-existing, untouched) times out intermittently under a 7-worker full-suite run on this machine
+
+**53. Not a P7.2 finding about anything P7.2 built — recorded because it
+was seen repeatedly while stress-testing observation 52's fix, and because
+"never hide a failure" applies to failures noticed in passing, not only
+ones a session caused.** Running the full client Playwright suite with
+Playwright's default worker count (7 on this machine) produced an
+intermittent `getByText(...).toBeVisible()` timeout (Playwright's 5s
+default) in `identity-review.spec.ts`'s existing, unmodified test, roughly
+1 run in 3, always at the same assertion (waiting on a pulled/rendered
+name after a `create_referral` push). The same class of symptom —
+`dashboard.spec.ts`'s "a new breach" test timing out — was also seen once
+this session and traced to a stale `LISTEN`/`NOTIFY` connection after
+several `docker compose down -v`/`up` cycles; restarting the `api`
+container fixed it immediately and reliably. `identity-review.spec.ts`'s
+flake did not respond the same way and was not chased further — it is
+almost certainly the same root cause as everything else in this section
+(this dev machine's `api`/Postgres pair becoming the bottleneck under 7
+concurrent Chromium instances, not a defect in the test or the feature it
+covers), but that is inference, not something this session verified the
+way the `api`-restart fix was verified. Worth a `--workers=` cap or
+per-assertion timeout budget if it recurs and starts costing real time —
+not done here because it is outside what P7.2 was asked to build.

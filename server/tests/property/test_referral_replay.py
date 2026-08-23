@@ -1,10 +1,12 @@
 """I3: for a random legal transition sequence, current_state replayed from
 the event log equals the cached value. Plan §6.5, docs/decisions/ADR-003.md.
 
-Same fresh-engine-per-example pattern as tests/property/test_permutation.py
-— app.db's module-level engine is bound to whichever event loop first used
-it, and asyncpg connections cannot cross loops, so reusing it across many
-Hypothesis examples (each its own asyncio.run()) would break.
+Fresh-engine-per-example: app.db's module-level engine is bound to
+whichever event loop first used it, and asyncpg connections cannot cross
+loops, so reusing it across many Hypothesis examples (each its own
+asyncio.run()) would break. tests/property/test_push_idempotency.py
+(docs/PHASE7_PLAN.md P7.2, D32) reuses the same pattern and the same walk
+strategy, for arbitrary retry rather than replay-vs-cache agreement.
 
 Calls handle_push() directly — no client, no login, no JWT — so it builds
 its own Actor by looking up the seeded asha_a / mo1 rows (server/app/seed.py)

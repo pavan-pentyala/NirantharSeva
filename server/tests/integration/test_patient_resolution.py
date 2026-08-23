@@ -71,7 +71,13 @@ async def test_same_name_same_village_resolves_to_one_patient_row(client, auth_h
 async def test_same_name_different_village_resolves_to_two_patient_rows(
     client, auth_headers, asha_b_auth_headers
 ):
-    name = "Test Dedup Patient Beta"
+    # Not "... Beta": that shared 3 of 4 words with this file's own "Test
+    # Dedup Patient Alpha" (87.8 via rapidfuzz — inside the review band),
+    # so pushing this to Village A first queued a spurious identity_review
+    # pair against Alpha instead of exercising a clean new_patient path.
+    # Found while building docs/PHASE7_PLAN.md P7.2's fixture-collision
+    # guard test.
+    name = "Village Split Duplicate Fixture"
     village_a_entity, village_b_entity = uuid.uuid4(), uuid.uuid4()
 
     await _push_accepted(client, auth_headers, "d-asha-a", _create_op(village_a_entity, name, 1))

@@ -4,24 +4,23 @@
 > to answer: where are we, what's next, what should I know before I start.
 > The how/why already live elsewhere — ADRs for architecture decisions,
 > `docs/PHASE*_PLAN.md` for what each phase built and why, git log for what
-> changed and when, `docs/PHASE2_OBSERVATIONS.md` for hard-won lessons
+> changed and when, `docs/OBSERVATIONS.md` for hard-won lessons
 > (append-only, one section per phase). Keep this file short: duplicating
 > those here just gives a future session more text to read for the same
 > information, at lower quality.
 
 **Last updated:** 2026-08-23
-**Last session model:** Sonnet (P7.1 implementation).
+**Last session model:** Sonnet (P7.1 + P7.2 implementation).
 
 ## Current phase
 
-**Phase 7, P7.1 is complete and verified.** The cohort generator
-(`generator/cohort.py`, `generator/timeline.py`, `generator/cli.py`), the
-config schema (`configs/e1_dropout25.yaml`), and the loader
-(`server/scripts/load_cohort.py`) all exist, are wired into
-`docker-compose.yml`, and every P7.1 exit criterion in
-`docs/PHASE7_PLAN.md` has been checked against a real command (see below).
-**P7.2 (the two missing test-layer gaps) has not been started — waiting
-for a go-ahead, per handoff R1.**
+**Phase 7 is complete and verified — both P7.1 and P7.2.** The cohort
+generator, the loader, the property-idempotency test, the two-device
+conflict Playwright spec, and the fixture-collision guard all exist and
+are checked against real commands (see below). **P7.3 (the cuttable
+review-hardening backlog, `docs/PHASE7_PLAN.md`) has not been started and
+is not required for Phase 7 to be done — it needs its own go-ahead,
+separately, per handoff R1, same as Phase 8.**
 
 ## Done
 
@@ -61,7 +60,7 @@ for a go-ahead, per handoff R1.**
   9 new/changed Playwright tests in `client/tests/dashboard.spec.ts`,
   including the plan's headline (a live breach, no reload) and one that
   specifically exercises D22's resolution path from the client side.
-  `docs/PHASE2_OBSERVATIONS.md` Phase 5 section, observations 34–40.
+  `docs/OBSERVATIONS.md` Phase 5 section, observations 34–40.
 - Phase 6 planning: D23–D27 decided with the user, ADR-013 (identity merge
   is REST, not a sync op) and ADR-014 (blocking with a missing phone)
   written. P6.1/P6.2 split approved.
@@ -88,7 +87,7 @@ for a go-ahead, per handoff R1.**
   `test_gold_set.py`; `tests/integration/test_linkage_blocking.py`,
   `test_linkage_pipeline.py`). Two real bugs found and fixed during
   verification, not just written and trusted — see observations 41–44 in
-  `docs/PHASE2_OBSERVATIONS.md`'s new Phase 6 section.
+  `docs/OBSERVATIONS.md`'s new Phase 6 section.
 - **P6.2** (`docs/PHASE6_PLAN.md` build order): migration `0007`
   (`patient.merged_into_id`, `patient_alias.normalized_alias` — no
   backfill needed, table was empty — the `identity_review` table +
@@ -159,16 +158,50 @@ for a go-ahead, per handoff R1.**
   silently made every generator-importing test (including P6.1's own)
   never actually run in CI's `server` job, and a cross-file test-pollution
   bug in `GET /org_units`'s exact-set assertion — see observations 47-51
-  in `docs/PHASE2_OBSERVATIONS.md`'s new Phase 7 section for both.
+  in `docs/OBSERVATIONS.md`'s new Phase 7 section for both.
+- **P7.2** (`docs/PHASE7_PLAN.md` build order): `tests/property/
+  test_push_idempotency.py` (D32) — same fresh-engine-per-example pattern
+  and walk strategy as `test_referral_replay.py`; Hypothesis additionally
+  draws an arbitrary retry/duplication/re-interleaving pattern over the
+  walk's ops (each op's first application stays in causal order, retries
+  can land anywhere after), asserting the final `current_state`, replayed
+  state, and — the part no single hand-picked retry can show — exactly one
+  `referral_event` row per `op_id`, however many times it was resent.
+  `client/tests/two-device-conflict.spec.ts` (§13.3's fifth E4 row) — two
+  browser contexts as the same actor (asha_a), device 2 only ever pulling
+  what device 1 created, both queuing the identical transition while
+  offline; a `page.route` gate makes the server-side commit ORDER
+  deterministic, and device 2's local lamport is forced (relative to
+  device 1's own observed value, not a hardcoded constant) to guarantee
+  ADR-003 row 5 ("conflict") rather than leaving it to chance — both fixes
+  were needed only because the first draft's "natural tie" assumption
+  broke under full-suite concurrent load; see observation 52.
+  `tests/unit/test_fixture_name_collisions.py` — a maintained registry of
+  village-scoped fixture patient names, scored pairwise with the real
+  `app.linkage.scoring.score`; found and fixed two real, previously
+  unnoticed collisions in the *existing* suite along the way
+  (`test_pull_cursor.py`'s 20 `"Cursor Test Patient {i}"` names, several
+  pairs scoring above `AUTO_ACCEPT`; `test_patient_resolution.py`'s "...
+  Beta" scoring 87.8 against its own file's "... Alpha") — fixed by
+  renaming, not by excluding them from the registry. The stale
+  `test_permutation.py` docstring reference in `test_referral_replay.py`
+  is gone. Suite now 259 (up from 256); client suite unaffected in count
+  (existing specs untouched) plus the one new spec, all green across
+  repeated full-suite runs. See observations 52-53 in
+  `docs/OBSERVATIONS.md`'s Phase 7 section.
 
 ## Not done / in progress
 
-- P7.2 (the property-idempotency test, the two-device-conflict Playwright
-  spec, the fixture-collision guard test): not started, needs the user's
-  go-ahead (handoff R1).
+- P7.3 (the review-hardening backlog — role-chip removal, org-list
+  ordering, phone-column-on-app_user, etc.): not started, cuttable, needs
+  its own go-ahead. Phase 8: not started, needs its own go-ahead.
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
-- No known open bugs.
+- **A pre-existing, unrelated flake was observed, not fixed:**
+  `client/tests/identity-review.spec.ts` (untouched this session)
+  intermittently hits Playwright's 5s default timeout under a full-suite
+  run with 7 parallel workers on this machine — not something P7.2 asked
+  for or something these changes caused; see observation 53.
 
 ## Exit criteria status
 
@@ -345,6 +378,20 @@ two-device-conflict Playwright spec, the fixture-collision guard test)
 are unaffected by any of the above and remain exactly as scoped in
 `docs/PHASE7_PLAN.md`.
 
+P7.2: every criterion in `docs/PHASE7_PLAN.md` checked against real
+commands — `pytest tests/property/test_push_idempotency.py -v` passes (20
+Hypothesis examples, each a random legal walk with a random
+retry/duplication pattern layered over it); `pytest tests/unit/
+test_fixture_name_collisions.py -v` passes both tests, including the one
+that deliberately feeds the checker a colliding pair and asserts it
+fails; `git grep -n test_permutation -- server/` is clean;
+`npx playwright test two-device-conflict.spec.ts` passes reliably (run
+standalone 4+ times and as part of the full 11-spec suite twice, after
+fixing the ordering and lamport races — see observation 52); `alembic
+heads` still `0007` (no migration); full server suite 259 passed (up from
+256), `ruff check`/`ruff format --check` clean; client `tsc --noEmit` and
+`npm run build` clean.
+
 ## Open item for the user
 
 **The real-phone clip** (plan §8.5, the Review-III fallback) is still
@@ -355,13 +402,10 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Start P7.2** on the user's go-ahead. P7.2 is the two remaining
-test-layer gaps plus the fixture-collision guard:
-`tests/property/test_push_idempotency.py` (D32), `client/tests/
-two-device-conflict.spec.ts` (§13.3's fifth E4 row), a fixture-collision
-guard test, and removing `tests/property/test_referral_replay.py`'s stale
-reference to the deleted `test_permutation.py`. No migration, no new
-screen. Model: Sonnet.
+**Phase 7 is done.** Next is either P7.3 (cuttable review-hardening
+backlog) or Phase 8 (`experiments/runner.py`, E1–E6) — wait for the user
+to say which, and when. Do not start either without an explicit
+go-ahead (handoff R1).
 
 To verify P7.1 yourself:
 
@@ -381,6 +425,26 @@ docker compose down -v   # this loaded real rows into the dev db — clean up af
 ```
 Expect: both CLI runs report identical counts, `diff` empty, the load
 reports `non_accepted=0`, `verify_replay` clean, escalated count 0.
+
+To verify P7.2 yourself:
+
+```bash
+docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS nirantharseva_test;" -c "CREATE DATABASE nirantharseva_test;"
+docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
+  api sh -c "alembic upgrade head && python -m app.seed && pytest -v tests/property/test_push_idempotency.py tests/unit/test_fixture_name_collisions.py"
+git grep -n test_permutation -- server/   # must be empty
+
+docker compose up -d --build
+docker compose run --rm api sh -c "alembic upgrade head && python -m app.seed"
+cd client && npx playwright test two-device-conflict.spec.ts
+```
+Expect 3 server tests passed, the grep empty, and the Playwright spec
+green. **Run the full client suite (`npx playwright test`, no filter) at
+least twice** if you want confidence this specific spec holds under
+concurrent load, not just in isolation — see observation 52 for why that
+distinction mattered here. `docker compose down -v` afterward; the server
+run above wrote to the isolated test DB (safe to just drop it again), but
+the Playwright runs write real rows to the dev DB.
 
 ## Verify the current state yourself
 
@@ -403,10 +467,10 @@ its real PWA precache — `offline-sync.spec.ts` only).
 docker compose up -d --build
 docker compose exec client npx tsc --noEmit && docker compose exec client npm run build
 docker compose exec -d client npm run preview        # starts :4173
-cd client && npx playwright test                     # expect 10 passed, ~2 min (see below)
+cd client && npx playwright test                     # expect 11 passed, ~2 min (see below)
 ```
 
-Two of those 10 tests need a demo-scale scheduler running first, or they'll
+Two of those 11 tests need a demo-scale scheduler running first, or they'll
 sit at their real-SLA pace instead of failing fast — start one before the
 `npx playwright test` above:
 
@@ -416,6 +480,16 @@ docker compose run --rm -d --name demo-scheduler -e SLA_SCALE=0.0004 -e SWEEP_IN
 docker stop demo-scheduler   # started with --rm, so this also removes it
 ```
 
+If the SSE-dependent dashboard test times out waiting for a live breach
+despite the scheduler logging that it escalated something, the API
+container's dedicated `LISTEN` connection is probably stale from an
+earlier `docker compose down -v`/`up` cycle in the same long session —
+`docker compose restart api` fixed this instantly and reliably when it
+happened this session. `identity-review.spec.ts` has also been seen to
+time out intermittently (Playwright's 5s default) under a full-suite run
+with many parallel workers on this machine, unrelated to the above and
+not chased further — see observation 53.
+
 Server (`alembic heads` should print `0007`):
 
 ```bash
@@ -423,7 +497,7 @@ docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS nirantharsev
 docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
   api sh -c "alembic upgrade head && python -m app.seed && ruff check . && ruff format --check . && pytest -q && python -m app.verify_replay"
 ```
-Expect `245 passed`, clean.
+Expect `259 passed`, clean.
 
 Identity resolution draft sweep (Phase 6's headline number), against the
 same isolated test DB set up above — **on Windows/Git-Bash,
@@ -456,7 +530,7 @@ docker compose exec -T db psql -U postgres -d nirantharseva -c "SELECT referral_
 docker stop sweep-demo   # started with --rm, this also removes it — docker ps -a is worth checking anyway
 ```
 **This escalates real dev-database referrals** — observations 35 and 39 in
-`docs/PHASE2_OBSERVATIONS.md` are two separate incidents this session of a
+`docs/OBSERVATIONS.md` are two separate incidents this session of a
 container from exactly this pattern outliving its tool call and quietly
 re-escalating a "fresh" reseed. Confirm `docker ps -a` shows only the four
 real services before trusting a "clean" reseed, and after `docker compose
@@ -539,7 +613,17 @@ around changes what that spec exercises. Clean up by deleting from
   generator-importing tests — every prior generator-importing test
   (including P6.1's `test_gold_set.py`) had apparently only ever been run
   through `docker compose run`, never through CI's bare job or a bare
-  local run. See observations 47-48, `docs/PHASE2_OBSERVATIONS.md`.
+  local run. See observations 47-48, `docs/OBSERVATIONS.md`.
+- **`server_lamport` (`app/sync/push.py`) is a GLOBAL max over the entire
+  `referral_event` table, not scoped to a referral or an org — any test
+  or script that assumes two devices' local lamport counters will
+  naturally agree (or naturally differ in a predictable way) is trusting
+  something that only holds in isolation, and on a persistent dev
+  database it decays further with every earlier run of the same test.**
+  `client/tests/two-device-conflict.spec.ts` hit this twice — once
+  needing a request-ordering fix (a `page.route` gate), once needing the
+  forced lamport to be computed relative to a live observed value instead
+  of a hardcoded constant. See observation 52.
 - **`GET /org_units` returns the exact global org_unit table, unscoped by
   design (P4.2) — any test that creates a real org_unit row and does not
   delete it afterward breaks `tests/integration/test_org_units.py`'s
@@ -622,7 +706,7 @@ around changes what that spec exercises. Clean up by deleting from
   can outlive the tool call and survive a subsequent `docker compose down
   -v` (which will report the network/volume "still in use" — read that
   warning, it means an orphan is still attached). See observation 35,
-  `docs/PHASE2_OBSERVATIONS.md`. Check with `docker ps -a` (not `docker
+  `docs/OBSERVATIONS.md`. Check with `docker ps -a` (not `docker
   compose ps`, which only lists service containers) after anything
   `timeout`-wrapped; clean up with `docker rm -f <name>` before trusting
   a "fresh" `down -v && up`.
@@ -646,6 +730,6 @@ around changes what that spec exercises. Clean up by deleting from
   identifiers, and your framework's required syntax — not just the code
   you meant to find. Read every match; never treat the hit count as
   pass/fail (observations 13, 29, 30).
-- **The rest of the hard-won detail lives in `docs/PHASE2_OBSERVATIONS.md`**
+- **The rest of the hard-won detail lives in `docs/OBSERVATIONS.md`**
   — read it before touching `server/` or `client/src/sync/`. Append-only,
   one section per phase, never rewritten.
