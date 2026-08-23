@@ -64,7 +64,7 @@ select = ["E", "F", "I", "UP", "B"]
 # disagreed about where `from generator... import ...` belongs relative to
 # `from app... import ...` until this was pinned explicitly. Found while
 # adding P7.1's generator-importing tests.
-known-first-party = ["app", "generator"]
+known-first-party = ["app", "generator", "experiments"]
 
 [build-system]
 requires = ["hatchling"]

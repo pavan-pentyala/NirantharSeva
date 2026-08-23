@@ -37,6 +37,7 @@ services:
     volumes:
       - ./server:/app
       - ./generator:/app/generator
+      - ./experiments:/app/experiments
       - ./configs:/app/configs
       - ./data:/app/data
       - server_venv:/app/.venv

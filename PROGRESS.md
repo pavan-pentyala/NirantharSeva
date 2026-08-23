@@ -10,19 +10,18 @@
 > information, at lower quality.
 
 **Last updated:** 2026-08-23
-**Last session model:** Opus (Phase 8 planning, plan-only — no code).
+**Last session model:** Sonnet (P8.1 implementation).
 
 ## Current phase
 
 **Phase 7 is complete, including the cuttable P7.3 backlog.** P7.1, P7.2,
 and P7.3 are all done and verified (see below).
 
-**Phase 8 is planned but not started.** `docs/PHASE8_PLAN.md`, ADR-016 and
-ADR-017 exist; D34–D37 are answered, D38/D39 were taken alone and are
-flagged for override. **The P8.1/P8.2/P8.3 split (D40) still needs the
-user's approval, and no sub-phase starts without its own go-ahead
-(handoff R1/R5).** Next session for P8.1 must be **Sonnet** — it is
-implementation.
+**Phase 8: P8.1 is done and verified.** The `experiments/` harness exists,
+E1 (45 cells) ran to completion, and every P8.1 exit criterion is checked
+against real commands (see below). **P8.2 (E2+E3+E6, `analysis.py`) and
+P8.3 (E4 evidence, E5 k6) are not started and each needs its own
+go-ahead** (handoff R1/R5) — D40's split is what governs the boundary.
 
 ## Done
 
@@ -270,10 +269,77 @@ implementation.
   did not match §13.2's specs. Real count is **63 cohort loads** (E1 45,
   E2 12, E3 3, E6 3), larger because ADR-017 grows E1 from 6 cells to 15.
 
+- **P8.1** (`docs/PHASE8_PLAN.md` build order, 2026-08-23, Sonnet):
+  `experiments/` — `grid.py` (E1's 15 cells: 3 escalation-off × dropout,
+  12 escalation-on × dropout × response_rate, `IN_TRANSIT`'s dropout_rate
+  is the swept stage per e1_dropout25.yaml's own precedent, everything
+  else pinned; deliberately smaller cohort than P7.1's demo-scale default
+  — n_patients≈22-25 per cell, flagged here since it's a wall-clock call,
+  not a correctness one), `db_lifecycle.py` (raw asyncpg CREATE/DROP
+  DATABASE against the maintenance connection — SQLAlchemy's own engine
+  can't run either outside a transaction), `cell.py` (the child process:
+  migrations via the real `alembic` CLI, `app.seed.seed()` for its
+  `sla_profile` rows, the cohort generated in-process to a tempdir exactly
+  like `tests/integration/test_load_cohort.py` already does, `get_clock()`
+  called *after* `CLOCK_MODE=simulated`/`SIM_START` are set so the FastAPI
+  app's own cached clock singleton is the one this loop steps — that
+  sharing is what keeps push's `now` and the sweep's `now` on the same
+  simulated timeline; ADR-016's whole reason a cell is one process), a
+  stepped `load()`/`sweep()` loop with a horizon past the cohort's own
+  last generated event, `resume.py` (ADR-017's `resume_escalated_referrals`
+  — the probability-`r` recovery of a genuine drop-out — **plus**
+  `reconcile_natural_continuations`, added after the identity check caught
+  a real bug, see below), `runner.py` (parent: plans cells, spawns one
+  child per (cell, seed) via `subprocess.run`, collects each child's one
+  printed JSON line into `raw.csv`/`cells.resolved.yaml`/`manifest.json`,
+  runs the r=0 identity check across every completed row). CI's
+  clock-discipline grep, `server/pyproject.toml`'s isort first-party list,
+  and `docker-compose.yml`'s `api` mount all extended to `experiments/`,
+  the same treatment `generator/` got in P7.1.
+  `tests/integration/test_load_cohort_upto_device_time.py` built first, as
+  the plan required — six tests pinning `upto_device_time`'s exact
+  boundary (`>` not `>=`) and the advancing-cutoff idempotent-resend
+  pattern P8.1's own loop depends on.
+
+  **Two real bugs found while getting E1's first real run to produce a
+  trustworthy number, not just a clean exit** — see observations 54–55,
+  `docs/OBSERVATIONS.md`, and the fuller report-facing writeup in
+  `docs/Observations_for_report.md`'s 2026-08-23 (later still) section:
+  (1) escalating a referral that was never actually going to drop out
+  silently and permanently blocked its own next planned event (a stale
+  `from_state` fixed at generation time no longer matched
+  `current_state=ESCALATED`), which **halved every escalation-on cell's
+  closure rate** until `reconcile_natural_continuations` was added — caught
+  by ADR-017's own r=0 identity check on the *first* full 45-cell run, not
+  by inspection; (2) PyJWT's `exp`/`iat` checks compare against the real
+  system clock unconditionally, which silently breaks in both directions
+  once `CLOCK_MODE=simulated` steps the same clock across real wall-clock
+  "now" — fixed in `app/api/auth.py` by checking `exp` against the
+  injected `Clock` by hand and disabling PyJWT's own real-time checks; two
+  new unit tests in `test_auth.py` pin both directions with a real
+  `SimulatedClock`. Neither is a Phase 8 API/contract change — both are
+  latent defects in already-shipped code (the loader's replay shortcut,
+  and `auth.py`'s clock-blind token check) that no earlier phase's tests
+  exercised, flagged here per handoff §7 since they touch production code
+  on my own initiative.
+
+  **E1 ran to completion**: 45 rows in `server/results/e1/raw.csv`
+  (committed — D36), `cells.resolved.yaml`, `manifest.json`. Total wall
+  time **~64.5 minutes** (`manifest.json`'s `total_wall_seconds=3869.9`),
+  ~75-115s/cell — comfortably faster than P7.1's own ~38s/load estimate
+  would suggest for 45 loads run serially with a stepped clock on top,
+  and the number P8.2/P8.3's own budget (18 more cells) should use. The
+  r=0 identity check passed, both by the runner's own automated assertion
+  and by an independent by-hand check of all nine dropout×seed pairs
+  after the fact. A single cell (`off_d25`/seed=7) re-run separately
+  reproduced its row byte-identical to the grid run's own, except
+  `wall_seconds` (timing, not data).
+
 ## Not done / in progress
 
-- Phase 8: planned, not started. D40's split needs approval; P8.1 then
-  needs its own go-ahead and must run on Sonnet.
+- **P8.2 (E2+E3+E6, `analysis.py`) and P8.3 (E4 evidence, E5 k6): not
+  started.** Each needs its own go-ahead (handoff R1/R5); D40 already
+  fixes what each contains.
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
 - **A pre-existing, unrelated flake was observed, not fixed:**
@@ -488,6 +554,27 @@ P7.3: every criterion in `docs/PHASE7_PLAN.md`'s "P7.3 exit criteria" met.
   value per the plan's own exit criterion ("0007, unless B3 was approved —
   then 0008").
 
+P8.1: every criterion in `docs/PHASE8_PLAN.md` checked against real
+commands — `MSYS_NO_PATHCONV=1 docker compose run --rm api python -m
+experiments.runner --exp E1 --out /app/results/e1/` writes all **45 rows**
+to `raw.csv`; re-running one cell (`off_d25`/seed=7) with `--cell --seeds`
+reproduces every substantive column byte-identical to the grid run's own
+row (only `wall_seconds` differs, which is timing, not data); the r=0
+identity check — escalation-on with `response_rate=0` must equal
+escalation-off's `closure_rate` at the same dropout level and seed — holds
+across all nine (dropout, seed) pairs, checked twice: once by the runner's
+own automated assertion (printed `Identity check passed`), once
+independently by reading the nine row-pairs out of `raw.csv` by eye after
+the run. `alembic heads` is `0008` (unchanged from P7.3 — P8.1 adds no
+migration). `tests/integration/test_load_cohort_upto_device_time.py`'s six
+boundary tests pass. Full server suite **269 passed** (up from 262),
+`ruff check`/`ruff format --check` clean, `python -m app.verify_replay`
+clean. **git_sha is "unknown" in every row** — `.git` isn't mounted into
+the `api` container (only `server/`, `generator/`, `experiments/`,
+`configs/`, `data/` are), so `git rev-parse HEAD` fails inside it; a
+known, accepted gap (`_git_sha()`'s own docstring), not something P8.2/P8.3
+need to fix unless a report figure actually needs real provenance.
+
 ## Open item for the user
 
 **The real-phone clip** (plan §8.5, the Review-III fallback) is still
@@ -498,20 +585,41 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Phase 8 is planned; nothing is built.** The split is approved (D40:
-P8.1 harness + E1 / P8.2 E2+E3+E6 + `analysis.py` / P8.3 E4 evidence +
-E5 k6). One gate remains: **the user gives P8.1 its own go-ahead**
-(handoff R1).
+**P8.1 is done.** Next is either **P8.2** (E2's SLA-window sweep, E3's
+threshold sweep at cohort scale, E6's full-cohort run, `analysis.py`
+turning `raw.csv`s into Chapter 4 tables/figures) or **P8.3** (E4's fault
+evidence — largely collection, not new tests, per Phase 8 planning's
+finding 4 — and E5's k6 load test). Wait for the user to say which, and
+when (handoff R1/R5) — do not start either without an explicit go-ahead.
 
-Then P8.1 starts, **on Sonnet**, from `docs/PHASE8_PLAN.md`'s build order.
-Read ADR-016 and ADR-017 first; they are the two decisions the harness's
-shape depends on, and both supersede something §12/§13 says literally.
+`experiments/grid.py` currently defines E1's cells only; P8.2 needs to add
+E2/E3/E6's cell definitions to it (D37's uniform-SLA-window rule for E2 is
+already decided, just not built) before `runner.py`/`cell.py` can run
+anything but `--exp E1`.
 
-First thing P8.1 should build, before any experiment cell: a test for
-`load_cohort.load()`'s `upto_device_time` parameter. P7.1 built it and
-tested only `None`; the stepped clock loop is its first real use, and a
-`<` vs `<=` boundary error there silently shifts every time-to-detection
-number without failing anything.
+To verify P8.1 yourself:
+
+```bash
+docker compose up -d --build
+docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS nirantharseva_test;" -c "CREATE DATABASE nirantharseva_test;"
+docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
+  api sh -c "alembic upgrade head && python -m app.seed && pytest -q tests/integration/test_load_cohort_upto_device_time.py"
+# expect 6 passed
+
+MSYS_NO_PATHCONV=1 docker compose run --rm api python -m experiments.runner --exp E1 --out /app/results/e1_check/
+```
+Expect: 45 lines logged (one per cell, each ~75-115s), `Identity check
+passed` printed near the end, `45 rows written to
+/app/results/e1_check/raw.csv`. **This takes about an hour** — each cell
+is its own fresh database and its own child process (ADR-016), and there
+is no way to shrink that without shrinking the grid itself. Compare
+`server/results/e1_check/raw.csv` against the committed
+`server/results/e1/raw.csv` — every column but `wall_seconds` should
+match row for row. Delete `server/results/e1_check/` afterward (scratch,
+not the committed run). `docker compose down -v` when done — each cell
+creates and drops its own `ns_exp_e1_*` database, but check `docker ps -a`
+first if the run was interrupted (same orphan-container risk noted below
+for the scheduler).
 
 To verify P7.3 yourself:
 
@@ -756,6 +864,30 @@ around changes what that spec exercises. Clean up by deleting from
 
 ## Known problems and workarounds
 
+- **`experiments.runner`'s `--out` needs `MSYS_NO_PATHCONV=1` too** — same
+  Git-Bash path-mangling as `--out`/`--gold` elsewhere (observation 41),
+  and it bit this exact command this session: a run without the prefix
+  exits 0, prints real-looking progress, and silently writes `raw.csv`
+  outside the repo entirely (`C:\Program Files\Git\app\results\...` on
+  this machine) instead of `server/results/e1/`. Always check the row
+  count lands in `server/results/<exp>/raw.csv` after a run, not just that
+  the command exited cleanly.
+- **Escalating a referral does not stop it from progressing on its own —
+  a loader that mechanically replays a fixed `from_state` will silently
+  and permanently block any referral that gets escalated without actually
+  dropping out.** Cost P8.1's first full E1 run a wrong headline number
+  (every escalation-on cell closing roughly half of what escalation-off
+  closed) before ADR-017's r=0 identity check caught it. See observation
+  54, `docs/OBSERVATIONS.md`, before touching `experiments/resume.py` or
+  `experiments/cell.py`'s sweep loop again.
+- **PyJWT's `exp`/`iat` checks compare against the real system clock,
+  unconditionally — under `CLOCK_MODE=simulated`, a token looks expired
+  before the simulated clock reaches real "now," and looks issued in the
+  future after it passes real "now."** `app/api/auth.py` now checks `exp`
+  against the injected `Clock` by hand instead. See observation 55,
+  `docs/OBSERVATIONS.md`, before touching token validation again — this
+  only shows up under a simulated clock that runs long enough to cross
+  real wall-clock time, which no phase before P8.1 ever did.
 - **`server/pyproject.toml` needs `pythonpath = [".."]` (pytest ini) and
   `[tool.ruff.lint.isort] known-first-party = ["app", "generator"]`, or
   `generator`-importing code behaves differently inside Docker vs. on the

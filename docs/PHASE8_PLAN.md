@@ -252,10 +252,25 @@ parent: append row to raw.csv; DROP DATABASE (unless --keep-db)
 E4 needs no cohort load. E5 needs one loaded database, twice (before and
 after indexing).
 
-At P7.1's measured ~38s per load over HTTP that is ~40 minutes of loading;
-ADR-016's in-process transport should beat it. **P8.1 must re-measure and
-record the real number** — the same discipline D31 imposed on P7.1, and for
-the same reason: a budget built on an estimate is not a budget.
+**Measured, not estimated — the same discipline D31 imposed on P7.1.** The
+first real number (a single escalation-off cell, `LOAD_STEP_HOURS=24`, D39
+compliant) came back at **590 seconds** — nowhere near tractable for 45
+cells (~7.4 hours). The reason: `load()` has no "already sent" cursor
+(`server/scripts/load_cohort.py`'s own docstring) and re-walks every
+referral row on every call, so its total cost across N checkpoints grows
+like N(N+1)/2, not N — a quadratic sensitivity to how many times it's
+called that the original design (§13.1's per-cell "stepped clock" language)
+did not anticipate. Raising `LOAD_STEP_HOURS` from 24 (daily) to 168
+(weekly) — a 7x reduction in checkpoint count — measured at **89.5
+seconds** for the same cell, a 6.6x speedup (not the naive 49x a pure
+quadratic model predicts, because per-step overhead — `sweep()`'s own
+~640 iterations across the horizon, each a real async round trip — is a
+second, roughly-linear cost floor underneath the quadratic one). At 89.5s
+per cell, **45 cells ≈ 67 minutes** — the number this phase's budget is
+actually built on, not the ~40-minutes-of-loading estimate this section
+originally carried forward from P7.1's very different (HTTP, no repeated
+re-push) measurement. See `experiments/grid.py`'s `LOAD_STEP_HOURS`
+comment for the state_entered_at-lag cost this trade accepts.
 
 **Seeds: 42, 7, 13.** 42 and 7 are already exercised by P7.1's
 reproducibility checks.
@@ -293,6 +308,34 @@ reproducibility checks.
   real use, and an off-by-one at the boundary (`<` vs `<=`) silently shifts
   which events land in which step, which moves every time-to-detection
   number without failing anything. Write its test before running E1.
+  (Checked in P8.1: the boundary is correct, inclusive at `>`, five new
+  tests in `tests/integration/test_load_cohort_upto_device_time.py`.)
+- **PyJWT validates `exp` *and* `iat` against the real system clock
+  internally, and cannot be told to use an injected one.** Under
+  `CLOCK_MODE=simulated`, this breaks from both directions as the
+  simulated clock crosses real wall-clock "now": before it, a token's
+  `exp` looks pre-expired; after it, the same token's `iat` looks
+  issued-in-the-future (`ImmatureSignatureError`). Every earlier phase's
+  simulated-clock use (P5.1/P5.2's sweep tests) called `sweep()` directly
+  and never went through `/auth/login` at all, so nothing had exercised
+  this combination before P8.1's own stepped loop did. Fixed in
+  `app/api/auth.py::_resolve_user` — `jwt.decode(..., options={
+  "verify_exp": False, "verify_iat": False})`, `exp` re-checked by hand
+  against the injected `Clock`. Two regression tests in
+  `tests/unit/test_auth.py` cover both directions. `CLOCK_MODE=real`
+  (production) was never affected.
+- **`load()`'s redundant-resend cost is quadratic in checkpoint count, not
+  linear — measure before trusting a cadence.** See `experiments/grid.py`'s
+  `LOAD_STEP_HOURS` comment and this file's "Cell counts and the
+  wall-clock budget" section: `LOAD_STEP_HOURS=24` measured at 590s/cell
+  (≈7.4h for 45 cells); `=168` measured at 89.5s/cell (≈67 min). Halving
+  the cadence does not halve the cost.
+- **`git` is not on PATH inside the `api` container** (`.git` isn't
+  mounted — only `server/`, `generator/`, `experiments/`, `configs/`,
+  `data/` are). `experiments/cell.py::_git_sha()` must catch `OSError`,
+  not just check `subprocess.run`'s return code — `check=False` prevents
+  a `CalledProcessError` on a nonzero exit, it does nothing for a missing
+  executable, which raises before there is a return code to check.
 - **Three seeds means three cohorts, not three runs of one cohort.** The
   generator is deterministic by exit criterion — same seed, byte-identical
   output. Re-running one cohort three times yields three identical rows.

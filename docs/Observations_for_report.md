@@ -186,3 +186,76 @@ module-level session factory directly into `handle_push` rather than through
 FastAPI's dependency system, so a harness that relied on
 `dependency_overrides` would have redirected reads and not writes — and
 produced plausible, wrong numbers with nothing failing.
+
+---
+
+## 2026-08-23 (later still) — Phase 8, P8.1 implementation (Sonnet)
+
+### E1's first real run silently produced a wrong headline number, and the harness's own internal check caught it before a table did
+
+`experiments/runner.py` ran the full E1 grid (45 cells: 3 dropout levels ×
+3 seeds escalation-off, plus 3 dropout × 4 response rates × 3 seeds
+escalation-on) twice before it produced a result worth keeping. The first
+run finished cleanly — exit 0, all 45 rows written, nothing crashed — and
+would have been indistinguishable from a correct result by looking at
+`raw.csv`'s shape alone. ADR-017's r=0 identity check (escalation-on with
+nobody responding to an alert must produce *exactly* the closure rate
+escalation-off does, since raising an alert nobody acts on cannot close a
+loop) failed on every one of the nine dropout × seed pairs it applies to,
+and by a large, consistent margin — escalation-on's closure rate was
+roughly half of escalation-off's, every time, not noisy in either
+direction. That consistency is what made it legible as a real bug rather
+than sampling variance: a harness contaminating its own measurement
+produces a *pattern*, not scatter.
+
+The mechanism (`docs/OBSERVATIONS.md` observation 54) was that the
+cohort loader replays each referral's events with a `from_state` fixed at
+generation time, and once the sweep escalates a referral that was never
+actually going to drop out — just running a little behind its own SLA
+window for one step, a routine timing accident at any real SLA scale —
+its next planned event is silently and permanently rejected, because the
+referral's real `current_state` has moved to `ESCALATED` underneath a
+plan that doesn't know that happened. The system's own real client never
+has this problem, because it always builds an outgoing transition from
+whatever state it last pulled, not from a plan decided in advance; the
+experiment harness, standing in for many real devices at once, took a
+shortcut a real device never takes, and the shortcut was invisible until
+an experiment used escalation *and* checked its own arithmetic against a
+known-should-be-identical baseline.
+
+**Why this belongs in the report, not just the fix log.** It is a clean,
+concrete illustration of a broader point worth making in Chapter 5's
+discussion of validity: a headline number that "runs cleanly" is not
+evidence that it is correct, and the difference between the two was
+entirely a designed internal consistency check, not code review, not a
+unit test on the harness (there wasn't one, and one testing "does
+escalation ever get resolved" in isolation would not have caught this —
+the bug only appears once a referral that was *never* going to drop out
+also gets escalated, an interaction between two mechanisms, not a defect
+in either one alone), and not eyeballing the numbers (the second run's
+`closure_rate` values are not obviously "more correct" looking than the
+first run's — both are plausible-looking fractions between 0 and 1). The
+identity check existed specifically because ADR-017 anticipated that E1's
+harness could contaminate itself and said so before any code ran; it is
+the reason this is a footnote about a caught bug rather than an
+unexamined headline number in Chapter 4.
+
+### PyJWT and a simulated clock disagree about what time it is, in both directions
+
+A second, unrelated defect surfaced while getting the harness working at
+all: `app/api/auth.py`'s token validation used PyJWT's built-in `exp`/`iat`
+checks, which compare against the real system clock unconditionally —
+there is no PyJWT option to hand it an injected clock. Every earlier
+phase's tests ran under `CLOCK_MODE=real`, where this is invisible by
+construction (the real clock and PyJWT's internal check are the same
+clock). P8.1's stepped-clock runner is the first caller to mint a token
+under `CLOCK_MODE=simulated` and then keep advancing that same clock long
+enough to cross real wall-clock "now" mid-run — before crossing, every
+token looked pre-expired; after, the identical token's `iat` looked
+issued in the future, and PyJWT rejected it for the opposite reason.
+Worth a paragraph in whichever chapter discusses the injectable-clock
+design (ADR-001): the clock discipline the codebase enforces everywhere
+else (no direct `datetime.now()` calls, checked by a CI grep) turned out
+to have one gap that no amount of grepping this codebase's own source
+would find, because the offending clock read is inside a third-party
+library's own code, not this project's.

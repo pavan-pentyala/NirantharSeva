@@ -31,11 +31,16 @@ client/blob-report/
 # others
 temp.txt
 
-# Generated experiment output — reproducible from a seed, not source.
-results/
+# P6.1's draft E3 sweep output — regenerable from a seed, never committed
+# (docs/PHASE6_PLAN.md). Phase 8 (D36, docs/PHASE8_PLAN.md) reverses this
+# for server/results/e1/, e2/, etc: those ARE committed — Chapter 4 is
+# built from them and I7 alone isn't enough reason to keep a reader from
+# seeing a number without re-running a 20-minute experiment. Path-anchored
+# so it catches only the draft directory, not every "results" anywhere.
+server/results/e3_draft/
 
 # Generated cohorts (docs/PHASE7_PLAN.md P7.1) — reproducible from a seed
-# and a config, same reasoning as results/ above.
+# and a config, same reasoning as server/results/e3_draft/ above.
 data/
 
 # Personal learning aids — not a deliverable, not for the panel.

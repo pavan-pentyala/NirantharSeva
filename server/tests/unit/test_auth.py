@@ -12,8 +12,10 @@ from datetime import UTC, datetime, timedelta
 import jwt
 from sqlalchemy import text
 
+from app.clock import SimulatedClock, get_clock
 from app.config import get_settings
 from app.db import async_session_factory
+from app.main import app
 
 FIXED_TIME = datetime(2026, 8, 18, 9, 0, tzinfo=UTC)
 
@@ -98,3 +100,66 @@ async def test_a_validly_signed_token_for_a_nonexistent_user_is_rejected(client)
 
     resp = await client.get("/sync/pull?since=0", headers={"authorization": f"Bearer {token}"})
     assert resp.status_code == 401
+
+
+async def test_token_stays_valid_under_a_simulated_clock_in_the_real_past(client):
+    """docs/PHASE8_PLAN.md / ADR-016: under CLOCK_MODE=simulated with
+    SIM_START behind the real wall clock (true for essentially every
+    experiment run), a token's exp claim is computed from the injected
+    Clock and lands in what the *real* clock would call the past. PyJWT's
+    own jwt.decode() validates exp against the real system clock — it has
+    no way to accept an injected one — so before this fix, get_current_user
+    rejected every token as expired the instant it checked. Expiry must be
+    checked against the same injected Clock login used to mint the token,
+    not against PyJWT's own real-time check."""
+    sim_clock = SimulatedClock(datetime(2020, 1, 1, tzinfo=UTC))  # well behind real "now"
+    app.dependency_overrides[get_clock] = lambda: sim_clock
+    try:
+        login_resp = await client.post(
+            "/auth/login", json={"username": "asha_a", "password": "dev"}
+        )
+        assert login_resp.status_code == 200
+        token = login_resp.json()["access_token"]
+
+        # Still within the simulated clock's own validity window — must be
+        # accepted, even though a real-time check would call it expired.
+        pull_resp = await client.get(
+            "/sync/pull?since=0", headers={"authorization": f"Bearer {token}"}
+        )
+        assert pull_resp.status_code == 200
+
+        # Advance the same simulated clock past the token's own (simulated)
+        # expiry — now it really is expired, on the clock that minted it.
+        settings = get_settings()
+        sim_clock.advance(minutes=settings.jwt_expire_minutes + 1)
+        expired_resp = await client.get(
+            "/sync/pull?since=0", headers={"authorization": f"Bearer {token}"}
+        )
+        assert expired_resp.status_code == 401
+    finally:
+        app.dependency_overrides.pop(get_clock, None)
+
+
+async def test_token_stays_valid_once_the_simulated_clock_passes_real_wall_clock_time(client):
+    """The other half of the same bug (see app/api/auth.py's module
+    docstring): PyJWT's own iat check rejects a token whose `iat` looks
+    like it was issued in the *future* relative to the real system clock
+    — which is exactly what happens once a simulated clock, advancing
+    through an experiment's stepped loop, crosses real wall-clock "now"
+    and keeps going. A token minted and used entirely on one side of that
+    line was already covered by the test above; this one straddles it."""
+    sim_clock = SimulatedClock(datetime.now(UTC) + timedelta(days=30))
+    app.dependency_overrides[get_clock] = lambda: sim_clock
+    try:
+        login_resp = await client.post(
+            "/auth/login", json={"username": "asha_a", "password": "dev"}
+        )
+        assert login_resp.status_code == 200
+        token = login_resp.json()["access_token"]
+
+        pull_resp = await client.get(
+            "/sync/pull?since=0", headers={"authorization": f"Bearer {token}"}
+        )
+        assert pull_resp.status_code == 200
+    finally:
+        app.dependency_overrides.pop(get_clock, None)

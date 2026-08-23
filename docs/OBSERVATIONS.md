@@ -1324,3 +1324,86 @@ covers), but that is inference, not something this session verified the
 way the `api`-restart fix was verified. Worth a `--workers=` cap or
 per-assertion timeout budget if it recurs and starts costing real time —
 not done here because it is outside what P7.2 was asked to build.
+
+---
+
+## Phase 8, P8.1 — the experiment harness
+
+**54. Escalation flags a referral; it does not stop the ASHA/MO from doing
+the work she was always going to do — and the loader had no way to
+express that, so it silently blocked her instead.** `server/scripts/
+load_cohort.py`'s `load()` replays each referral's pre-generated events in
+order, and each transition op carries the `from_state` the generator
+recorded when it built the walk — a static value, fixed at generation
+time. `app/sync/push.py`'s coherence check (ADR-003) accepts a transition
+only when its declared `from_state` matches the referral's actual
+`current_state`. Those two facts are consistent everywhere `load()` was
+used before Phase 8, because P7.1's own exit criterion is *zero escalated
+referrals before any sweep runs* — nothing ever changes `current_state`
+out from under a planned event. Phase 8's whole premise breaks that: the
+sweep can (and, at any real SLA window relative to the generator's 1-36h
+per-step dwell, routinely does) escalate a referral that was never
+actually going to drop out — just running a little behind its own SLA
+window for one step — and the instant that happens, `current_state`
+becomes `ESCALATED` while the referral's next planned event still says
+`from_state="IN_TRANSIT"` (or whatever it was). Coherent-looking, silently
+rejected, forever — `load()` tracks this in `report.non_accepted` but
+nothing in `experiments/cell.py` surfaced it, so every escalation-on cell
+was quietly closing roughly half of what its matched escalation-off cell
+closed, at *every* dropout level and *every* seed, and the numbers still
+looked like plausible experiment output. **Found by ADR-017's own r=0
+identity check** (escalation raised, nobody responds, must produce the
+identical closure rate escalation-off does) — a validity check specified
+for exactly this class of failure and it did its job the first time it
+ran for real. The real client never has this problem: it constructs an
+op's `from_state` from whatever its own pulled cache currently holds
+(D20), never from a plan fixed in advance — a device is stateful in the
+right direction, a mechanical event replayer is not. Fixed in
+`experiments/resume.py`'s `reconcile_natural_continuations`, run once
+after a cell's simulated horizon and its final sweep: for every cohort
+referral still `ESCALATED`, if the generator's own walk had more steps
+planned past the breached state, push them, first one's `from_state`
+overridden to `"ESCALATED"` (which resolves the open escalation row via
+D22, the same mechanism a real device's next honest transition triggers).
+A referral with no further planned events is left alone by construction —
+it really did drop out, and that is ADR-017's `resume_escalated_referrals`
+concern, not this one's. The two functions look similar (same token
+cache, same push shape) and are easy to conflate; the difference that
+matters is that reconciliation is unconditional (no `response_rate`
+draw — nothing was actually interrupted) while resumption is the
+probability-`r` recovery of a genuine drop-out.
+
+**55. PyJWT validates `exp` and `iat` against the real system clock, with
+no way to hand it an injected one — invisible under `CLOCK_MODE=real`,
+silently wrong under `CLOCK_MODE=simulated` in *both* time directions.**
+Every login-then-request round trip before Phase 8 ran under
+`CLOCK_MODE=real`, where `RealClock.now()` and PyJWT's own internal
+`datetime.now()` check agree by construction, so `app/api/auth.py`'s
+plain `jwt.decode(...)` had never been exercised against a clock that
+disagreed with real wall time. P8.1's runner sets `CLOCK_MODE=simulated`
+with `SIM_START` at the cohort's own generated start (necessarily in the
+past relative to real "now," often by months) and then steps the *same*
+clock forward through the whole simulated horizon — so every login mints
+a token whose `exp` claim comes from `SimulatedClock.now()`, and that
+value crosses real wall-clock "now" partway through a long-running cell.
+Before it crosses: the token's `exp` is in PyJWT's own idea of the past,
+so every request looks expired and `get_current_user` rejects it outright
+— found first, and looks like an ordinary expiry bug. After it crosses:
+the *same* token's `iat` now looks like it was issued in the future
+relative to real wall time, and PyJWT raises `ImmatureSignatureError`
+instead — a second, differently-shaped failure from the identical root
+cause, found only once a cell ran long enough (many simulated days) to
+cross the line from the other side, which is exactly what a stepped-clock
+experiment does and no earlier phase's simulated-clock use (P5.1's sweep
+tests, all short and synchronous) ever did. Fixed by decoding with
+`verify_exp=False, verify_iat=False` and checking `exp` by hand against
+`clock.now()` (the same injected `Clock` every other module in this
+codebase already uses, ADR-001) — `iat` has no equivalent manual check,
+because nothing in this app treats "issued in the future" as meaningful
+on its own once `exp` already governs the token's valid window. A latent
+bug in already-shipped code, not a Phase 8 API change: `CLOCK_MODE=real`
+(production, and every earlier phase's test suite) was never affected,
+because `RealClock.now()` already agrees with PyJWT's own real-time
+checks on both claims. Two new unit tests in `server/tests/unit/
+test_auth.py` pin both directions with a real `SimulatedClock` via
+`app.dependency_overrides`, not just a mocked JWT.

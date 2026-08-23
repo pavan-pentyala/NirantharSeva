@@ -16,11 +16,11 @@ jobs:
             echo "::error::Found a direct clock call outside app/clock.py. Use the injected Clock — see docs/decisions/ADR-001.md."
             exit 1
           fi
-      - name: No direct clock calls in generator/ or server/scripts (docs/PHASE7_PLAN.md)
+      - name: No direct clock calls in generator/, server/scripts, or experiments/ (docs/PHASE7_PLAN.md, docs/PHASE8_PLAN.md)
         run: |
-          if grep -rnE 'datetime\.(now|utcnow)\(|time\.time\(' generator server/scripts \
+          if grep -rnE 'datetime\.(now|utcnow)\(|time\.time\(' generator server/scripts experiments \
               --include='*.py'; then
-            echo "::error::Found a direct clock call in generator/ or server/scripts — device times must come from the config's simulated start plus generated offsets, see docs/PHASE7_PLAN.md."
+            echo "::error::Found a direct clock call in generator/, server/scripts, or experiments/ — device times and experiment time must come from the config's simulated start / the injected SimulatedClock, see docs/PHASE7_PLAN.md and docs/PHASE8_PLAN.md. Wall-clock harness timing must use time.monotonic(), never datetime.now()/time.time()."
             exit 1
           fi
 

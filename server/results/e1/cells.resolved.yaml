@@ -1,0 +1,292 @@
+exp: E1
+seeds:
+- 42
+- 7
+- 13
+sim_start: '2026-01-01T00:00:00+00:00'
+cells:
+- exp: E1
+  cell_id: off_d10
+  escalation_on: false
+  dropout_pct: 10
+  response_rate: null
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.1
+- exp: E1
+  cell_id: off_d25
+  escalation_on: false
+  dropout_pct: 25
+  response_rate: null
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.25
+- exp: E1
+  cell_id: off_d40
+  escalation_on: false
+  dropout_pct: 40
+  response_rate: null
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.4
+- exp: E1
+  cell_id: on_d10_r00
+  escalation_on: true
+  dropout_pct: 10
+  response_rate: 0.0
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.1
+- exp: E1
+  cell_id: on_d10_r025
+  escalation_on: true
+  dropout_pct: 10
+  response_rate: 0.25
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.1
+- exp: E1
+  cell_id: on_d10_r05
+  escalation_on: true
+  dropout_pct: 10
+  response_rate: 0.5
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.1
+- exp: E1
+  cell_id: on_d10_r075
+  escalation_on: true
+  dropout_pct: 10
+  response_rate: 0.75
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.1
+- exp: E1
+  cell_id: on_d25_r00
+  escalation_on: true
+  dropout_pct: 25
+  response_rate: 0.0
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.25
+- exp: E1
+  cell_id: on_d25_r025
+  escalation_on: true
+  dropout_pct: 25
+  response_rate: 0.25
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.25
+- exp: E1
+  cell_id: on_d25_r05
+  escalation_on: true
+  dropout_pct: 25
+  response_rate: 0.5
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.25
+- exp: E1
+  cell_id: on_d25_r075
+  escalation_on: true
+  dropout_pct: 25
+  response_rate: 0.75
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.25
+- exp: E1
+  cell_id: on_d40_r00
+  escalation_on: true
+  dropout_pct: 40
+  response_rate: 0.0
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.4
+- exp: E1
+  cell_id: on_d40_r025
+  escalation_on: true
+  dropout_pct: 40
+  response_rate: 0.25
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.4
+- exp: E1
+  cell_id: on_d40_r05
+  escalation_on: true
+  dropout_pct: 40
+  response_rate: 0.5
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.4
+- exp: E1
+  cell_id: on_d40_r075
+  escalation_on: true
+  dropout_pct: 40
+  response_rate: 0.75
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.4
