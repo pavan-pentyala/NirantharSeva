@@ -34,6 +34,10 @@ temp.txt
 # Generated experiment output — reproducible from a seed, not source.
 results/
 
+# Generated cohorts (docs/PHASE7_PLAN.md P7.1) — reproducible from a seed
+# and a config, same reasoning as results/ above.
+data/
+
 # Personal learning aids — not a deliverable, not for the panel.
 docs/LEARNING_PLAN.md
 docs/PROJECT_REFERENCE.md

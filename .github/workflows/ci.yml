@@ -16,6 +16,13 @@ jobs:
             echo "::error::Found a direct clock call outside app/clock.py. Use the injected Clock — see docs/decisions/ADR-001.md."
             exit 1
           fi
+      - name: No direct clock calls in generator/ or server/scripts (docs/PHASE7_PLAN.md)
+        run: |
+          if grep -rnE 'datetime\.(now|utcnow)\(|time\.time\(' generator server/scripts \
+              --include='*.py'; then
+            echo "::error::Found a direct clock call in generator/ or server/scripts — device times must come from the config's simulated start plus generated offsets, see docs/PHASE7_PLAN.md."
+            exit 1
+          fi
 
   server:
     runs-on: ubuntu-latest

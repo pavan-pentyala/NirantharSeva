@@ -37,6 +37,8 @@ services:
     volumes:
       - ./server:/app
       - ./generator:/app/generator
+      - ./configs:/app/configs
+      - ./data:/app/data
       - server_venv:/app/.venv
     command: >
       sh -c "alembic upgrade head &&

@@ -9,19 +9,19 @@
 > those here just gives a future session more text to read for the same
 > information, at lower quality.
 
-**Last updated:** 2026-08-21
-**Last session model:** Opus 5 (Phase 7 planning). Implementation is Sonnet.
+**Last updated:** 2026-08-23
+**Last session model:** Sonnet (P7.1 implementation).
 
 ## Current phase
 
-**Phase 6 is complete and verified — both P6.1 and P6.2.** Identity
-resolution is wired into the real referral-creation path, the review
-queue is a real screen, and Screen 6 works end to end in a live browser
-(screenshot in `docs/screenshots/screen6-identity-review.png`).
-
-**Phase 7 is planned, not started** — `docs/PHASE7_PLAN.md`, D28–D33,
-ADR-015. Waiting for a go-ahead to start P7.1. A ready-to-use starting
-prompt is in `temp.txt` (gitignored scratch file).
+**Phase 7, P7.1 is complete and verified.** The cohort generator
+(`generator/cohort.py`, `generator/timeline.py`, `generator/cli.py`), the
+config schema (`configs/e1_dropout25.yaml`), and the loader
+(`server/scripts/load_cohort.py`) all exist, are wired into
+`docker-compose.yml`, and every P7.1 exit criterion in
+`docs/PHASE7_PLAN.md` has been checked against a real command (see below).
+**P7.2 (the two missing test-layer gaps) has not been started — waiting
+for a go-ahead, per handoff R1.**
 
 ## Done
 
@@ -126,11 +126,46 @@ prompt is in `temp.txt` (gitignored scratch file).
   alone under handoff §2 and flagged in the plan for override), ADR-015
   (a cohort loads by replay through `/sync/push`) written. P7.1/P7.2
   split approved.
+- **P7.1** (`docs/PHASE7_PLAN.md` build order): `pyyaml` promoted to a
+  direct dependency; `configs/e1_dropout25.yaml` (the real config, §11.1's
+  schema verbatim); `generator/names.py` gained `FIRST_NAMES`/
+  `LAST_NAMES` (combinatorial pool for genuinely distinct people —
+  `NAME_VARIANT_GROUPS`/`FILLER_NAMES` untouched, still P6.1's); `generator/
+  cohort.py` (district — facilities/sub-centres/villages/ASHAs/ANMs/MOs,
+  namespaced `cohort{seed}_...`/`Cohort{seed}...` so two loads never
+  collide; patients — one `_Person` per distinct human, `duplicate_rate`
+  giving a fraction a second record, `name_variant_rate` deciding whether
+  that second record uses the group's alternate spelling or repeats the
+  first exactly; a same-village name-collision guard using the real
+  `app.linkage.scoring.score`, re-drawing on a hit and reporting the
+  count; referrals — 1-5 per patient record, weighted, to reach D31's
+  ~600 from ~200 patients); `generator/timeline.py` (the ordinary-path
+  state walk with per-stage `dropout_rate`, asserted at import time to
+  never touch ESCALATED, `push_delay_seconds` per D33's
+  `connectivity_profile`); `generator/cli.py` (config resolution +
+  defaults, writes all seven contract files, `config.resolved.yaml`
+  echoes the seed actually used — I7); `server/scripts/load_cohort.py`
+  (district by direct SQL exactly like `app/seed.py`'s pattern, referrals
+  and events replayed through the real `/sync/push` with one login per
+  generated user, `client`/`session_factory` both injectable so the same
+  function serves the real CLI and `tests/integration/test_load_cohort.py`'s
+  in-process ASGI client); `docker-compose.yml` mounts `./configs` and
+  `./data` on `api`; CI's clock-discipline grep extended to `generator/`
+  and `server/scripts`. 11 new tests (`tests/unit/test_cohort_generator.py`,
+  `tests/integration/test_load_cohort.py`), suite now 256 (up from 245).
+  Two pre-existing, environment-dependent gaps found and fixed while
+  verifying, not just written and trusted — a `pytest`/`ruff` sys.path/
+  import-sort divergence between Docker and bare `uv run` that had
+  silently made every generator-importing test (including P6.1's own)
+  never actually run in CI's `server` job, and a cross-file test-pollution
+  bug in `GET /org_units`'s exact-set assertion — see observations 47-51
+  in `docs/PHASE2_OBSERVATIONS.md`'s new Phase 7 section for both.
 
 ## Not done / in progress
 
-- P7.1: not started, needs the user's go-ahead (handoff R1). Starting
-  prompt ready in `temp.txt`.
+- P7.2 (the property-idempotency test, the two-device-conflict Playwright
+  spec, the fixture-collision guard test): not started, needs the user's
+  go-ahead (handoff R1).
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
 - No known open bugs.
@@ -260,6 +295,56 @@ renamed, not worked around — see observations 45–46 for the mechanism and
 why "unique-looking" wasn't unique enough twice over (once for the exact
 name pattern, again for the boilerplate words shared across files).
 
+P7.1: every criterion in `docs/PHASE7_PLAN.md` checked against real
+commands — `python -m generator.cli --seed 42 --config
+configs/e1_dropout25.yaml --out data/run_001/` emits all seven files
+(patients=220, referrals=621, events=2039 on the default config); run
+twice with the same seed and `diff -r` the two output directories —
+byte-identical; seed 7 against the same config produces different output
+(`diff -rq` shows every file differs); `config.resolved.yaml` carries
+`seed: 42` and every default filled in; a full cohort loaded into a
+freshly migrated, freshly seeded database through `/sync/push`
+(`python scripts/load_cohort.py --cohort data/run_001/`) reports
+`non_accepted=0`, and every loaded referral's `origin_org_id` equals its
+own generated ASHA's `org_unit_id` (checked by query, all rows); `python
+-m app.verify_replay` clean afterward (623 referrals, 2662 events
+checked, including the two seeded ones); `SELECT count(*) FROM
+referral_event WHERE to_state='ESCALATED'` is 0 on a freshly loaded
+database; `grep -rnE 'datetime\.(now|utcnow)\(|time\.time\('
+generator server/scripts` finds nothing but its own explanatory
+comments (read by hand, not just counted — PROGRESS.md's own warning
+about grep-based criteria), and CI's clock-discipline job now covers
+both directories; `alembic heads` is still `0007`; `ruff check`, `ruff
+format --check`, and the full server suite (256 passed, up from 245) are
+all green, in Docker **and** on the bare host (observations 47-48 are why
+both were checked, not just one).
+
+**The measured wall-clock cohort-load time is ~38 seconds** for the
+default ~620-referral, ~2660-op cohort (D31's own estimate was "~200
+patients / ~600 referrals" for exactly this reason — the number Phase 8's
+E1 budget is built on, per ADR-015). 54 loads (18 cells × 3 seeds) ≈ 34
+minutes total — comfortably inside a working session; no need to fall
+back to ADR-015's in-process or snapshot/restore alternatives.
+
+Two things decided alone under handoff §2, flagged here so they can be
+overruled:
+
+- **`ground_truth_identity.json`'s shape adapts P6.1's `gold_set.py`
+  pattern (`{seed, patients, queries}`) rather than copying it exactly.**
+  `patients` lists the first occurrence of each duplicated person's
+  record; `queries` lists each later occurrence, with `expected_record_id`
+  pointing back — record ids, not DB patient ids, since (per ADR-015) the
+  generator never writes to the database itself, so no DB patient id
+  exists yet when this file is written.
+- **`events.csv` has no `lamport` column** (the plan's contract table
+  doesn't list one); the loader derives it as `step + 1` (create is
+  lamport 1) rather than the generator inventing a second counter.
+
+P7.2's own three items (`tests/property/test_push_idempotency.py`, the
+two-device-conflict Playwright spec, the fixture-collision guard test)
+are unaffected by any of the above and remain exactly as scoped in
+`docs/PHASE7_PLAN.md`.
+
 ## Open item for the user
 
 **The real-phone clip** (plan §8.5, the Review-III fallback) is still
@@ -270,15 +355,32 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Start P7.1** on the user's go-ahead, in a new session, using the prompt
-in `temp.txt`. P7.1 is the cohort generator + the configs + the loader:
-`generator/cohort.py`, `timeline.py`, `cli.py` (building on P6.1's
-`names.py`/`gold_set.py`, not replacing them), `configs/`, and
-`server/scripts/load_cohort.py`. No migration (`alembic heads` stays
-`0007`), no new screen, no test-layer work — that is P7.2. Model: Sonnet.
+**Start P7.2** on the user's go-ahead. P7.2 is the two remaining
+test-layer gaps plus the fixture-collision guard:
+`tests/property/test_push_idempotency.py` (D32), `client/tests/
+two-device-conflict.spec.ts` (§13.3's fifth E4 row), a fixture-collision
+guard test, and removing `tests/property/test_referral_replay.py`'s stale
+reference to the deleted `test_permutation.py`. No migration, no new
+screen. Model: Sonnet.
 
-**P7.1 owes one number back:** the measured wall-clock time of a single
-cohort load. Phase 8's E1 budget is fifty-four of them (ADR-015).
+To verify P7.1 yourself:
+
+```bash
+docker compose up -d --build
+docker compose run --rm api sh -c "alembic upgrade head && python -m app.seed"
+MSYS_NO_PATHCONV=1 docker compose run --rm api \
+  python -m generator.cli --seed 42 --config configs/e1_dropout25.yaml --out /app/data/run_001/
+MSYS_NO_PATHCONV=1 docker compose run --rm api \
+  python -m generator.cli --seed 42 --config configs/e1_dropout25.yaml --out /app/data/run_002/
+diff -r data/run_001 data/run_002                    # must be empty — I7
+MSYS_NO_PATHCONV=1 docker compose run --rm api python scripts/load_cohort.py --cohort /app/data/run_001/
+docker compose run --rm api python -m app.verify_replay
+docker compose exec -T db psql -U postgres -d nirantharseva \
+  -c "SELECT count(*) FROM referral_event WHERE to_state='ESCALATED';"   # must be 0
+docker compose down -v   # this loaded real rows into the dev db — clean up after
+```
+Expect: both CLI runs report identical counts, `diff` empty, the load
+reports `non_accepted=0`, `verify_replay` clean, escalated count 0.
 
 ## Verify the current state yourself
 
@@ -425,6 +527,28 @@ around changes what that spec exercises. Clean up by deleting from
 
 ## Known problems and workarounds
 
+- **`server/pyproject.toml` needs `pythonpath = [".."]` (pytest ini) and
+  `[tool.ruff.lint.isort] known-first-party = ["app", "generator"]`, or
+  `generator`-importing code behaves differently inside Docker vs. on the
+  bare host** — Docker's `./generator:/app/generator` bind mount makes
+  `generator/` a real child of `server/`'s own root; on the bare host
+  (CI's `server` job, or any local `uv run pytest`/`uv run ruff` from
+  `server/`) it is a sibling directory instead, and both `pytest`'s
+  import resolution and `ruff`'s isort category detection default to
+  different answers for the two layouts. Found while adding P7.1's own
+  generator-importing tests — every prior generator-importing test
+  (including P6.1's `test_gold_set.py`) had apparently only ever been run
+  through `docker compose run`, never through CI's bare job or a bare
+  local run. See observations 47-48, `docs/PHASE2_OBSERVATIONS.md`.
+- **`GET /org_units` returns the exact global org_unit table, unscoped by
+  design (P4.2) — any test that creates a real org_unit row and does not
+  delete it afterward breaks `tests/integration/test_org_units.py`'s
+  exact-set assertion, even if its org names never collide with the
+  seeded ones.** `tests/integration/test_load_cohort.py` hit this and now
+  cleans up every row it creates (org_unit, app_user, patient, referral,
+  referral_event, etc., in FK-respecting order) in a `finally` block —
+  copy that pattern for any future test that loads a real cohort or
+  otherwise creates org units. See observation 49.
 - **Any test that creates a patient needs a name sharing NO words with
   any other test's patient name, in any file, server or client — and a
   random differentiator, never `Date.now()`.** Since P6.2,

@@ -32,6 +32,81 @@ NAME_VARIANT_GROUPS: list[list[str]] = [
     ["Ramesh Yadav", "Ramesh Yadava"],
 ]
 
+# Combinatorial pool for Phase 7's cohort generator (generator/cohort.py).
+# NOT random character noise — every entry is a real, plausible Indian
+# first or last name; combining them gives enough distinct full names for
+# a ~200-patient cohort without reusing the 35 names above, which exist
+# specifically to carry a controlled near-duplicate or true-negative
+# relationship (docs/DOMAIN_PRIMER.md "Names in test and demo data").
+# cohort.py still checks every same-village pair with app.linkage.scoring
+# and redraws on an accidental collision — this pool only makes redraws
+# rare, it does not replace the check.
+FIRST_NAMES: list[str] = [
+    "Amit",
+    "Priya",
+    "Ravi",
+    "Sita",
+    "Manoj",
+    "Pooja",
+    "Ashok",
+    "Nisha",
+    "Vijay",
+    "Rekha",
+    "Sanjay",
+    "Usha",
+    "Ajay",
+    "Kiran",
+    "Rohit",
+    "Neha",
+    "Dinesh",
+    "Sarita",
+    "Mahesh",
+    "Anjali",
+    "Ramesh",
+    "Shanti",
+    "Sunil",
+    "Kavya",
+    "Prakash",
+    "Lata",
+    "Naveen",
+    "Poonam",
+    "Yogesh",
+    "Divya",
+]
+
+LAST_NAMES: list[str] = [
+    "Sharma",
+    "Verma",
+    "Gupta",
+    "Yadav",
+    "Mishra",
+    "Pandey",
+    "Chauhan",
+    "Rathore",
+    "Tiwari",
+    "Saxena",
+    "Agarwal",
+    "Choudhary",
+    "Malik",
+    "Rana",
+    "Bhatt",
+    "Joshi",
+    "Nair",
+    "Menon",
+    "Reddy",
+    "Naidu",
+    "Khan",
+    "Sheikh",
+    "Ansari",
+    "Qureshi",
+    "Das",
+    "Barman",
+    "Bora",
+    "Hazarika",
+    "Deka",
+    "Kalita",
+]
+
 # Distinct, unrelated people — no variant relationship to each other or to
 # NAME_VARIANT_GROUPS. Used to fill out true negatives in the gold set:
 # candidates that must NOT be scored as a match to anything above.

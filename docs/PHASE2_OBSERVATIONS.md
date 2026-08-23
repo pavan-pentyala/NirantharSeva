@@ -1094,3 +1094,163 @@ even two names differing in every digit of a random-looking suffix — and
 every place that manufactures a "this is a different person" fixture
 needs to be re-audited when fuzzy matching goes live, not just the ones
 touched by the current diff.**
+
+---
+
+# Phase 7 — implementation observations
+
+**Status:** P7.1 complete (cohort generator, configs, loader). CI green.
+
+## `import generator` outside Docker's bind mount was silently resolving to nothing, in every session since P6.1
+
+**47. `docs/PHASE6_PLAN.md`'s own build order says `generator/` "is otherwise
+invisible inside the container" without the `./generator:/app/generator`
+bind mount — but nothing checked whether it was equally invisible OUTSIDE
+Docker, in CI's bare `server` job (`uv sync && uv run pytest`, no Docker
+involved) and in any local `uv run pytest` from `server/`.** It was: `server/`
+was the only directory ever added to `sys.path` (via the editable install of
+`nirantharseva-server`), and `generator/` sits one level up, a sibling, not a
+child. On a machine that happens to have a stray empty `server/generator/`
+directory (this one did — an untracked leftover from an earlier `docker
+compose up` that, for reasons unrelated to this bug, materialized a mount
+point there), `import generator` **succeeds** as an empty PEP 420 namespace
+package with no error, and `from generator.gold_set import generate` then
+fails with `ModuleNotFoundError('generator.gold_set')` — a submodule error
+that reads like a typo, not the real problem. On a fresh checkout with no
+such stray directory, the same test fails with the more honest
+`ModuleNotFoundError('generator')`. Either way, every generator-importing
+test — P6.1's own `tests/unit/test_gold_set.py` included — has apparently
+never actually run in CI's `server` job or in a bare local `uv run pytest`;
+every green run on record was a `docker compose run` run, where the bind
+mount papers over it. Found only because P7.1 added more generator-importing
+tests and one was run locally without Docker first, as a fast pre-Docker
+lint/import sanity check. **Fixed** by adding `pythonpath = [".."]` to
+`[tool.pytest.ini_options]` in `server/pyproject.toml` — pytest's own
+`pythonpath` ini option, no extra dependency. Verified by re-running the
+exact `uv run python -c "from generator.gold_set import generate"` repro
+from before the fix (fails) against after (succeeds), and by confirming
+`uv run pytest tests/unit/test_gold_set.py` gets past collection/import (it
+then fails on an unrelated, expected DB-connectivity error, since there is
+no Postgres reachable outside Docker on this machine — the point was
+collection, not a full green run). Worth checking whenever a future phase
+adds a new repo-root, non-`server/` Python directory that tests need to
+import: bind-mount visibility and `sys.path` visibility are two different
+things, and only one of them was ever actually wired up.
+
+## `ruff`'s import-sort category for a cross-boundary package depends on whether it happens to be nested under the project root at scan time
+
+**48. The same `generator` import that observation 47 fixes for pytest also
+sorted differently depending on environment, even after the fix: inside
+Docker (`generator/` bind-mounted at `/app/generator`, a real child of the
+project root `/app`), `ruff`'s isort auto-detected it as first-party
+alongside `app`, sorted alphabetically after it; on the bare host (`server/`
+as the project root, `generator/` a sibling, not a child), `ruff` sorted it
+as some other category, before `app`.** Both `ruff check .` and `ruff
+format --check .` are part of the same `docker compose run ... pytest`
+one-liner this project's own verify instructions use, and CI's `server` job
+runs the identical commands bare — so the two environments disagreed about
+the "correct" sorted order of the exact same import block in the exact same
+file, and satisfying one would fail the other. Not a hypothetical: writing
+`server/tests/unit/test_cohort_generator.py` on the bare host, letting
+`ruff check --fix` sort it, then running the identical `ruff check .` inside
+Docker immediately re-flagged it (and vice versa) — an oscillation, not a
+one-time fix. **Fixed** by adding an explicit `[tool.ruff.lint.isort]
+known-first-party = ["app", "generator"]` to `server/pyproject.toml`, so the
+category is a stated fact instead of a directory-nesting inference. Verified
+by running `ruff check` and `ruff format --check` in both environments back
+to back against the same commit and getting "all checks passed" from both.
+Same root cause as observation 47 (Docker's bind mount changes what
+`generator/` looks like from inside `/app/server`'s own directory listing),
+different tool, different symptom — worth remembering as one class of bug,
+not two, the next time something behaves differently `docker compose run`
+vs. bare.
+
+## `GET /org_units` is unscoped by design (P4.2) — which makes it an exact-set assertion any org-creating test can break, not just the ones that collide by name
+
+**49. `tests/integration/test_org_units.py` asserts the database's org_unit
+table contains *exactly* `{"PHC Ramnagar", "Sub-centre Kotwali", "Village
+A", "Village B"}` — not a subset check.** `docs/PHASE7_PLAN.md`'s own
+"Traps" section already named the collision half of this risk ("never let
+the generator's org names collide with the seeded ones — P6.2 already hit
+this once"), and `generator/cohort.py`'s names (`"Cohort{seed} PHC 1"` etc.)
+never do collide. That was not sufficient: `server/tests/integration/
+test_load_cohort.py`'s first draft created a real, non-colliding cohort
+district via `server/scripts/load_cohort.py` and left it in the database
+after the test function returned, and *any* additional row in `org_unit` —
+colliding name or not — breaks an exact-set assertion the same way. Two
+tests in a completely different file (`test_org_units.py`) started failing
+depending on test execution order, the same cross-file-pollution shape as
+observations 44-46, just via `org_unit` instead of `patient`. **Fixed** by
+giving `test_load_cohort.py` its own `finally`-blocked cleanup that deletes
+every row it created (`identity_review`, `patient_alias`, `referral_event`,
+`sync_conflict`, `escalation`, `referral`, `patient`, `app_user`,
+`org_unit`, in FK-respecting order) before the test function returns — not
+by weakening the collision-avoidance already in place, and not by loosening
+`test_org_units.py`'s assertion, since the exact-set check is the entire
+point of that test (P4.2: `GET /org_units` is deliberately unscoped, org
+names are not patient data, and that unscoped-ness is worth pinning
+precisely). **A second bug hid inside the first fix's own cleanup query**:
+the patient-selecting subquery joined through `referral` (`SELECT
+r.patient_id FROM referral r JOIN app_user u ON ... WHERE u.name LIKE
+:prefix`), but by the time the cleanup statement that deletes `patient` rows
+ran, the *previous* cleanup statement had already deleted every matching
+`referral` row — so the subquery silently returned zero rows, the `patient`
+delete deleted nothing, and the very next statement (`DELETE FROM app_user
+...`) failed on `fk_patient_created_by`, a foreign-key violation that only
+appears once the *second* test in the file runs (the first test's cleanup
+order happened to not expose it in every ordering). Re-deriving the
+patient-id subquery from `patient.village_org_id IN (SELECT id FROM
+org_unit WHERE name LIKE :org_prefix)` instead — independent of whether
+`referral` rows still exist — fixed it for good. Worth remembering
+generally: a multi-statement cleanup's later subqueries can silently see
+the *effects* of its own earlier statements, and a subquery that "obviously"
+finds the right rows needs to be checked against the state it will actually
+run in, not the state at the top of the function.
+
+## A `(index * K) % N` combinatorial name generator can accidentally re-introduce the periodicity it was built to avoid, depending on the caller's own stride
+
+**50. `generator/cohort.py`'s `_combinatorial_name(index)` originally paired
+`FIRST_NAMES[index % 30]` with `LAST_NAMES[(index // 30) % 30]` — correct in
+isolation, but `_assign_people` calls it with a *global* person index while
+assigning villages round-robin (`village_index = i % n_villages`), so within
+one village (`n_villages=8`), consecutive calls land 8 apart, not 1 apart.
+`gcd(8, 30) = 2`, so a single village's ~25-27 people only ever draw from 15
+of the 30 possible first names, each one repeated roughly twice per
+village — real-looking names individually, but visibly repetitive side by
+side in one village's patient list, and (worse) enough shared-token overlap
+between same-first-name pairs to trigger the collision-guard's re-draw path
+far more than necessary (19 re-draws became 104 on the default config when a
+first attempted fix — striding the last-name index by a small odd constant —
+traded one periodicity artifact for a different one, still keyed off the
+same underlying `index`). **Fixed** by scrambling `index` through a fixed
+multiplicative hash (`(index * 2654435761) % 2**32`, Knuth's constant) before
+splitting the result across the two name pools, which decorrelates the name
+assignment from whatever stride the caller happens to use — deterministic
+(no RNG, so reproducibility is untouched) and independent of `n_villages`.
+Re-draw count on the default config dropped to 9. Verified by re-running the
+byte-identical-twice check after the change (still identical) and by reading
+`patients.csv`'s first several rows by eye. Worth remembering: a "index // N,
+index % N" split is only collision-free against *sequential* callers; a
+caller that steps by anything other than 1 needs the split to be scrambled,
+not just correct in isolation.
+
+## `duplicate_rate`'s and `dropout_rate`'s literal config values, checked against a real load, not just reasoned about
+
+**51. The default `configs/e1_dropout25.yaml` (200 patients, 10% duplicate
+rate, 8 villages, 2 facilities) produced 220 patient records, 621 referrals,
+2039 transition events on seed 42 — close to D31's "~200 patients / ~600
+referrals" estimate without being tuned to hit it exactly (referral count
+per patient record is drawn from a `[1,2,3,4,5]` distribution weighted
+toward 2-3, not fixed).** A full load of that cohort through the real
+`/sync/push` (`server/scripts/load_cohort.py`, no `docker compose run
+--rm api sh -c "time ..."` available in the slim image — `time` isn't
+installed — so the loader's own `elapsed_seconds` field is the only source
+for this number) took **~38 seconds**, with zero non-`accepted` results.
+Phase 8's E1 budget is 18 cells × 3 seeds = 54 loads (ADR-015); 54 × 38s is
+about 34 minutes of load time total, comfortably inside a working session —
+the honest number ADR-015 required P7.1 to produce, not a projection. Also
+checked directly, not assumed: zero `ESCALATED` events anywhere in a freshly
+migrated, freshly loaded database (`SELECT count(*) FROM referral_event
+WHERE to_state='ESCALATED'` → 0), and every loaded referral's
+`origin_org_id` equals its own generated ASHA's `org_unit_id` (joined and
+compared row by row, not sampled).

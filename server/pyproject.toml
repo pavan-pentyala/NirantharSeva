@@ -14,6 +14,7 @@ dependencies = [
     "argon2-cffi>=23.1",
     "apscheduler>=3.10",
     "rapidfuzz>=3.10",
+    "pyyaml>=6.0",
 ]
 
 [dependency-groups]
@@ -30,6 +31,21 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
+# generator/ is a repo-root directory (docs/PHASE6_PLAN.md P6.1 build order
+# #9), one level above server/ (this file's own directory, pytest's
+# rootdir). Without this, `import generator` outside Docker's bind mount
+# resolves to nothing real: this machine had a stray, untracked, empty
+# server/generator/ directory (a leftover Docker Desktop bind-mount
+# artifact) that Python happily imports as an empty PEP 420 namespace
+# package with no error and no submodules, so `from generator.gold_set
+# import generate` fails with ModuleNotFoundError('generator.gold_set')
+# instead of the fixable ModuleNotFoundError('generator') a fresh checkout
+# would raise. Found while adding P7.1's generator-importing unit tests;
+# every generator-importing test (including P6.1's own
+# tests/unit/test_gold_set.py) was silently untested outside `docker
+# compose run` before this line existed — see docs/PHASE2_OBSERVATIONS.md
+# Phase 7 section.
+pythonpath = [".."]
 
 [tool.ruff]
 line-length = 100
@@ -37,6 +53,18 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+# Without this, ruff's import-sort category for `generator` depends on
+# whether it is physically nested under this file's directory — true only
+# inside Docker's bind mount (docker-compose.yml mounts ./generator at
+# /app/generator, alongside ./server's own /app/app), false on a bare
+# checkout (CI's "server" job, and any local `uv run ruff` from server/),
+# where generator/ is a sibling directory instead. The two environments
+# disagreed about where `from generator... import ...` belongs relative to
+# `from app... import ...` until this was pinned explicitly. Found while
+# adding P7.1's generator-importing tests.
+known-first-party = ["app", "generator"]
 
 [build-system]
 requires = ["hatchling"]

@@ -1,0 +1,17 @@
+# docs/PHASE7_PLAN.md "Contracts fixed now" — the config file schema.
+# E1's headline cell: a quarter of referrals never arrive (IN_TRANSIT's
+# dropout_rate is the one that matters for that experiment).
+seed: 42
+n_patients: 200 # D31
+n_villages: 8
+n_ashas: 8 # one ASHA per village
+n_facilities: 2 # PHCs above the sub-centres
+dropout_rate: # per-stage (§11.1), NOT one global rate
+  CREATED: 0.10 # never left the village
+  IN_TRANSIT: 0.25 # never arrived — E1's headline stage
+  ARRIVED: 0.10
+  TREATED: 0.05
+  BACK_REFERRED: 0.05
+name_variant_rate: 0.15 # fraction of records using a variant spelling
+duplicate_rate: 0.10 # fraction of people with a second record
+connectivity_profile: intermittent # always_online | intermittent | poor
