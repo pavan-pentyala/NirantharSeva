@@ -97,7 +97,7 @@ watched (see the `demo` target in `Makefile`). For the report:
    set up, and the fallback of last resort (the owed real-phone clip,
    `PROGRESS.md`'s open item) if a live demo cannot be risked.
 
-### Decision recorded: no "simulate offline" button was built, and why
+### Decision recorded: no "simulate offline" button was built, and why (P7.3 C6)
 
 `navigator.onLine` is read at three call sites in `client/src/sync/
 engine.ts` (lines 120, 194, 284 as of this session). A hand-rolled
@@ -108,3 +108,81 @@ any of the three paths above — costs one keystroke or one command and
 is unarguable by construction. This was a deliberate decision, not an
 unbuilt feature, and the report should state it as such if the question
 comes up.
+
+---
+
+## 2026-08-23 (later) — Phase 8 planning (Opus, plan-only)
+
+No code this session. Three documents produced: `docs/PHASE8_PLAN.md`,
+`docs/decisions/ADR-016.md`, `docs/decisions/ADR-017.md`. Two findings
+below belong in the report regardless of how Phase 8 turns out.
+
+### The headline experiment had a hole in it, found before it was run
+
+This is the most important thing to say honestly in Chapter 4, and it is a
+better story than the result it replaced.
+
+E1 was specified as *escalation {on, off} × dropout {10, 25, 40}%*,
+reporting loop closure rate. Planning it revealed that **the experiment as
+written could not produce a non-null result**. Escalation in this system
+*surfaces* a stalled referral — the sweep writes an `escalation` row and a
+`SYSTEM`-authored event, and the dashboard lights up. It never *moves* the
+referral. What moves it is a supervisor reading Screen 4 and telephoning an
+ASHA: a human act, outside the software, and deliberately so (SMS/IVR is on
+the frozen scope list, so an automated nudge was never in scope).
+
+Meanwhile the generator models drop-out as a timeline that simply stops.
+Nothing in the generator, the loader, or the server ever restarts a stopped
+timeline. So escalation-on and escalation-off would have produced
+*identical* closure rates — not as a finding, but as an artefact of a
+harness incapable of showing anything else.
+
+The resolution (ADR-017) splits E1 into two results that are never blended:
+
+- **Measured** — detection rate, time-to-detection, and escalation volume.
+  Properties of code that actually ran, with no assumption anywhere.
+- **Modelled** — loop closure as a function of an assumed
+  `escalation_response_rate`, swept over {0, 0.25, 0.5, 0.75}, with the
+  assumption stated in every caption and axis label.
+
+The reportable claim therefore changes shape: not "escalation improves loop
+closure by X%", but "escalation improves closure by X% *if supervisors act
+on a quarter of alerts*, by Y% *if they act on half*" — a frontier a reader
+can locate their own field reality on. The sentence worth defending in
+Chapter 4 is the break-even one: the responsiveness below which escalation
+costs more attention than it returns.
+
+**Why this is worth a paragraph rather than a footnote.** A panel member who
+has run a simulation will ask "what in your model responds to an alert?" —
+and the answer being *already in the design, with the assumption swept
+rather than assumed* is a much stronger position than discovering the gap
+under questioning. It also generalises: a system that measures a
+notification mechanism must be explicit about whether it is measuring
+notification or measuring the response to it, because those are different
+claims and only one of them is usually in evidence.
+
+### The instrumentation plan contradicted itself, and the schema settled it
+
+`docs/IMPLEMENTATION_PLAN.md` §12 and §13.1 give incompatible answers for how
+one experiment cell is isolated from the next: §13.1 says a fresh database
+per cell via container teardown, §12 says a `run_id` column is "how you run
+eighteen E1 cells without eighteen databases."
+
+The schema decided it. Migration `0003`'s docstring drew a line at the time
+it was written — `referral_event` and `sync_conflict` carry `run_id` because
+they "record something happening during a specific run"; cache and lookup
+tables (`referral`, `patient`, `escalation`) do not. So `run_id` cannot
+scope `app/domain/escalation.py`'s sweep, which selects from `referral`. In
+a shared database the sweep would escalate other cells' referrals, and E1's
+headline number would be measuring cross-contamination.
+
+Worth recording in the report as a small, concrete instance of a general
+point: **an instrumentation decision taken in week 3 constrained an
+experiment design in week 9, and the constraint was invisible until the
+experiment was planned in detail.** The resolution (ADR-016 — one database
+and one OS process per cell) also documents a related trap: `app/db.py`
+binds its engine at import time and `app/api/sync.py` passes the
+module-level session factory directly into `handle_push` rather than through
+FastAPI's dependency system, so a harness that relied on
+`dependency_overrides` would have redirected reads and not writes — and
+produced plausible, wrong numbers with nothing failing.

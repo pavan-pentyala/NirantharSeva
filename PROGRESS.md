@@ -10,14 +10,19 @@
 > information, at lower quality.
 
 **Last updated:** 2026-08-23
-**Last session model:** Sonnet (P7.3 implementation).
+**Last session model:** Opus (Phase 8 planning, plan-only — no code).
 
 ## Current phase
 
 **Phase 7 is complete, including the cuttable P7.3 backlog.** P7.1, P7.2,
-and now P7.3 (the review-hardening backlog, `docs/PHASE7_PLAN.md`) are all
-done and verified (see below). **Phase 8 has not been started — it needs
-its own go-ahead, per handoff R1.**
+and P7.3 are all done and verified (see below).
+
+**Phase 8 is planned but not started.** `docs/PHASE8_PLAN.md`, ADR-016 and
+ADR-017 exist; D34–D37 are answered, D38/D39 were taken alone and are
+flagged for override. **The P8.1/P8.2/P8.3 split (D40) still needs the
+user's approval, and no sub-phase starts without its own go-ahead
+(handoff R1/R5).** Next session for P8.1 must be **Sonnet** — it is
+implementation.
 
 ## Done
 
@@ -239,9 +244,35 @@ its own go-ahead, per handoff R1.**
   chips, Screen 1/4 headers with role+village+logout, the facility
   default, the fixed banner copy).
 
+- **Phase 8 planning** (2026-08-23, Opus, no code): `docs/PHASE8_PLAN.md`,
+  **ADR-016** (one database and one OS process per experiment cell) and
+  **ADR-017** (E1 reports measured detection and modelled recovery
+  separately). D34–D37 answered by the user; D38 (child-process-per-cell
+  mechanism) and D39 (`SLA_SCALE` pinned to 1.0 in experiments) taken alone
+  and flagged for override; **D40 (the P8.1/P8.2/P8.3 split) is proposed
+  and awaiting approval.**
+  Four findings the plan rests on, all verified against the repo rather
+  than assumed: (1) **E1 as specified in §13.2 could not produce a non-null
+  result** — escalation surfaces a stalled referral but never moves one, and
+  nothing in the simulation responded to an alert, so escalation-on/off
+  would have given identical closure rates by construction (ADR-017 is the
+  fix); (2) **§12 and §13.1 contradict each other on cell isolation**, and
+  `referral` has no `run_id` column by deliberate design (migration `0003`'s
+  docstring), so §12's version cannot scope the sweep; (3) **`app/db.py`
+  binds its engine at import time and `app/api/sync.py:32` passes the
+  module-level `async_session_factory` straight into `handle_push`, not via
+  `Depends`** — so `dependency_overrides` can redirect `/sync/pull` but not
+  `/sync/push`, which is why a cell needs a process boundary rather than an
+  override (ADR-016); (4) **E4 is already four-fifths built** across Phases
+  1–7 — Phase 8's E4 work is evidence collection, not new tests.
+  Also corrected: PROGRESS.md's old "54 loads (18 cells × 3 seeds)" budget
+  did not match §13.2's specs. Real count is **63 cohort loads** (E1 45,
+  E2 12, E3 3, E6 3), larger because ADR-017 grows E1 from 6 cells to 15.
+
 ## Not done / in progress
 
-- Phase 8: not started, needs its own go-ahead.
+- Phase 8: planned, not started. D40's split needs approval; P8.1 then
+  needs its own go-ahead and must run on Sonnet.
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
 - **A pre-existing, unrelated flake was observed, not fixed:**
@@ -466,9 +497,21 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Phase 7 is done, all of it, including P7.3.** Next is Phase 8
-(`experiments/runner.py`, E1–E6) — wait for the user to say to start it.
-Do not start without an explicit go-ahead (handoff R1).
+**Phase 8 is planned; nothing is built.** Two gates before code:
+
+1. **The user approves D40's sub-phase split** (P8.1 harness + E1 / P8.2
+   E2+E3+E6 + `analysis.py` / P8.3 E4 evidence + E5 k6) — handoff R5.
+2. **The user gives P8.1 its own go-ahead** — handoff R1.
+
+Then P8.1 starts, **on Sonnet**, from `docs/PHASE8_PLAN.md`'s build order.
+Read ADR-016 and ADR-017 first; they are the two decisions the harness's
+shape depends on, and both supersede something §12/§13 says literally.
+
+First thing P8.1 should build, before any experiment cell: a test for
+`load_cohort.load()`'s `upto_device_time` parameter. P7.1 built it and
+tested only `None`; the stepped clock loop is its first real use, and a
+`<` vs `<=` boundary error there silently shifts every time-to-detection
+number without failing anything.
 
 To verify P7.3 yourself:
 
@@ -692,6 +735,15 @@ around changes what that spec exercises. Clean up by deleting from
   validation, ancestor-of-origin shape (follows from B2). **B3** — add
   `app_user.phone`, migration `0008`. **B4** — add logout, token-only,
   Dexie untouched. Do not re-ask any of these.
+- Phase 8's four (D34 E1 splits into measured detection + modelled recovery
+  swept over `escalation_response_rate` — ADR-017; D35 one database and one
+  OS process per cell — ADR-016; D36 `results/` is committed minus bulk
+  per-request dumps; D37 E2's SLA sweep sets every `sla_profile.max_hours`
+  uniformly to the cell value) were answered 2026-08-23. D38 (a cell runs in
+  a child process) and D39 (`SLA_SCALE` pinned to `1.0` in every experiment
+  process) were taken alone under handoff §2 and are flagged in
+  `docs/PHASE8_PLAN.md` for override. **D40 (the sub-phase split) is the one
+  Phase 8 decision still open.**
 - **New standing instruction (2026-08-23, applies going forward):**
   `docs/Observations_for_report.md` (new file, not gitignored) collects
   results/framing/discussion material for the final written report, one
