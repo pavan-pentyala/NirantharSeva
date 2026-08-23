@@ -27,7 +27,7 @@ test("client killed mid-push resumes from inflight and lands exactly once", asyn
   // rapidfuzz once create_referral resolves through the real fuzzy
   // pipeline (P6.2) — harmless to this test itself, but it queues a
   // spurious identity_review pair that would clutter a live demo of
-  // Screen 6. See docs/PHASE2_OBSERVATIONS.md.
+  // Screen 6. See docs/OBSERVATIONS.md.
   await page1.getByTestId("new-referral-button").click();
   await page1.getByTestId("patient-name-input").fill(`Resume After Kill ${crypto.randomUUID().slice(0, 8)}`);
   await page1.getByTestId("save-referral-button").click();

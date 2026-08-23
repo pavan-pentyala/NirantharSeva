@@ -6,7 +6,7 @@
 lines, one sweep snippet, one SSE snippet, one exit criterion — this file
 supplies the rest, the way `docs/PHASE4_PLAN.md` did for §8.
 **Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
-**Read before starting P5.1:** `docs/PHASE2_OBSERVATIONS.md` (all four
+**Read before starting P5.1:** `docs/OBSERVATIONS.md` (all four
 phase sections), ADR-001 (clock), ADR-002 (advisory lock), ADR-005 (org
 scoping), ADR-011, ADR-012.
 **Design bundle:** `docs/design_handoff_ui_screens/`, Screen 4. Governs

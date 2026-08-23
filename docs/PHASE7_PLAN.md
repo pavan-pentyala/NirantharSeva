@@ -6,7 +6,7 @@
 lines, one CLI contract, one test-layer table — this file supplies the rest,
 the way `docs/PHASE6_PLAN.md` did for §10.
 **Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
-**Read before starting P7.1:** `docs/PHASE2_OBSERVATIONS.md` (all six phase
+**Read before starting P7.1:** `docs/OBSERVATIONS.md` (all six phase
 sections — observations 44–46 are the ones this phase can most easily
 repeat), `docs/DOMAIN_PRIMER.md` ("Names in test and demo data"), ADR-001
 (clock), ADR-002 (sequence lock), ADR-005 (org scoping), ADR-006 (the actor

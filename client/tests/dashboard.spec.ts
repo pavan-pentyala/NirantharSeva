@@ -65,7 +65,7 @@ test("EventSource recovers after a connectivity drop and the dashboard re-conver
  * both comfortably inside this file's wait timeouts). Stop it after with
  * `docker stop demo-scheduler` (it was started with --rm, so stopping it
  * also removes it — no separate `docker rm` needed, and `docker ps -a`
- * is worth checking anyway; see docs/PHASE2_OBSERVATIONS.md observation 35
+ * is worth checking anyway; see docs/OBSERVATIONS.md observation 35
  * for why a container from this exact pattern can outlive expectations).
  * The ordinary `scheduler` service keeps running throughout at its own
  * production-scale config regardless — this is additive, not a swap.
@@ -81,7 +81,7 @@ test("a new breach appears on the supervisor dashboard without a page refresh", 
   // names (that alone still scores in the review band and would queue a
   // spurious identity_review pair, cluttering a live demo of Screen 6) —
   // now that create_referral resolves patients through the real fuzzy
-  // pipeline (P6.2). See docs/PHASE2_OBSERVATIONS.md.
+  // pipeline (P6.2). See docs/OBSERVATIONS.md.
   const patientName = `Breach Watch Fixture ${crypto.randomUUID().slice(0, 8)}`;
 
   await login(page, "asha_a");

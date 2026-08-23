@@ -12,7 +12,7 @@ ever goes downward, so this needs no new fixture.
 Village B carries every patient/referral this file inserts directly,
 never Village A — Village A is where tests/integration/
 test_push_identity_resolution.py and test_normalized_name_backfill.py run
-real fuzzy scoring, and (per observation 44, docs/PHASE2_OBSERVATIONS.md)
+real fuzzy scoring, and (per observation 44, docs/OBSERVATIONS.md)
 token_set_ratio scores on shared words regardless of which test wrote
 them. decide() and list_reviews() never call app/linkage/scoring.py, so
 which village this file's bare-insert fixtures sit in doesn't matter to

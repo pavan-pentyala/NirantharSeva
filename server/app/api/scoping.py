@@ -8,7 +8,7 @@ count drifts and a list can be checked — if you add one, add it here:
 3. The referral branch of GET /sync/pull (app/sync/pull.py)
 4. app/sync/push.py::_actor_can_see_referral_origin — the write path needs
    the same subtree test the read path uses (D6, added after ADR-005 was
-   written; see docs/PHASE2_OBSERVATIONS.md #11)
+   written; see docs/OBSERVATIONS.md #11)
 5. GET /referrals/{id}/timeline (app/api/referrals.py::get_referral_timeline,
    docs/decisions/ADR-008.md)
 6. GET /dashboard and GET /dashboard/stream (app/api/dashboard.py::_fetch_snapshot,

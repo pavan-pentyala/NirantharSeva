@@ -9,7 +9,7 @@ directly, not asserted here (that would test rapidfuzz, not this wiring).
 Every existing/query pair here shares no word with app.seed's fixture
 ("Lakshmi Devi", "Ramesh Kumar" — both in Village A) or with any other
 pair in this file, for the reason observation 44
-(docs/PHASE2_OBSERVATIONS.md) documents: token_set_ratio scores on shared
+(docs/OBSERVATIONS.md) documents: token_set_ratio scores on shared
 words regardless of which test wrote them, and this file's tests all run
 against the same live Village A with no per-test rollback.
 """

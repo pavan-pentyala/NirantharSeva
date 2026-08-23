@@ -36,7 +36,7 @@ test("offline: create three referrals, advance one, reload, data survives, then 
   // score high enough via rapidfuzz (once create_referral resolves
   // patients through the real fuzzy pipeline, P6.2) to either silently
   // reuse another patient's identity or queue a spurious identity_review
-  // pair. See docs/PHASE2_OBSERVATIONS.md.
+  // pair. See docs/OBSERVATIONS.md.
   const patientNames = [0, 1, 2].map(() => `Airplane Mode Fixture ${crypto.randomUUID().slice(0, 8)}`);
   for (const name of patientNames) {
     await page.getByTestId("new-referral-button").click();
@@ -52,7 +52,7 @@ test("offline: create three referrals, advance one, reload, data survives, then 
   }
 
   // Advance one of the three (CREATED -> IN_TRANSIT, the ASHA's own
-  // GUARDS-permitted action — see docs/PHASE2_OBSERVATIONS.md's P4.2
+  // GUARDS-permitted action — see docs/OBSERVATIONS.md's P4.2
   // section on why Screen 3 never offers her actions she doesn't have).
   const advancedName = patientNames[0];
   await page.getByTestId("referral-row").filter({ hasText: advancedName }).click();

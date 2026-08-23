@@ -82,7 +82,7 @@ async def test_pulled_transition_event_payload_repeats_the_same_snapshot(client,
             # silently reuse that test's patient via fuzzy_auto instead of
             # creating this test's own, now that create_referral resolves
             # patients through the real fuzzy pipeline (P6.2). See
-            # observation 44, docs/PHASE2_OBSERVATIONS.md.
+            # observation 44, docs/OBSERVATIONS.md.
             "patient_name": "Transition Snapshot Person",
             "reason": "cough",
             "priority": "routine",

@@ -6,7 +6,7 @@
 lines, one pipeline snippet, four exit criteria — this file supplies the
 rest, the way `docs/PHASE5_PLAN.md` did for §9.
 **Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
-**Read before starting P6.1:** `docs/PHASE2_OBSERVATIONS.md` (all five phase
+**Read before starting P6.1:** `docs/OBSERVATIONS.md` (all five phase
 sections), `docs/DOMAIN_PRIMER.md` ("Names in test and demo data"), ADR-001
 (clock), ADR-005 (org scoping), ADR-009 (why this phase owns exactly one
 call site), ADR-013, ADR-014.

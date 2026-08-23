@@ -61,7 +61,7 @@ async def test_five_identical_pushes_result_in_one_referral_row(client, auth_hea
     # metric), which — now that create_referral resolves patients through
     # the real fuzzy pipeline (P6.2) rather than an exact match — would
     # silently reuse that other test's patient instead of creating this
-    # test's own. See observation 44, docs/PHASE2_OBSERVATIONS.md.
+    # test's own. See observation 44, docs/OBSERVATIONS.md.
     body = _batch(op_id, entity_id, patient_name="Repeat Push Second Patient")
 
     for _ in range(5):

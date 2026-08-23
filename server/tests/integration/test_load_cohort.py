@@ -11,7 +11,7 @@ database, unscoped — generator/cohort.py's own org names never collide
 with the seeded ones (docs/PHASE7_PLAN.md "Traps"), but a genuinely new,
 non-colliding org left behind still breaks that exact-set assertion for
 any test that happens to run afterward in the same session. Same class of
-cross-file pollution P6.2 hit twice (docs/PHASE2_OBSERVATIONS.md
+cross-file pollution P6.2 hit twice (docs/OBSERVATIONS.md
 observations 44-46) — the fix there was to stop colliding; the fix here is
 to leave nothing behind at all, since this test's whole point is to
 persist real rows through a real load.

@@ -8,7 +8,7 @@ eight lines long, has no subsections, and — alone among the build phases — *
 exit criteria**. This file supplies what it leaves out, and marks every override
 "supersedes §7". There is exactly one: D9.
 **Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
-**Read before starting:** `docs/PHASE2_OBSERVATIONS.md`, then ADR-007 and
+**Read before starting:** `docs/OBSERVATIONS.md`, then ADR-007 and
 ADR-008.
 
 ---
@@ -309,7 +309,7 @@ count drifts, a list is checkable — with a line saying "if you add one, add it
 here." `replay_state`'s docstring says "the P3 replay endpoint"; it is a CLI.
 **Do not rewrite ADR-005** to fix its "three" — `ADR-TEMPLATE.md` forbids
 rewriting a decided ADR, and the correction is already recorded in ADR-008's
-Context and in `docs/PHASE2_OBSERVATIONS.md`.
+Context and in `docs/OBSERVATIONS.md`.
 
 **`sync_conflict` is written and read by nothing.** Do not add a conflicts
 endpoint — that is Phase 6's review queue. The timeline's `advanced=false` *is*

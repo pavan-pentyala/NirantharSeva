@@ -310,7 +310,7 @@ async def test_sla_scale_shrinks_the_window(monkeypatch, make_referral):
     # 0 or 1 can't tell "scaled correctly" apart from "scale silently
     # ignored" — 0.5 with both a just-inside and just-outside case can:
     # if SLA_SCALE were truncated to an integer 0 instead of read as 0.5
-    # (a real bug this test caught — see docs/PHASE2_OBSERVATIONS.md),
+    # (a real bug this test caught — see docs/OBSERVATIONS.md),
     # make_interval's result would be exactly zero and *both* referrals
     # would escalate regardless of age, not just the 13h-old one.
     within_window = await make_referral("CREATED", BASE - timedelta(hours=11))

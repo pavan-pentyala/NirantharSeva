@@ -3,7 +3,7 @@
 **Status:** **Phase 2 complete.** P2.1 built and CI-green (`4dd737b`); P2.2 built
 and CI-green (`5802b13`, docstring fix `03fdbcf`, run `32101818251`). All
 exit criteria below are met. What the build actually taught — as opposed to what
-this document predicted before it — is in `docs/PHASE2_OBSERVATIONS.md`.
+this document predicted before it — is in `docs/OBSERVATIONS.md`.
 **Source of truth for *what*:** `docs/IMPLEMENTATION_PLAN.md` §6. This file does
 not replace it — it records the decisions §6 leaves open, the order of work,
 **and the places where a later decision supersedes §6. Every such override is
@@ -590,7 +590,7 @@ it there — a `display_name` column, or renamed seed rows. Do not add a column 
 - [x] Auth works against `app_user`; `DEV_USERS` is gone from all 13 sites —
       **it was 14.** The list above missed `client/src/pages/ToyPage.tsx`'s
       hardcoded dev auto-login. See observation 10 in
-      `docs/PHASE2_OBSERVATIONS.md`
+      `docs/OBSERVATIONS.md`
 - [x] `0004` applies to a cold database; `origin_org_id` is NOT NULL and
       indexed; `app_user.name` is unique
 - [x] The seed runs in dev, in CI's `server` job, and in CI's `e2e` job

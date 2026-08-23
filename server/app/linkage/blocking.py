@@ -32,7 +32,7 @@ class Candidate:
 # type to infer from a NULL comparison, so a call with phone=None raises
 # asyncpg.exceptions.AmbiguousParameterError instead of matching anything —
 # discovered running this query for real, the same shape as observation 37
-# (docs/PHASE2_OBSERVATIONS.md, SLA_SCALE's CAST in app/domain/escalation.py).
+# (docs/OBSERVATIONS.md, SLA_SCALE's CAST in app/domain/escalation.py).
 _BLOCK_QUERY = """
     SELECT id, normalized_name
     FROM patient

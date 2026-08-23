@@ -56,7 +56,7 @@ _NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, "nirantharseva.escalation")
 # window was supposed to be. SLA_SCALE=1.0 (the production default) hides
 # this completely (round(1.0) == 1), which is exactly why it survived
 # app/domain/escalation.py's own test suite — see
-# docs/PHASE2_OBSERVATIONS.md for the fractional-scale test this bug
+# docs/OBSERVATIONS.md for the fractional-scale test this bug
 # needed and the ones already there didn't cover.
 _BREACH_QUERY = """
     SELECT r.id, r.current_state, s.escalate_to_role, s.version

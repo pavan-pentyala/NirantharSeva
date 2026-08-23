@@ -230,7 +230,7 @@ export async function applyPulledEvents(events: api.EventOut[]): Promise<void> {
  * the case that matters most: a device's own confirming pull for its own
  * op never advanced, because its optimistic write had already moved
  * referral_cache past what the confirming event's from_state expected — see
- * docs/PHASE2_OBSERVATIONS.md's P4.2 section. Folding from
+ * docs/OBSERVATIONS.md's P4.2 section. Folding from
  * referral_event_cache instead is immune to that, because nothing but this
  * function ever writes there.
  *

@@ -43,7 +43,7 @@ testpaths = ["tests"]
 # would raise. Found while adding P7.1's generator-importing unit tests;
 # every generator-importing test (including P6.1's own
 # tests/unit/test_gold_set.py) was silently untested outside `docker
-# compose run` before this line existed — see docs/PHASE2_OBSERVATIONS.md
+# compose run` before this line existed — see docs/OBSERVATIONS.md
 # Phase 7 section.
 pythonpath = [".."]
 

@@ -7,7 +7,7 @@ session).
 one Dexie schema, one Lamport snippet, three exit criteria — this file
 supplies the rest, the way `docs/PHASE3_PLAN.md` did for §7.
 **Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
-**Read before starting P4.1:** `docs/PHASE2_OBSERVATIONS.md`, ADR-006 (actor
+**Read before starting P4.1:** `docs/OBSERVATIONS.md`, ADR-006 (actor
 identity), ADR-008 (the replay fold), ADR-009, ADR-010.
 **Design bundle:** `docs/design_handoff_ui_screens/`, tracked in git. Governs
 appearance, never architecture (handoff §8).
@@ -173,7 +173,7 @@ assumed from this plan alone.
 ## Traps for this phase, learned from Phase 2 and Phase 3
 
 - **Grep-based exit criteria match your prose, not just your code** (observed
-  twice in Phase 3, `docs/PHASE2_OBSERVATIONS.md` observation 13). P4.3's
+  twice in Phase 3, `docs/OBSERVATIONS.md` observation 13). P4.3's
   `grep -rn toy_` criterion above will catch a comment that mentions "toy_"
   in passing, not just leftover code — word it carefully when writing it, or
   reword the comment.

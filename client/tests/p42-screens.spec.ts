@@ -15,7 +15,7 @@ test("ASHA creates a referral offline, it appears in the list and detail after r
   // names (that alone still scores in the review band and would queue a
   // spurious identity_review pair, cluttering a live demo of Screen 6) —
   // now that create_referral resolves patients through the real fuzzy
-  // pipeline (P6.2). See docs/PHASE2_OBSERVATIONS.md.
+  // pipeline (P6.2). See docs/OBSERVATIONS.md.
   const patientName = `Reconnect Sync Fixture ${crypto.randomUUID().slice(0, 8)}`;
 
   await page.goto("/login");
@@ -66,7 +66,7 @@ test("ASHA creates a referral offline, it appears in the list and detail after r
 
   // ASHA's real action: mark as sent (CREATED -> IN_TRANSIT). Screen 3's
   // footer must show this, not the mockup's "Mark as arrived" (ARRIVED is
-  // MO-only — see docs/PHASE2_OBSERVATIONS.md's P4.2 section).
+  // MO-only — see docs/OBSERVATIONS.md's P4.2 section).
   await page.getByTestId("referral-action-button").click();
   // Appears twice — once as the timeline's still-pending next step, once
   // as the footer's replacement for an action button she doesn't have.

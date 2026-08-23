@@ -74,7 +74,7 @@ Whenever a phase or sub-phase is reported complete (the same moment
 `docs/LEARNING_PLAN.md` covering it, in the same shape as its existing
 sections: the problem it solves, a concrete trace-it-yourself exercise
 through the real code, where the plan bent and why (check
-`docs/PHASE2_OBSERVATIONS.md` and the phase's ADRs for real drift, don't
+`docs/OBSERVATIONS.md` and the phase's ADRs for real drift, don't
 invent any), and self-check questions. Update `docs/PROJECT_REFERENCE.md`'s
 tables (ADR index, directory map, data flow, "bugs that taught the most")
 if the phase added any. Append one line to each file's own Update log.

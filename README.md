@@ -112,7 +112,7 @@ The five decisions most worth reading, in `docs/decisions/`:
 | `docs/IMPLEMENTATION_PLAN.md` | The full ten-week build spec |
 | `docs/PHASE*_PLAN.md` | Per-phase build order, decisions, exit criteria |
 | `docs/decisions/` | Architecture decision records, ADR-001 onward |
-| `docs/PHASE2_OBSERVATIONS.md` | Hard-won lessons, append-only, one section per phase |
+| `docs/OBSERVATIONS.md` | Hard-won lessons, append-only, one section per phase |
 | `docs/UI_DESIGN_BRIEF.md` + `docs/design_handoff_ui_screens/` | The design brief and its seven screen references |
 | `docs/screenshots/` | What each screen actually renders |
 | `docs/HANDOFF_CLAUDE_CODE.md` | Operating rules for AI-assisted sessions on this repo |

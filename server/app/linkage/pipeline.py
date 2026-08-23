@@ -9,7 +9,7 @@ Resolution below carries both.
 
 Thresholds (Settings.identity_auto_accept / identity_review_floor) are
 compared here, in Python, never pushed into a query — see scripts on
-observation 37 in docs/PHASE2_OBSERVATIONS.md for what happens to a float
+observation 37 in docs/OBSERVATIONS.md for what happens to a float
 threshold that migrates into SQL.
 
 Wired into app/sync/push.py's `_resolve_patient` in P6.2 — ADR-009's one
