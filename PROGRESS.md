@@ -249,8 +249,9 @@ implementation.
   **ADR-017** (E1 reports measured detection and modelled recovery
   separately). D34–D37 answered by the user; D38 (child-process-per-cell
   mechanism) and D39 (`SLA_SCALE` pinned to 1.0 in experiments) taken alone
-  and flagged for override; **D40 (the P8.1/P8.2/P8.3 split) is proposed
-  and awaiting approval.**
+  and flagged for override; **D40 (the P8.1/P8.2/P8.3 split) and D41
+  (deployment belongs to Phase 9, not Phase 8 — §14 governs, the phase
+  map's P8 row is stale) both approved by the user.**
   Four findings the plan rests on, all verified against the repo rather
   than assumed: (1) **E1 as specified in §13.2 could not produce a non-null
   result** — escalation surfaces a stalled referral but never moves one, and
@@ -497,11 +498,10 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Phase 8 is planned; nothing is built.** Two gates before code:
-
-1. **The user approves D40's sub-phase split** (P8.1 harness + E1 / P8.2
-   E2+E3+E6 + `analysis.py` / P8.3 E4 evidence + E5 k6) — handoff R5.
-2. **The user gives P8.1 its own go-ahead** — handoff R1.
+**Phase 8 is planned; nothing is built.** The split is approved (D40:
+P8.1 harness + E1 / P8.2 E2+E3+E6 + `analysis.py` / P8.3 E4 evidence +
+E5 k6). One gate remains: **the user gives P8.1 its own go-ahead**
+(handoff R1).
 
 Then P8.1 starts, **on Sonnet**, from `docs/PHASE8_PLAN.md`'s build order.
 Read ADR-016 and ADR-017 first; they are the two decisions the harness's
@@ -742,8 +742,10 @@ around changes what that spec exercises. Clean up by deleting from
   uniformly to the cell value) were answered 2026-08-23. D38 (a cell runs in
   a child process) and D39 (`SLA_SCALE` pinned to `1.0` in every experiment
   process) were taken alone under handoff §2 and are flagged in
-  `docs/PHASE8_PLAN.md` for override. **D40 (the sub-phase split) is the one
-  Phase 8 decision still open.**
+  `docs/PHASE8_PLAN.md` for override. **D40** (split into P8.1/P8.2/P8.3)
+  and **D41** (deployment stays in Phase 9 — §14 governs, the phase map's
+  P8 row is stale; Phase 8 ships no deployment) were also answered
+  2026-08-23. No Phase 8 decision is open.
 - **New standing instruction (2026-08-23, applies going forward):**
   `docs/Observations_for_report.md` (new file, not gitignored) collects
   results/framing/discussion material for the final written report, one

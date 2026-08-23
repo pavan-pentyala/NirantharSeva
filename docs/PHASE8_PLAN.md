@@ -149,7 +149,7 @@ from colliding.
 
 ---
 
-## D40 — proposed sub-phase split (handoff R5: needs approval before P8.1 starts)
+## D40 — sub-phase split. **Approved by the user 2026-08-23** (handoff R5)
 
 Phase 8 is too big for one session: a harness, six experiments, an analysis
 layer, a load test, and a tool (k6) that has never been in the repository.
@@ -164,9 +164,15 @@ P8.1 is the large and risky one — everything after it reuses the harness.
 P8.3 depends on nothing in P8.2 and could be cut or deferred to Phase 9
 without affecting E1/E2/E3/E6.
 
-**Scope note.** The phase map (§4) lists "deploy" under P8, while §14 puts
-deployment in Phase 9. **Recommendation: deployment stays in Phase 9.**
-Phase 8 is already three sub-phases and deployment is not an experiment.
+### D41 — deployment belongs to Phase 9, not Phase 8. **Decided with the user 2026-08-23.**
+
+The phase map (§4) lists "deploy" under P8; §14 puts deployment in Phase 9
+alongside the demo script and the recorded clip. They disagree, and the
+disagreement is resolved in §14's favour: Phase 8 is already three
+sub-phases of experiment work, deployment is not an experiment, and §14
+already treats local `docker compose up` as the *primary* demo path with a
+deployed URL secondary. **Phase 8 ships no deployment.** The phase map's P8
+row is the stale one; §14 governs.
 
 ---
 
