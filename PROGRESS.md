@@ -9,8 +9,8 @@
 > those here just gives a future session more text to read for the same
 > information, at lower quality.
 
-**Last updated:** 2026-08-24 (even later)
-**Last session model:** Sonnet (pre-Phase-9 audit + fixes).
+**Last updated:** 2026-08-24 (Phase 9 planning)
+**Last session model:** Opus (Phase 9 planning, no code).
 
 ## Current phase
 
@@ -22,9 +22,23 @@ The `experiments/` harness covers E1/E2/E3/E6, `experiments/analysis.py`
 regenerates every table/figure/dashboard from `raw.csv` alone, E4's fault
 matrix is filled from real recorded runs, and E5's k6 load test (a
 genuinely new tool in this repo) produced real per-endpoint latency
-numbers and an honest index finding. **Phase 9 (deployment, demo script,
-the report) is next and needs its own go-ahead** — nothing in this repo
-has started it.
+numbers and an honest index finding.
+
+**Phase 9 is planned but not started.** `docs/PHASE9_PLAN.md` and
+**ADR-018** (deployment-ready config, not a deployed instance) were
+written 2026-08-24 (Opus, plan-only — no code). D42–D45 answered by the
+user; D46–D49 taken alone and flagged in the plan for override. **The
+split is P9.1 / P9.2 / P9.3 (D45) and each needs its own explicit
+go-ahead** (handoff R1/R5).
+
+**The written report is OUT of Phase 9 scope (D42).** Nothing
+report-shaped exists in this repository and none will be created here —
+the user has his own plan for it and will share it after Phase 9
+completes. The phase map's P9 row ("Chapters 4–5, appendices") is
+superseded on this point. Phase 9 produces artifacts a report can later
+draw on (a verified demo, a measured number, a production config), not
+report prose. Do not scaffold chapters, do not draft an outline, do not
+"get a head start" on it.
 
 **P8.2 found and fixed a real bug in already-committed P8.1 code** — a
 shared RNG re-seeded per call in `experiments/resume.py`, not per cell,
@@ -547,12 +561,45 @@ clean before trusting migration `0009`.
   reset (`docker compose down -v`) between E5 and E4 (so the k6-loaded
   cohort didn't interfere with E4's own assertions) and again at the end.
 
+- **Phase 9 planning** (2026-08-24, Opus, no code): `docs/PHASE9_PLAN.md`
+  and **ADR-018** (deployment-ready configuration, not a deployed
+  instance). D42–D45 answered by the user; D46–D49 taken alone and
+  flagged in the plan for override. Five findings the plan rests on, all
+  verified against the repo rather than assumed: (1) **the written report
+  does not exist anywhere in this repository** — tracked, untracked or
+  ignored — so the phase map's "report 50%" (P7) and "Chapters 4–5" (P9)
+  both assume something that was never here; D42 defers it out of Phase 9
+  entirely; (2) **`README.md` is five phases stale**, describing a
+  half-built project on the first file any external reader opens; (3)
+  **§3's promised advisory-lock sentence was never measured** — E5
+  measured an *index* change, not the lock, leaving a gap exactly where §3
+  says a sharp panel is most likely to probe (D44 fixes it); (4) **`make
+  demo` does not match §14** (no reset, no cohort, no dashboard, no
+  scenario steps) and `make` isn't installed on this machine anyway; (5)
+  `docs/mom/` empty, root `results/` a stray `.gitkeep` while real results
+  live in `server/results/`, `temp.txt` stray at the root.
+
 ## Not done / in progress
 
-- **Phase 9 (deployment, demo script, report) is not started.** Needs its
-  own go-ahead — nothing about it was decided or built this session.
+- **Phase 9 is planned, not started.** `docs/PHASE9_PLAN.md` + ADR-018
+  exist; no Phase 9 code has been written. P9.1, P9.2 and P9.3 each need
+  their own go-ahead (handoff R1/R5). P9.1 (deliverable hygiene + the
+  demo path) is the intended first sub-phase.
+- **`README.md` is five phases stale and is a P9.1 deliverable** — it
+  claims "Phases 0–4 complete", "Phase 5 … planned but not built", and
+  that `anm1`/`supervisor1` see placeholder screens. All seven screens
+  are real (`PlaceholderPage` was deleted in P6.2). Do not trust it as a
+  description of the system until P9.1 rewrites it.
+- **The written report is deferred until after Phase 9 (D42)** — not
+  started, not scaffolded, and deliberately not in Phase 9's scope. The
+  user will share his own plan for it once Phase 9 is done.
 - **The real-phone airplane-mode recording is not done.** User has said
-  keep it — do not drop it, do not re-propose dropping it.
+  keep it — do not drop it, do not re-propose dropping it. It is a P9.3
+  deliverable (§8.5's Review-III fallback) and needs a physical phone.
+- **`docs/mom/` is empty** — §2.2 asks for weekly minutes of meeting, and
+  there are none for ten weeks. These are records of real meetings with
+  the guide, so they belong to the user, not to a session; flagged here
+  only so it is not discovered missing at submission.
 - **A pre-existing, unrelated flake was observed, not fixed:**
   `client/tests/identity-review.spec.ts` (untouched this session)
   intermittently hits Playwright's 5s default timeout under a full-suite
@@ -836,12 +883,23 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Phase 8 is done — P8.1, P8.2, P8.3 all complete.** Next is **Phase 9**
-(deployment, demo script, the report itself — docs/IMPLEMENTATION_PLAN.md
-§14). Wait for the user's go-ahead before starting it; nothing about it
-has been decided yet, including whether Opus should lead the report
-chapters (design/writing work, not code — handoff R2 would say Opus, not
-Sonnet).
+**Phase 8 is done, the pre-Phase-9 audit is done, and Phase 9 is planned.**
+Next is **P9.1** — deliverable hygiene and the demo path: rewrite
+`README.md` to reality, clear the stray files, rebuild the demo runner to
+§14's specification as a script (`make` isn't installed here — D46), write
+`docs/DEMO_SCRIPT.md`, and rehearse the click path cold end to end.
+`docs/PHASE9_PLAN.md` has the full build order, contracts and traps;
+**ADR-018** has the deployment decision. This is implementation work —
+**Sonnet, not Opus** (handoff R2).
+
+Wait for an explicit go-ahead before starting P9.1, and do not roll from
+P9.1 into P9.2 without a second one (R1/R5).
+
+**Two things a P9 session must not do:** touch the written report in any
+form (D42 — deferred until after Phase 9, the user has his own plan), and
+re-run any Phase 8 experiment (nothing in Phase 9 touches the code path
+`experiments/` exercises; the lock measurement writes a *new*
+`server/results/e5_lock/`, it does not modify `e5/`).
 
 To verify P8.3 yourself:
 
@@ -1194,6 +1252,20 @@ around changes what that spec exercises. Clean up by deleting from
   `sla_profile(state) WHERE active`) as a safety net in the same
   migration, even though nothing currently violates it. Both landed as
   migration `0009`.
+- **Phase 9's four (D42–D45) were answered 2026-08-24; do not re-ask.**
+  **D42** — the written report is deferred until *after* Phase 9, on the
+  user's own plan; it is out of Phase 9's scope entirely and nothing
+  report-shaped gets created, scaffolded or outlined during it. **D43** —
+  deployment ships as *ready configuration only*, never a live instance
+  (ADR-018); local Compose stays the primary demo path per §14. **D44** —
+  measure the advisory lock's write-latency cost, delivering the sentence
+  §3 promised and E5 never produced. **D45** — Phase 9 splits into
+  P9.1/P9.2/P9.3 (see `docs/PHASE9_PLAN.md`'s table). D46 (demo logic in a
+  script, Makefile is a wrapper), D47 (reset = drop/recreate the database,
+  not `down -v`), D48 (the demo seeds for *states*, not volume) and D49
+  (§14's "open the dashboard" satisfied by printing the URL) were taken
+  alone under handoff §2 and are flagged in `docs/PHASE9_PLAN.md` for
+  override. No Phase 9 decision is currently open.
 
 ## Known problems and workarounds
 
