@@ -1,0 +1,8 @@
+
+Running 3 tests using 3 workers
+
+  ok 2 [chromium] › tests\client-kill-resume.spec.ts:9:1 › client killed mid-push resumes from inflight and lands exactly once (2.0s)
+  ok 3 [chromium] › tests\two-device-conflict.spec.ts:50:1 › two devices offline, same referral, same transition -> one accepted, one conflict, nothing lost (3.1s)
+  ok 1 [chromium] › tests\offline-sync.spec.ts:21:1 › offline: create three referrals, advance one, reload, data survives, then sync exactly once online (17.5s)
+
+  3 passed (19.0s)

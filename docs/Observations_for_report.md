@@ -366,3 +366,55 @@ slow, not actually stuck — sits at windows shorter than this experiment's
 approved range, not inside it. Worth a sentence in Chapter 4's discussion
 of E2: the frontier this harness can show is real, but flatter than the
 question originally posed, and the reason is legible rather than mysterious.
+
+## 2026-08-24 (later) — Phase 8, P8.3 (E4 evidence, E5 k6 load test)
+
+### E4 needed no new tests, and running the five that already existed was the entire sub-phase
+
+Every fault §13.3 asks for already had a real test built somewhere across
+Phases 1–7: a Playwright partition test, a bash script that kills the API
+container mid-batch, a Playwright client-kill test, a Hypothesis-driven
+idempotency property test, and a two-browser-context conflict test.
+Phase 8 planning's own audit found this before any P8.3 code was written.
+P8.3's actual work was running all five against a freshly reset stack and
+writing down what really happened, not adding a sixth test nobody asked
+for. All five passed, with the specific numbers (which patient, how many
+events, which statuses) recorded in `server/results/e4/matrix.md` rather
+than asserted from memory. The methodological point worth a sentence in
+Chapter 5: a fault-injection section of a report is stronger for citing
+five *runs*, dated and reproducible, than for citing five tests that
+"should" pass — the two are not the same evidence, even when the code
+behind them hasn't changed.
+
+### An index that exists in the schema and an index that matters for a query are different claims
+
+E5 asked docs/IMPLEMENTATION_PLAN.md's own question literally: measure the
+open-loops query before and after indexing. The complication is that the
+index (`idx_referral_open`) has existed in the schema since migration
+0003 — there was nothing new to add. "Before/after" here meant dropping
+it on a live, cohort-loaded database, measuring, recreating it, and
+measuring again — never touching a committed migration.
+
+The result was a clean, honest null: the query plan Postgres chooses is
+**identical** with the index present or absent, at this project's own
+data scale (a 621-referral cohort, the same size Phase 7's own default
+generator config produces). `EXPLAIN ANALYZE` shows a sequential scan
+either way — correct on Postgres's part, since a table that fits in a
+handful of disk pages is genuinely faster to read start-to-finish than to
+look up through an index. Per-endpoint p50/p95, read directly from the
+`request_timing` table the instrumentation middleware has been writing
+since Phase 1 (rather than from k6's own summary, which was kept only as
+a cross-check), move by a few milliseconds in *both* directions across
+the five endpoints tested — the shape of ordinary measurement noise, not
+of a real effect.
+
+This is worth a full paragraph in Chapter 4's discussion of E5, not a
+footnote, because the interesting claim is not "the index doesn't work"
+— it almost certainly would, at ten or a hundred times this row count —
+but that *an index existing is not the same claim as an index mattering
+for the query and data volume actually in front of you*, and the honest
+way to answer which one is true is to measure it at the scale you
+actually have, not to reason abstractly from the fact that a partial
+index was designed for exactly this predicate. A report that only ever
+measured EXPLAIN plans at a convenient, larger, synthetic row count would
+have produced a more flattering number and a less true one.

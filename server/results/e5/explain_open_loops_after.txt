@@ -1,0 +1,27 @@
+                                                                 QUERY PLAN                                                                 
+--------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=247.82..247.83 rows=1 width=8) (actual time=0.349..0.351 rows=1 loops=1)
+   CTE subtree
+     ->  Recursive Union  (cost=0.15..207.20 rows=321 width=16) (actual time=0.052..0.125 rows=6 loops=1)
+           ->  Index Only Scan using org_unit_pkey on org_unit  (cost=0.15..8.17 rows=1 width=16) (actual time=0.039..0.039 rows=1 loops=1)
+                 Index Cond: (id = 'bceb0640-8929-51cf-8b62-4887339fc522'::uuid)
+                 Heap Fetches: 1
+           ->  Hash Join  (cost=0.33..19.58 rows=32 width=16) (actual time=0.023..0.023 rows=2 loops=3)
+                 Hash Cond: (o.parent_id = s.id)
+                 ->  Seq Scan on org_unit o  (cost=0.00..16.50 rows=650 width=32) (actual time=0.001..0.001 rows=18 loops=3)
+                 ->  Hash  (cost=0.20..0.20 rows=10 width=16) (actual time=0.001..0.001 rows=2 loops=3)
+                       Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                       ->  WorkTable Scan on subtree s  (cost=0.00..0.20 rows=10 width=16) (actual time=0.000..0.000 rows=2 loops=3)
+   ->  Hash Join  (cost=11.72..39.06 rows=312 width=4) (actual time=0.208..0.334 rows=300 loops=1)
+         Hash Cond: (referral.origin_org_id = subtree.id)
+         ->  Seq Scan on referral  (cost=0.00..22.23 rows=623 width=20) (actual time=0.007..0.083 rows=623 loops=1)
+         ->  Hash  (cost=9.22..9.22 rows=200 width=16) (actual time=0.132..0.132 rows=6 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 9kB
+               ->  HashAggregate  (cost=7.22..9.22 rows=200 width=16) (actual time=0.129..0.130 rows=6 loops=1)
+                     Group Key: subtree.id
+                     Batches: 1  Memory Usage: 40kB
+                     ->  CTE Scan on subtree  (cost=0.00..6.42 rows=321 width=16) (actual time=0.053..0.126 rows=6 loops=1)
+ Planning Time: 0.651 ms
+ Execution Time: 0.550 ms
+(23 rows)
+

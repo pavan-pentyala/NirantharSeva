@@ -1484,3 +1484,29 @@ second fact is a property of the approved cohort and the approved sweep
 range meeting each other, not something this session changed or could
 fix without changing either — reported as-is in `docs/
 Observations_for_report.md`, not smoothed over.
+
+## Phase 8, P8.3 — an index that already exists is not the same claim as an index that matters at this scale
+
+**58. `idx_referral_open` (migration 0003) makes no measurable difference
+to the dashboard's open-loops query at this project's own data scale.**
+E5 dropped the index, ran `EXPLAIN ANALYZE` and a k6 load test (10 VUs,
+40s, a P7.1-scale 621-referral cohort), then recreated it and repeated
+both. The query plan was **identical** either way — `Seq Scan on
+referral (cost=0.00..22.23 rows=623)` — Postgres's planner never touches
+the partial index at 623 rows, correctly: the whole table fits in a
+handful of pages, and a sequential scan beats random-access index lookups
+at this size. `request_timing`'s own per-endpoint p50/p95 (queried
+directly, not read off k6's summary — plan §12's own design) moved by
+low single-digit milliseconds in *both* directions depending on the
+endpoint, consistent with ordinary sampling noise on a ~380-request
+run, not a causal effect. Not a bug and not a surprise once stated
+plainly: an index existing in the schema and an index *mattering* for a
+given query are different claims, and the second one is an empirical
+question that has to be asked at the data volume actually in play, not
+assumed from the first. `idx_referral_open` would very likely start
+mattering once `referral` reaches tens or hundreds of thousands of
+rows — a scale this project's own generator/demo cohorts never reach
+(D31) — but that is a claim about where the index would help, not
+something this session measured. Reported as-is in `docs/
+Observations_for_report.md`, the same discipline observation 57's
+flat E2 frontier was reported with.

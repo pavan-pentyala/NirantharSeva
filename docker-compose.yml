@@ -63,6 +63,19 @@ services:
       - server_venv:/app/.venv
     command: python -m app.scheduler.run
 
+  # E5 (Phase 8, P8.3). Not started by plain `docker compose up` — gated
+  # behind the "load" profile, since a load test is never something that
+  # should run just because the stack came up. Invoke as:
+  #   docker compose --profile load run --rm k6 run /scripts/load.js
+  k6:
+    image: grafana/k6:latest
+    profiles: ["load"]
+    volumes:
+      - ./experiments/k6:/scripts
+      - ./server/results/e5:/results
+    environment:
+      BASE_URL: http://api:8000
+
   client:
     build: ./client
     environment:

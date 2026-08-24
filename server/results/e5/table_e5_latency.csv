@@ -1,0 +1,13 @@
+run_id,endpoint,method,n,p50_ms,p95_ms
+e5_after,/auth/login,POST,2,65.83,69.72
+e5_before,/auth/login,POST,2,61.44,66.40
+e5_after,/dashboard,GET,378,4.78,26.10
+e5_before,/dashboard,GET,376,5.14,45.72
+e5_after,/health,GET,1,31.47,31.47
+e5_before,/health,GET,1,29.10,29.10
+e5_after,/referrals,GET,378,4.17,25.85
+e5_before,/referrals,GET,376,4.51,42.34
+e5_after,/sync/pull,GET,378,10.66,36.79
+e5_before,/sync/pull,GET,376,12.88,42.98
+e5_after,/sync/push,POST,378,10.43,56.82
+e5_before,/sync/push,POST,376,10.30,49.90

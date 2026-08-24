@@ -9,20 +9,22 @@
 > those here just gives a future session more text to read for the same
 > information, at lower quality.
 
-**Last updated:** 2026-08-24
-**Last session model:** Sonnet (P8.2 implementation).
+**Last updated:** 2026-08-24 (later)
+**Last session model:** Sonnet (P8.3 implementation).
 
 ## Current phase
 
 **Phase 7 is complete, including the cuttable P7.3 backlog.** P7.1, P7.2,
 and P7.3 are all done and verified (see below).
 
-**Phase 8: P8.1 and P8.2 are done and verified.** The `experiments/`
-harness now covers E1/E2/E3/E6, `experiments/analysis.py` regenerates
-every table/figure/dashboard from `raw.csv` alone, and all four
-experiments have real, committed results in `server/results/`. **P8.3
-(E4 evidence, E5 k6) is not started and needs its own go-ahead**
-(handoff R1/R5) — D40's split is what governs the boundary.
+**Phase 8 is complete — P8.1, P8.2, and P8.3 are all done and verified.**
+The `experiments/` harness covers E1/E2/E3/E6, `experiments/analysis.py`
+regenerates every table/figure/dashboard from `raw.csv` alone, E4's fault
+matrix is filled from real recorded runs, and E5's k6 load test (a
+genuinely new tool in this repo) produced real per-endpoint latency
+numbers and an honest index finding. **Phase 9 (deployment, demo script,
+the report) is next and needs its own go-ahead** — nothing in this repo
+has started it.
 
 **P8.2 found and fixed a real bug in already-committed P8.1 code** — a
 shared RNG re-seeded per call in `experiments/resume.py`, not per cell,
@@ -429,10 +431,58 @@ or `experiments/cell.py`'s E2 loop again.
   `ns_exp_*` databases or orphaned containers after the session (checked
   by hand, `docker ps -a` and a `pg_database` query).
 
+- **P8.3** (`docs/PHASE8_PLAN.md` build order, 2026-08-24 later, Sonnet):
+  **E4** — no new tests (confirmed by Phase 8 planning: all five §13.3
+  rows already had one). Ran all five against a freshly reset, migrated,
+  reseeded stack and recorded what actually happened:
+  `server/tests/fault/kill_api.sh` (20-op batch, API killed 50ms in,
+  restarted, retried — 20 `referral_event` rows, not 40),
+  `client/tests/offline-sync.spec.ts`, `client-kill-resume.spec.ts`,
+  `two-device-conflict.spec.ts` (Playwright, all three), and
+  `tests/integration/test_push_idempotent.py` +
+  `tests/property/test_push_idempotency.py` (5 tests, the latter a
+  Hypothesis-generated arbitrary retry pattern, not just a fixed ×5). All
+  five passed; `server/results/e4/matrix.md` has the five-row table plus
+  raw captured output (`kill_api_output.txt`, `idempotency_output.txt`,
+  `playwright_output.txt`).
+
+  **E5** — k6 added fresh: `docker-compose.yml`'s new `k6` service, gated
+  behind the `--profile load` flag so it never starts with a plain
+  `docker compose up` (`docker-compose.yml`'s own comment explains why);
+  `experiments/k6/load.js` (login once in `setup()`, then per-iteration
+  `GET /dashboard` + `GET /referrals` + `GET /sync/pull` as a
+  broad-subtree MO, one `POST /sync/push create_referral` as an ASHA — the
+  mix confirmed with the user). Run against a fresh dev database loaded
+  with a real P7.1-scale cohort (seed 42: 220 patients, 621 referrals),
+  10 VUs, 40s, twice — once with `idx_referral_open` (migration 0003,
+  already shipped — not a new index) dropped, once with it restored.
+  Per-endpoint p50/p95 come from `request_timing` (queried directly, per
+  the plan's own design in §12 — "E5 is then a query, not a re-run"), not
+  from k6's own summary, which is kept only as a cross-check
+  (`k6_before_summary.json`/`k6_after_summary.json`).
+
+  **The honest finding: the index makes no measurable difference at this
+  data scale.** `EXPLAIN ANALYZE` produces the *identical* query plan
+  (`Seq Scan on referral`) with the index dropped or present — Postgres's
+  planner correctly prefers a sequential scan over an index lookup on a
+  ~600-row table. Latency moved a few milliseconds in both directions
+  across the five endpoints tested, consistent with sampling noise, not a
+  causal effect. Reported as-is (`server/results/e5/summary.md`,
+  `explain_open_loops_{before,after}.txt`, `table_e5_latency.csv`) — the
+  same discipline P8.2's flat E2 frontier was reported with, not smoothed
+  into a more flattering number. See observation 58, `docs/OBSERVATIONS.md`.
+
+  Verified: full server suite **269 passed** (unchanged — no new server
+  tests), `ruff check`/`ruff format --check` clean, `python -m
+  app.verify_replay` clean, `alembic heads` still `0008` (P8.3 adds no
+  migration). Client `tsc --noEmit` and `npm run build` clean. Stack fully
+  reset (`docker compose down -v`) between E5 and E4 (so the k6-loaded
+  cohort didn't interfere with E4's own assertions) and again at the end.
+
 ## Not done / in progress
 
-- **P8.3 (E4 evidence, E5 k6): not started.** Needs its own go-ahead
-  (handoff R1/R5); D40 already fixes what it contains.
+- **Phase 9 (deployment, demo script, report) is not started.** Needs its
+  own go-ahead — nothing about it was decided or built this session.
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
 - **A pre-existing, unrelated flake was observed, not fixed:**
@@ -691,6 +741,23 @@ tests; P8.2 is a harness/tooling sub-phase), `ruff check`/
 tree, `python -m app.verify_replay` clean. No `ns_exp_*` database or
 orphaned `docker ps -a` entry survived the session.
 
+P8.3: every criterion in `docs/PHASE8_PLAN.md`'s D40 table checked against
+real commands — `server/results/e4/matrix.md` has all five §13.3 rows,
+each citing a real, dated run (not "should pass"); raw output for each is
+committed alongside (`kill_api_output.txt`, `idempotency_output.txt`,
+`playwright_output.txt`). `server/results/e5/table_e5_latency.csv` has
+p50/p95 per endpoint in both index states, sourced from `request_timing`
+directly; `explain_open_loops_before.txt`/`_after.txt` hold the real
+`EXPLAIN ANALYZE` output for both states (byte-for-byte identical query
+plan — the honest finding, not a shortfall in what was measured).
+`alembic heads` is `0008` (P8.3 adds no migration — `idx_referral_open`
+was dropped/recreated by hand on the running dev database for the
+measurement, never via a migration). Full server suite **269 passed**
+(unchanged), `ruff check`/`ruff format --check` clean, `python -m
+app.verify_replay` clean, client `tsc --noEmit`/`npm run build` clean. No
+leftover `ns_exp_*` database, no orphaned container, `docker compose down
+-v` run clean at the end (checked by hand).
+
 ## Open item for the user
 
 **The real-phone clip** (plan §8.5, the Review-III fallback) is still
@@ -701,10 +768,39 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**P8.1 and P8.2 are both done.** Next is **P8.3** (E4's fault evidence —
-largely collection, not new tests, per Phase 8 planning's finding 4 — and
-E5's k6 load test, which needs k6 added to the repo fresh). Wait for the
-user's go-ahead (handoff R1/R5) before starting it.
+**Phase 8 is done — P8.1, P8.2, P8.3 all complete.** Next is **Phase 9**
+(deployment, demo script, the report itself — docs/IMPLEMENTATION_PLAN.md
+§14). Wait for the user's go-ahead before starting it; nothing about it
+has been decided yet, including whether Opus should lead the report
+chapters (design/writing work, not code — handoff R2 would say Opus, not
+Sonnet).
+
+To verify P8.3 yourself:
+
+```bash
+docker compose down -v && docker compose up -d --build
+docker compose run --rm api sh -c "alembic upgrade head && python -m app.seed"
+bash server/tests/fault/kill_api.sh
+```
+Expect `PASS: 20 ops landed exactly once...` at the end. This kills the
+real `api` container and restarts it — expected, that is the test.
+
+```bash
+docker compose exec db psql -U postgres -c "DROP DATABASE IF EXISTS nirantharseva_test;" -c "CREATE DATABASE nirantharseva_test;"
+docker compose run --rm -e DATABASE_URL="postgresql+asyncpg://postgres:dev@db:5432/nirantharseva_test" \
+  api sh -c "alembic upgrade head && python -m app.seed && pytest -v tests/integration/test_push_idempotent.py tests/property/test_push_idempotency.py"
+```
+Expect 5 passed.
+
+E5 is not worth re-running casually — it needs a full cohort load, two
+API container restarts, and two 40s k6 runs (~10 minutes total, plus the
+`idx_referral_open` drop/recreate). If you do, `docker-compose.yml`'s own
+comment on the `k6` service has the exact invocation
+(`docker compose --profile load run --rm k6 run /scripts/load.js
+--summary-export=/results/...`) — `MSYS_NO_PATHCONV=1` is required, same
+as every other `docker compose run` passing a container path. `docker
+compose down -v` afterward; this loads real referrals into the dev
+database and drops a real index, temporarily, on it.
 
 To verify P8.2 yourself:
 
@@ -1012,6 +1108,16 @@ around changes what that spec exercises. Clean up by deleting from
   =12` for E2 specifically (not the shared `LOAD_STEP_HOURS=168`), after
   the confound in observation 57 was found and measured — the ~18-20min/
   cell cost was shown before, not after, committing to the full grid.
+- **P8.3's two decisions, both answered 2026-08-24 (later), do not
+  re-ask:** E5's before/after index comparison drops/recreates
+  `idx_referral_open` by hand on a scratch-loaded dev database (never a
+  migration, never a permanent schema change) rather than inventing a
+  second index to compare; the k6 load mix is `GET /dashboard` + `GET
+  /referrals` + `GET /sync/pull` (broad-subtree MO login) + `POST
+  /sync/push create_referral` (ASHA login), 10 VUs, 40s per run — a
+  representative slice, not a stress test, chosen over a sync-path-only
+  script because the dashboard/referrals reads are what the index
+  question is actually about.
 
 ## Known problems and workarounds
 
@@ -1113,6 +1219,11 @@ around changes what that spec exercises. Clean up by deleting from
   path, the command still exits 0, and a `--rm` container erases the only
   copy of whatever it wrote to the wrong place (observation 41). Prefix
   any such command with `MSYS_NO_PATHCONV=1`.
+  **Hit again with k6 (P8.3)** — `docker compose --profile load run --rm
+  k6 run /scripts/load.js` without the prefix rewrote `/scripts/load.js`
+  to a literal `C:/Program Files/Git/scripts/load.js` and failed with "the
+  moduleSpecifier ... couldn't be found on local disk," not a silent
+  wrong-location write this time, but the same root cause.
 - **`asyncpg.exceptions.AmbiguousParameterError` on a bind parameter whose
   first use in a query is `:param IS NULL`** — asyncpg's prepared-statement
   protocol has no type to infer from a NULL comparison. Same root cause as
