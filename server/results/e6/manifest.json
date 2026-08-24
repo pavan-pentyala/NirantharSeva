@@ -1,0 +1,13 @@
+{
+  "alembic_head": "0008",
+  "cells_run": 3,
+  "exp": "E6",
+  "git_sha": "unknown",
+  "harness_version": 1,
+  "per_cell_wall_seconds": {
+    "full_cohort_s13": 1042.193,
+    "full_cohort_s42": 1132.771,
+    "full_cohort_s7": 1164.36
+  },
+  "total_wall_seconds": 3344.5
+}

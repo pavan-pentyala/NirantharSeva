@@ -238,6 +238,24 @@ async def resume_escalated_referrals(
     order is a database scan order, not seeded, and I7 needs the draw
     itself to be the only source of randomness that matters here).
 
+    Each referral gets its OWN `Random(f"{cell_seed}:{cell_id}:resume:
+    {referral_id}")` — not one shared `Random(f"{cell_seed}:{cell_id}:
+    resume")` reused across referrals and across calls. This function runs
+    once per sweep pass (every SWEEP_STEP_HOURS, ~1000+ times over a cell's
+    horizon), and most passes see only one or two newly-escalated
+    referrals — a single shared stream, freshly re-seeded from the SAME
+    string on every call, hands most referrals the *identical* first draw,
+    so whether a referral "succeeds" stopped depending on response_rate at
+    all and started depending only on which (cell_seed, cell_id) it was in
+    and how many other referrals happened to escalate in the same pass.
+    Found by comparing E1's own already-committed raw.csv against a fresh
+    E2 run: resumed_count was 0-or-(nearly)-all for a given (dropout, seed)
+    across every response_rate, never a real ~25/50/75% split — the
+    signature of this bug, not of a working probability draw. Per-referral
+    keying makes each referral's draw independent of every other one and
+    of how sweep passes happen to batch them, while staying exactly as
+    reproducible (same seed -> same outcome) as before.
+
     Logs in fresh every call, never a token cached across calls — unlike
     server/scripts/load_cohort.py's own per-call token cache (which is
     naturally safe: the injected clock never advances *during* one load()
@@ -252,7 +270,6 @@ async def resume_escalated_referrals(
     if response_rate <= 0.0 or not escalated_referral_ids:
         return outcome
 
-    rng = Random(f"{cell_seed}:{cell_id}:resume")
     user_org_role = _user_by_org_role(district)
     token_cache: dict[str, dict] = {}
 
@@ -277,7 +294,8 @@ async def resume_escalated_referrals(
         breached_state = breached_state_by_id.get(referral_id)
         if breached_state is None:
             continue  # already resolved by a later step this same sweep pass -- nothing to do
-        if not (rng.random() < response_rate):
+        referral_rng = Random(f"{cell_seed}:{cell_id}:resume:{referral_id}")
+        if not (referral_rng.random() < response_rate):
             continue
 
         referral = referral_by_id[str(referral_id)]
@@ -291,7 +309,7 @@ async def resume_escalated_referrals(
         from_state = State.ESCALATED.value
         pushed_ok = True
         for step_index, (_frm, to) in enumerate(steps):
-            device_time = device_time + timedelta(hours=rng.uniform(1, 12))
+            device_time = device_time + timedelta(hours=referral_rng.uniform(1, 12))
             role = _ROLE_FOR[State(to)]
             actor = (
                 referral.origin_user

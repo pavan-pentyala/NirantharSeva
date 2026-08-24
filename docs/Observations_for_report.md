@@ -259,3 +259,110 @@ else (no direct `datetime.now()` calls, checked by a CI grep) turned out
 to have one gap that no amount of grepping this codebase's own source
 would find, because the offending clock read is inside a third-party
 library's own code, not this project's.
+
+## 2026-08-24 — Phase 8, P8.2 implementation (Sonnet)
+
+### A second harness bug, this time in already-committed E1 results, found only because a second experiment reused the same code
+
+P8.1's `experiments/resume.py` models a supervisor "acting on" an
+escalation as a single random draw per referral: with probability
+`escalation_response_rate`, the referral resumes its interrupted timeline;
+otherwise it stays dropped. The draw was seeded as
+`Random(f"{cell_seed}:{cell_id}:resume")` — built once per *call* to the
+function, not once per *cell*. That function runs once every simulated
+sweep step (roughly a thousand times over one cell's horizon), and most
+calls see only one or two referrals newly escalated. A fresh `Random`
+object re-seeded from the same string every call hands its very first
+draw to whichever referral happens to be alone in that call — the same
+value, every time, for a given (cell, seed) — so instead of each referral
+getting its own independent coin flip, most referrals in a cell got the
+identical outcome: either the whole cell's escalated referrals recovered,
+or none of them did, depending on one fixed number nobody had reason to
+inspect.
+
+E1's own r=0 identity check could not catch this, because r=0 never calls
+the function at all (nothing to resume when nobody responds) — the check
+was specified for exactly the failure P8.1 found (observation 54), and
+this is a different failure occupying the same file. It surfaced only
+once P8.2 reused the identical function for a second experiment (E2,
+sweeping the SLA window rather than the response rate) and every one of
+E2's twelve cells came back reporting **100% closure**, regardless of
+window. A true 50%-per-referral draw does not produce total success
+twelve times running; that was the tell. Going back to look at E1's own
+already-committed numbers with this in mind confirmed the same fault had
+been there from the start: at one fixed dropout level and seed, the count
+of referrals recovered went from zero (r=0, expected) to *every* escalated
+referral (r=0.25) to a partial number (r=0.5) back to *every one again*
+(r=0.75) — while a **different seed at the identical r=0.25** recovered
+none at all. That is not what a working probability looks like at any
+sample size; it is the fingerprint of a fixed, arbitrary outcome standing
+in for one.
+
+The fix keys each referral's draw off the referral's own id —
+`Random(f"{cell_seed}:{cell_id}:resume:{referral_id}")`, constructed fresh
+per referral rather than shared across a call — so a referral's outcome
+depends only on itself, not on which other referrals happened to escalate
+in the same sweep pass. Reproducibility (I7) is preserved exactly: the
+same seed still produces the same per-referral outcome deterministically,
+because the fault was never "using a seeded RNG," it was reusing one
+stream across independent decisions that needed to be independent.
+**Both E1's full 45-cell grid and E2's full 12-cell grid had to be
+re-run** after the fix — real time spent re-generating results that had
+already been reported as complete, on a bug that produced a clean exit
+and a plausible-looking number every single time it ran.
+
+**Why this belongs in the report.** It is the same lesson observation 54
+already taught, arriving by a different door: a harness's own internal
+consistency checks are only as good as their coverage, and a check
+specified for one failure mode (r=0, "does escalation-on match
+escalation-off when nobody responds") says nothing about a different
+failure mode living in the very same function (r>0, "is each referral's
+recovery actually independent of the others"). The bug was caught not by
+re-reading the code, but by the oldest and cheapest validity test there
+is — running the same modelled mechanism a second time, under different
+conditions, and noticing that the numbers moved in a way a real
+probability distribution does not.
+
+### A swept experiment parameter can be silently overridden by a cheaper harness setting from an earlier experiment
+
+A second, independent issue turned up while validating E2 before
+committing to its full grid: cells at opposite ends of the swept SLA
+window (24 hours and 120 hours) produced **byte-identical** escalation
+data — the same referrals, the same breach timestamps, nothing differing
+by so much as a second. The SLA window was having no effect at all.
+
+The cause was `LOAD_STEP_HOURS=168` (weekly), a setting P8.1 tuned purely
+for E1's wall-clock budget — E1 never sweeps anything the load cadence
+could interact with, so the tuning was safe there. E2 sweeps the SLA
+window itself, and 168 hours is wider than every value in that sweep
+({24, 48, 72, 120}); a referral can sit unpushed for up to a week between
+loader batches, which is enough on its own to breach any window E2 tests,
+before the window's actual value ever gets a chance to matter. A setting
+chosen to make one experiment affordable had, without anyone deciding it
+should, made a different experiment's entire independent variable inert.
+
+The fix was a second, E2-specific cadence (`E2_LOAD_STEP_HOURS=12`, below
+the narrowest swept window), which cost a real, measured price: each cell
+went from about ninety seconds to roughly eighteen to twenty minutes,
+making E2's full twelve-cell grid a multi-hour run rather than a
+fifteen-minute one. After the fix, escalation counts did differ between
+cells rather than repeating the same number twelve times — confirming the
+window was finally being measured rather than masked.
+
+One honest limitation survived the fix and is worth stating plainly
+rather than smoothing over: even with the confound removed, E2's
+escalation-volume metric still shows only modest movement across
+{24..120} hours on this cohort, for two structural reasons that are not
+bugs. First, a referral that never sends its next event at all will
+eventually breach *any* window, given the long horizon every cell runs
+for — the window changes *when* detection happens, not *whether* it
+does, so a static end-of-horizon count is not very sensitive to it.
+Second, `generator/timeline.py`'s per-transition dwell time is drawn
+uniformly from one to thirty-six hours — a real but *not dropped-out*
+referral rarely lingers long enough to breach even the narrowest swept
+window (24 hours) before its next event lands. The interesting part of
+an alert-fatigue frontier — false alarms on referrals that are merely
+slow, not actually stuck — sits at windows shorter than this experiment's
+approved range, not inside it. Worth a sentence in Chapter 4's discussion
+of E2: the frontier this harness can show is real, but flatter than the
+question originally posed, and the reason is legible rather than mysterious.

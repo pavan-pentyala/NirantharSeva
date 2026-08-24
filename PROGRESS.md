@@ -9,19 +9,32 @@
 > those here just gives a future session more text to read for the same
 > information, at lower quality.
 
-**Last updated:** 2026-08-23
-**Last session model:** Sonnet (P8.1 implementation).
+**Last updated:** 2026-08-24
+**Last session model:** Sonnet (P8.2 implementation).
 
 ## Current phase
 
 **Phase 7 is complete, including the cuttable P7.3 backlog.** P7.1, P7.2,
 and P7.3 are all done and verified (see below).
 
-**Phase 8: P8.1 is done and verified.** The `experiments/` harness exists,
-E1 (45 cells) ran to completion, and every P8.1 exit criterion is checked
-against real commands (see below). **P8.2 (E2+E3+E6, `analysis.py`) and
-P8.3 (E4 evidence, E5 k6) are not started and each needs its own
-go-ahead** (handoff R1/R5) — D40's split is what governs the boundary.
+**Phase 8: P8.1 and P8.2 are done and verified.** The `experiments/`
+harness now covers E1/E2/E3/E6, `experiments/analysis.py` regenerates
+every table/figure/dashboard from `raw.csv` alone, and all four
+experiments have real, committed results in `server/results/`. **P8.3
+(E4 evidence, E5 k6) is not started and needs its own go-ahead**
+(handoff R1/R5) — D40's split is what governs the boundary.
+
+**P8.2 found and fixed a real bug in already-committed P8.1 code** — a
+shared RNG re-seeded per call in `experiments/resume.py`, not per cell,
+silently corrupted every escalation-on/r>0 cell's closure numbers in the
+*already-reported-as-done* E1 grid. Found only because E2 reused the
+same function and produced impossible 100%-closure results. Fixed, and
+**both E1's 45-cell grid and E2's 12-cell grid were re-run** with the fix
+— `server/results/e1/` and `server/results/e2/` now hold the corrected
+data, not the original P8.1 run. See observations 56–57
+(`docs/OBSERVATIONS.md`) and this session's section in
+`docs/Observations_for_report.md` before touching `experiments/resume.py`
+or `experiments/cell.py`'s E2 loop again.
 
 ## Done
 
@@ -335,11 +348,91 @@ go-ahead** (handoff R1/R5) — D40's split is what governs the boundary.
   reproduced its row byte-identical to the grid run's own, except
   `wall_seconds` (timing, not data).
 
+  **Superseded by P8.2 — this run's own `resumed_and_closed`/`closure_rate`
+  numbers for every escalation-on cell were wrong** (observation 56): a
+  shared RNG in `experiments/resume.py`, re-seeded per call instead of per
+  cell, meant most referrals in a cell got an identical fixed outcome
+  instead of an independent per-referral draw. The r=0 identity check
+  above is genuinely unaffected (r=0 never calls the buggy function) and
+  still holds on the corrected data. `server/results/e1/raw.csv` now holds
+  the re-run, not this original one — see the P8.2 entry below.
+
+- **P8.2** (`docs/PHASE8_PLAN.md` build order, 2026-08-24, Sonnet):
+  `experiments/grid.py` gained `e2_cells()`/`e3_cells()`/`e6_cells()` (D37's
+  uniform `sla_profile.max_hours` override for E2, `FULL_COHORT_CONFIG`
+  for E6 — both confirmed with the user, since cohort scale and E2's fixed
+  `escalation_response_rate=0.5` are experiment parameters, not
+  implementation details); `experiments/cell.py` gained `_run_e2_cell`,
+  `_run_e3_cell`, `_run_e6_cell` (E1's own `_run_cell` untouched, kept as
+  its own dispatch path in `main()` — this session's changes cannot alter
+  E1's already-verified code path); `experiments/runner.py` generalized
+  `RAW_COLUMNS` into `RAW_COLUMNS_BY_EXP` (one column set per experiment,
+  matching PHASE8_PLAN.md's own table) and the r=0 identity check now
+  gates on `args.exp == "E1"`. `experiments/analysis.py` (new): reads only
+  `raw.csv`, writes `table_*.csv`, `figure_*.png` (matplotlib — new `dev`
+  dependency, confirmed with the user, `server/pyproject.toml`/`uv.lock`),
+  `summary.md`, and a self-contained `dashboard.html` per experiment.
+  `matplotlib>=3.11.1` added via `uv add --group dev matplotlib` inside
+  the `api` container (same install path as every other dependency here).
+
+  **Two real, load-bearing bugs found and fixed before trusting any
+  number from this sub-phase** — see observations 56–57,
+  `docs/OBSERVATIONS.md`, and `docs/Observations_for_report.md`'s
+  2026-08-24 section for the fuller report-facing writeup:
+  (1) `experiments/resume.py`'s RNG bug (above) — found by E2's cells all
+  reporting `closure_rate=1.0` regardless of SLA window, which is not
+  what a real 50%-per-referral draw produces; confirmed against E1's own
+  committed data (same fault, since P8.1). Fixed by keying each
+  referral's draw off its own id, not a stream shared across referrals
+  and calls. **Both E1 (45 cells) and E2 (12 cells) were re-run** after
+  the fix — `server/results/e1/` and `server/results/e2/` hold the
+  corrected data. (2) E2's SLA-window sweep was initially confounded by
+  E1's own `LOAD_STEP_HOURS=168` (weekly push-batching lag exceeds every
+  window E2 sweeps, {24,48,72,120}h) — found by running the 24h and 120h
+  cells first and comparing their escalation rows directly: byte-identical.
+  Fixed with a separate `E2_LOAD_STEP_HOURS=12` (confirmed with the user
+  given the cost: ~90s/cell → ~18-20min/cell). Even after the fix,
+  `escalations_raised`/`escalations_per_100_referrals` still barely move
+  across the swept range — a real, structural property of this cohort's
+  dwell-time distribution meeting the approved sweep range, not a bug;
+  reported honestly rather than smoothed over.
+
+  **Final results, all committed:**
+  - **E1** (`server/results/e1/`, re-run): 45 rows, ~66 minutes,
+    identity check passed. `figure_e1_closure.png` is the corrected
+    headline figure — every dropout curve starts exactly on its own
+    escalation-off baseline at r=0 and rises smoothly and monotonically
+    through r=0.25/0.5/0.75.
+  - **E2** (`server/results/e2/`): 12 rows (4 SLA windows × 3 seeds),
+    ~3.7 hours (`E2_LOAD_STEP_HOURS=12`). `table_e2_frontier.csv`:
+    closure_rate ~0.78-0.80 and escalations_per_100_referrals identical
+    (~42.7) across all four windows — the flat-frontier finding above.
+  - **E3** (`server/results/e3/`): 18 rows (1 cell × 3 seeds × 6
+    thresholds), ~31 seconds total. `blocking_recall=1.0` on every seed —
+    honest limitation: `generator/cohort.py`'s duplicate model (frozen
+    P7.1 code) only produces same-village, same/near-spelling pairs, none
+    of gold_set.py's harder cross-village/phone-changed categories, so
+    this cohort-scale E3 mostly reconfirms the P6.1 draft rather than
+    adding new signal — worth a sentence in Chapter 4, not a defect.
+  - **E6** (`server/results/e6/`): 3 rows (1 cell × 3 seeds, full P7.1-scale
+    cohort — confirmed with the user), ~56 minutes. `unresolvable_fraction`
+    0.40-0.47 across three genuinely different cohorts (621/627/636
+    referrals — confirms three different seeds, not one repeated),
+    mean ≈0.445. `lost` is 0 in every seed — nothing in this codebase ever
+    writes the `LOST` state, noted in `experiments/cell.py`'s own comment,
+    not something P8.2 needed to fix.
+
+  Verified: full server suite **269 passed** (unchanged count — no new
+  server tests, this sub-phase is harness/tooling only), `ruff check`/
+  `ruff format --check` clean, `python -m app.verify_replay` clean.
+  `alembic heads` still `0008` (P8.2 adds no migration). No leftover
+  `ns_exp_*` databases or orphaned containers after the session (checked
+  by hand, `docker ps -a` and a `pg_database` query).
+
 ## Not done / in progress
 
-- **P8.2 (E2+E3+E6, `analysis.py`) and P8.3 (E4 evidence, E5 k6): not
-  started.** Each needs its own go-ahead (handoff R1/R5); D40 already
-  fixes what each contains.
+- **P8.3 (E4 evidence, E5 k6): not started.** Needs its own go-ahead
+  (handoff R1/R5); D40 already fixes what it contains.
 - **The real-phone airplane-mode recording is not done.** User has said
   keep it — do not drop it, do not re-propose dropping it.
 - **A pre-existing, unrelated flake was observed, not fixed:**
@@ -575,6 +668,29 @@ the `api` container (only `server/`, `generator/`, `experiments/`,
 known, accepted gap (`_git_sha()`'s own docstring), not something P8.2/P8.3
 need to fix unless a report figure actually needs real provenance.
 
+**P8.1's original numbers above are superseded** — see the P8.2 entry in
+"Done" and observation 56: the r=0 identity check itself still holds
+(unaffected by the bug), but the response-rate-swept closure numbers it
+sat next to were wrong until this session's fix and re-run.
+
+P8.2: every criterion in `docs/PHASE8_PLAN.md`'s D40 table checked against
+real commands — `server/results/{e2,e3,e6}/raw.csv` exist with the exact
+row counts D40/PHASE8_PLAN.md's "Cell counts" table specifies (E2: 12,
+E3: 18, E6: 3); `MSYS_NO_PATHCONV=1 docker compose run --rm api python -m
+experiments.analysis --exp E2 --in /app/results/e2/ --out
+/app/results/e2/` (and the same for E1/E3/E6) regenerates
+`table_*.csv`/`figure_*.png`/`summary.md`/`dashboard.html` reading
+**only** `raw.csv` — checked by running it after the source databases
+were already dropped (ADR-016's per-cell lifecycle drops each database
+before the next cell starts; nothing in `analysis.py` imports `app.*` or
+opens a database connection at all, checked by reading the file, not just
+by it happening to work). `alembic heads` is `0008` (P8.2 adds no
+migration). Full server suite **269 passed** (unchanged — no new server
+tests; P8.2 is a harness/tooling sub-phase), `ruff check`/
+`ruff format --check` clean across `experiments/` and the whole server
+tree, `python -m app.verify_replay` clean. No `ns_exp_*` database or
+orphaned `docker ps -a` entry survived the session.
+
 ## Open item for the user
 
 **The real-phone clip** (plan §8.5, the Review-III fallback) is still
@@ -585,17 +701,40 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**P8.1 is done.** Next is either **P8.2** (E2's SLA-window sweep, E3's
-threshold sweep at cohort scale, E6's full-cohort run, `analysis.py`
-turning `raw.csv`s into Chapter 4 tables/figures) or **P8.3** (E4's fault
-evidence — largely collection, not new tests, per Phase 8 planning's
-finding 4 — and E5's k6 load test). Wait for the user to say which, and
-when (handoff R1/R5) — do not start either without an explicit go-ahead.
+**P8.1 and P8.2 are both done.** Next is **P8.3** (E4's fault evidence —
+largely collection, not new tests, per Phase 8 planning's finding 4 — and
+E5's k6 load test, which needs k6 added to the repo fresh). Wait for the
+user's go-ahead (handoff R1/R5) before starting it.
 
-`experiments/grid.py` currently defines E1's cells only; P8.2 needs to add
-E2/E3/E6's cell definitions to it (D37's uniform-SLA-window rule for E2 is
-already decided, just not built) before `runner.py`/`cell.py` can run
-anything but `--exp E1`.
+To verify P8.2 yourself:
+
+```bash
+docker compose up -d --build
+MSYS_NO_PATHCONV=1 docker compose run --rm api python -m experiments.runner --exp E3 --out /app/results/e3_check/
+MSYS_NO_PATHCONV=1 docker compose run --rm api python -m experiments.analysis --exp E3 --in /app/results/e3_check/ --out /app/results/e3_check/
+```
+Expect: 3 cells x 6 rows = 18 rows in `raw.csv` (~30s total — E3 is the
+cheap one, a single load pass per seed, no clock stepping), then
+`table_e3_thresholds.csv`, `table_e3_summary.csv`, `figure_e3_prf.png`,
+`summary.md`, `dashboard.html` all appear in the same directory. Compare
+against the committed `server/results/e3/` — every column but
+`wall_seconds`/`git_sha` should match. Delete `server/results/e3_check/`
+afterward.
+
+**E2 and E6 are not worth re-verifying casually — they now take ~3.7
+hours and ~56 minutes respectively** (E2_LOAD_STEP_HOURS=12 for E2;
+E6's full P7.1-scale cohort for E6). If you do:
+```bash
+MSYS_NO_PATHCONV=1 docker compose run --rm api python -m experiments.runner --exp E2 --out /app/results/e2_check/ --cell sla24 --seeds 42
+```
+One cell only, ~18-20 minutes, is enough to sanity-check the harness
+still works without re-running the whole grid.
+
+**Before touching `experiments/resume.py` again:** read observation 56
+(`docs/OBSERVATIONS.md`) first. The bug was a shared RNG re-seeded per
+call instead of per cell — any change to how `resume_escalated_referrals`
+or `reconcile_natural_continuations` constructs its `Random` needs to
+preserve "one independent stream per referral," not just "looks seeded."
 
 To verify P8.1 yourself:
 
@@ -861,9 +1000,41 @@ around changes what that spec exercises. Clean up by deleting from
   alongside `PROGRESS.md`, whenever the session produced anything
   report-worthy — this is now in `CLAUDE.md`'s "End of every session"
   section too.
+- **P8.2's three decisions, all answered 2026-08-24, do not re-ask:**
+  E2's fixed `escalation_response_rate=0.5` (grid.py's `E2_RESPONSE_RATE`
+  — the median of E1's own swept {0,0.25,0.5,0.75}, chosen for direct
+  comparability with E1's r=0.5 cells); E6 uses the full P7.1-scale
+  cohort (`FULL_COHORT_CONFIG`, ~200 patients/~620 referrals), not E1/E2's
+  smaller grid-scale one, despite the wall-clock cost (~56 min for 3
+  seeds) — "full-cohort run" (§13.2) was read literally; `matplotlib`
+  added as a new `dev`-group dependency for `experiments/analysis.py`'s
+  figures, confirmed before it was added. Also answered: `E2_LOAD_STEP_HOURS
+  =12` for E2 specifically (not the shared `LOAD_STEP_HOURS=168`), after
+  the confound in observation 57 was found and measured — the ~18-20min/
+  cell cost was shown before, not after, committing to the full grid.
 
 ## Known problems and workarounds
 
+- **A `Random(seed_string)` built fresh inside a function that gets
+  called many times per cell gives every call the same first draw, not
+  an independent one per referral.** `experiments/resume.py`'s
+  `resume_escalated_referrals` did exactly this — silently corrupted
+  every escalation-on/r>0 cell in P8.1's *committed* E1 run, invisible to
+  the r=0 identity check (which never calls this function at all). Fixed
+  by keying the RNG off the referral's own id, constructed inside the
+  per-referral loop, not once per call. Before changing anything in this
+  file that constructs a `Random`, check: does this seed string vary per
+  independent decision, or could two different draws share it? See
+  observation 56, `docs/OBSERVATIONS.md`.
+- **A harness setting tuned for one experiment's wall-clock budget can
+  silently neutralize a different experiment's swept parameter.**
+  `LOAD_STEP_HOURS=168` (P8.1, tuned for E1) is wider than every SLA
+  window E2 sweeps ({24,48,72,120}h) — push-batching lag alone breached
+  every window regardless of its value, until `E2_LOAD_STEP_HOURS=12`
+  fixed it (at a real cost: ~90s/cell → ~18-20min/cell). Before adding a
+  new sweep to any future experiment, ask whether any existing constant
+  in `experiments/grid.py` sits inside — not below — the new sweep's own
+  range. See observation 57, `docs/OBSERVATIONS.md`.
 - **`experiments.runner`'s `--out` needs `MSYS_NO_PATHCONV=1` too** — same
   Git-Bash path-mangling as `--out`/`--gold` elsewhere (observation 41),
   and it bit this exact command this session: a run without the prefix

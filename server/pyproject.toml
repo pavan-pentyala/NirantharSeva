@@ -24,6 +24,7 @@ dev = [
     "httpx>=0.27",
     "ruff>=0.7",
     "hypothesis>=6.115",
+    "matplotlib>=3.11.1",
 ]
 
 [tool.pytest.ini_options]

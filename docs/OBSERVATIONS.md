@@ -1407,3 +1407,80 @@ because `RealClock.now()` already agrees with PyJWT's own real-time
 checks on both claims. Two new unit tests in `server/tests/unit/
 test_auth.py` pin both directions with a real `SimulatedClock` via
 `app.dependency_overrides`, not just a mocked JWT.
+
+## Phase 8, P8.2 — a shared RNG stream, re-seeded from the same string on
+every call, is not the same thing as one independent draw per referral
+
+**56. `experiments/resume.py`'s `resume_escalated_referrals` built one
+`Random(f"{cell_seed}:{cell_id}:resume")` per *call*, not one per *cell* —
+so every referral that happened to escalate alone in its own sweep pass
+(the common case: the function runs once every `SWEEP_STEP_HOURS`, roughly
+a thousand times over a cell's horizon, and escalations trickle in a few
+at a time) drew the exact same first value from a stream that had just
+been reset to the same seed, instead of an independent
+`Bernoulli(response_rate)` trial.** The bug was invisible in P8.1's own
+exit criteria — the r=0 identity check never exercises this function at
+all (response_rate=0 short-circuits before the RNG is even touched,
+`if response_rate <= 0.0: return outcome`), and the r>0 cells still
+produced a plausible-looking `raw.csv` row: a number, in range, nothing
+raised. It surfaced only once a *second* experiment (E2, P8.2) reused the
+same function at a different `response_rate` and every cell — four
+different SLA windows, three different seeds — came back with
+`closure_rate=1.0`. That was the tell: a real 50% draw does not produce
+100% success twelve times running. Tracing it back to E1's own
+already-committed `server/results/e1/raw.csv` confirmed the same fault
+had been there since P8.1: at a fixed (dropout, seed), `resumed_count`
+across r={0, 0.25, 0.5, 0.75} went 0 → *all* escalated referrals → some
+partial number → *all* again, for one seed, while a **different seed at
+the identical r=0.25** showed 0 — the signature of "whichever fixed
+draw this (cell_seed, cell_id) pair happens to produce, decides
+everything," not of a working probability. Fixed by keying each
+referral's own `Random` off the referral's own id —
+`Random(f"{cell_seed}:{cell_id}:resume:{referral_id}")`, constructed fresh
+inside the per-referral loop rather than once per call — so a referral's
+draw depends only on itself, never on how many other referrals happened
+to escalate in the same sweep pass or how many times the function had
+already been called before it. I7 is untouched: the same seed still
+produces the same per-referral outcome, because the key is still fully
+deterministic — it was the *sharing* of one stream across independent
+referrals that was wrong, not the use of a seeded RNG itself. **Cost:**
+E1's full 45-cell grid and E2's full 12-cell grid both had to be
+re-run after the fix (E1: ~66 minutes; E2: ~3.9 hours at the corrected
+`E2_LOAD_STEP_HOURS=12` — see observation 57) — real wall-clock time
+lost to a bug that produced clean exits and readable numbers the entire
+time. Nothing about ADR-017's own identity check was wrong; it simply
+never had a reason to look at the one code path this bug lived in.
+
+## Phase 8, P8.2 — a swept parameter can't move a metric that a cheaper
+harness knob already decided for it
+
+**57. E2 sweeps `sla_profile.max_hours` over {24, 48, 72, 120} hours to
+measure the alert-fatigue frontier, but the harness loads a cohort in
+batches of `LOAD_STEP_HOURS` (168, weekly — P8.1's own tuning for E1's
+wall-clock budget) between sweeps. 168 exceeds every value E2 sweeps, so
+a referral's push-batching lag alone was long enough to trigger a breach
+regardless of which window was configured — the window never got a
+chance to matter.** Found the same way observation 56 was: not by
+inspection, but by running one cell at each end of the swept range (24h,
+120h) before trusting the full grid, and comparing the actual
+`(referral_id, breached_state)` rows the two runs produced — byte for
+byte identical, for two windows five times apart. `LOAD_STEP_HOURS`
+governs `state_entered_at`'s lag (documented in `experiments/grid.py`
+since P8.1, in the context of E1's own `mean_hours_to_detection` bias),
+but nobody had reasoned through what that lag does to an experiment whose
+*entire x-axis* sits inside it. Fixed with a second, E2-only constant
+(`E2_LOAD_STEP_HOURS=12`, below the narrowest swept window) — cells got
+noticeably slower (~90s to ~1080-1210s each) but the window began to
+matter again: escalation counts and false positives dropped and started
+differing between cells rather than repeating the same numbers four times.
+A second, separate finding sits underneath this one and is *not* a bug:
+even after the fix, `escalations_raised`/`escalations_false_positive`
+still don't move much across {24..120}h, because (a) a referral that
+genuinely never sends its next event will breach *any* window eventually,
+given a long enough horizon, and (b) `generator/timeline.py`'s per-step
+dwell time (`rng.uniform(1, 36)` hours) rarely produces a "slow but alive"
+referral whose real delay exceeds even the narrowest swept window. That
+second fact is a property of the approved cohort and the approved sweep
+range meeting each other, not something this session changed or could
+fix without changing either — reported as-is in `docs/
+Observations_for_report.md`, not smoothed over.

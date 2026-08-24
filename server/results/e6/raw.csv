@@ -1,0 +1,4 @@
+exp,cell_id,seed,run_id,wall_seconds,cohort_patients,cohort_referrals,cohort_events,git_sha,alembic_head,referrals_total,closed,lost,stuck_open,escalated_unresolved,unresolvable_fraction,identity_review_pending
+E6,full_cohort,42,e6_full_cohort_s42,1132.771,220,621,2039,unknown,0008,621,329,0,44,248,0.47020933977455714,3
+E6,full_cohort,7,e6_full_cohort_s7,1164.36,220,627,2193,unknown,0008,627,374,0,45,208,0.40350877192982454,3
+E6,full_cohort,13,e6_full_cohort_s13,1042.193,220,636,2100,unknown,0008,636,342,0,49,245,0.46226415094339623,2

@@ -1,0 +1,27 @@
+exp: E3
+seeds:
+- 42
+- 7
+- 13
+sim_start: '2026-01-01T00:00:00+00:00'
+cells:
+- exp: E3
+  cell_id: thresholds
+  escalation_on: false
+  dropout_pct: null
+  response_rate: null
+  sla_window_hours: null
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      IN_TRANSIT: 0.25
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05

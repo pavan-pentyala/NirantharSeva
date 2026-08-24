@@ -26,10 +26,11 @@ from typing import Any
 import yaml
 
 from app.config import get_settings
+from experiments.cell import ROW_MARKER
 from experiments.db_lifecycle import create_database, database_url_for, drop_database
 from experiments.grid import SEEDS, SIM_START, Cell, cells_for
 
-RAW_COLUMNS = [
+_COMMON_COLUMNS = [
     "exp",
     "cell_id",
     "seed",
@@ -40,23 +41,67 @@ RAW_COLUMNS = [
     "cohort_events",
     "git_sha",
     "alembic_head",
-    "escalation_on",
-    "dropout_rate",
-    "response_rate",
-    "referrals_total",
-    "referrals_closed",
-    "closure_rate",
-    "dropped_total",
-    "escalations_raised",
-    "escalations_true_positive",
-    "escalations_false_positive",
-    "dropped_detected",
-    "detection_rate",
-    "mean_hours_to_detection",
-    "resumed_count",
-    "resumed_and_closed",
-    "reconciled_count",
 ]
+
+# Per docs/PHASE8_PLAN.md "raw.csv columns" — one column set per experiment,
+# since E2/E3/E6 don't share E1's own (escalation_on, dropped_total, ...)
+# shape. E1's own extra "reconciled_count" (P8.1, not in the plan's fixed
+# table) is kept as-is — already shipped and committed.
+RAW_COLUMNS_BY_EXP: dict[str, list[str]] = {
+    "E1": _COMMON_COLUMNS
+    + [
+        "escalation_on",
+        "dropout_rate",
+        "response_rate",
+        "referrals_total",
+        "referrals_closed",
+        "closure_rate",
+        "dropped_total",
+        "escalations_raised",
+        "escalations_true_positive",
+        "escalations_false_positive",
+        "dropped_detected",
+        "detection_rate",
+        "mean_hours_to_detection",
+        "resumed_count",
+        "resumed_and_closed",
+        "reconciled_count",
+    ],
+    "E2": _COMMON_COLUMNS
+    + [
+        "sla_window_hours",
+        "response_rate",
+        "referrals_total",
+        "referrals_closed",
+        "closure_rate",
+        "escalations_raised",
+        "escalations_per_100_referrals",
+        "escalations_false_positive",
+    ],
+    "E3": _COMMON_COLUMNS
+    + [
+        "threshold",
+        "precision",
+        "recall",
+        "f1",
+        "auto_resolution_rate",
+        "blocking_recall",
+        "miss_normalize",
+        "miss_blocking",
+        "miss_scoring",
+        "miss_threshold",
+    ],
+    "E6": _COMMON_COLUMNS
+    + [
+        "referrals_total",
+        "closed",
+        "lost",
+        "stuck_open",
+        "escalated_unresolved",
+        "unresolvable_fraction",
+        "identity_review_pending",
+    ],
+}
 
 
 def _sanitize(value: str) -> str:
@@ -69,7 +114,7 @@ def _db_name(exp: str, cell_id: str, seed: int) -> str:
 
 def _run_cell_subprocess(
     base_database_url: str, exp: str, cell: Cell, seed: int, keep_db: bool
-) -> dict[str, Any]:
+) -> list[dict[str, Any]]:
     db_name = _db_name(exp, cell.cell_id, seed)
     print(f"[{exp}/{cell.cell_id}/seed={seed}] creating database {db_name}", file=sys.stderr)
     _run_async(create_database, base_database_url, db_name)
@@ -114,18 +159,31 @@ def _run_cell_subprocess(
             f"no row written. See its stderr above."
         )
 
-    stdout_lines = [line for line in result.stdout.splitlines() if line.strip()]
-    if not stdout_lines:
+    # Only lines carrying experiments.cell's own ROW_MARKER prefix are a
+    # cell's row(s) — everything else on this stdout (alembic's migration
+    # chatter, and app/instrumentation/logging.py's own structured JSON
+    # request logs, which are ALSO valid JSON and outnumber the real rows by
+    # a hundred to one during a cohort load) is not. E1 prints one row, E3
+    # prints six (docs/PHASE8_PLAN.md's "Cell counts" table) — "the last
+    # line" and "any line that parses as JSON" are both wrong once more than
+    # one experiment is in play; see experiments/cell.py's own comment.
+    rows: list[dict[str, Any]] = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line.startswith(ROW_MARKER):
+            continue
+        rows.append(json.loads(line[len(ROW_MARKER) :]))
+    if not rows:
+        print(result.stdout, file=sys.stderr)
         print(result.stderr, file=sys.stderr)
         raise RuntimeError(f"cell {exp}/{cell.cell_id}/seed={seed} printed no JSON row")
 
-    row = json.loads(stdout_lines[-1])
     print(
         f"[{exp}/{cell.cell_id}/seed={seed}] done in {elapsed:.1f}s "
-        f"(cell reported {row.get('wall_seconds')}s)",
+        f"({len(rows)} row(s), cell reported {rows[0].get('wall_seconds')}s)",
         file=sys.stderr,
     )
-    return row
+    return rows
 
 
 def _run_async(fn, *args) -> None:
@@ -134,13 +192,13 @@ def _run_async(fn, *args) -> None:
     asyncio.run(fn(*args))
 
 
-def _write_raw_csv(rows: list[dict[str, Any]], out_dir: Path) -> None:
+def _write_raw_csv(rows: list[dict[str, Any]], out_dir: Path, columns: list[str]) -> None:
     path = out_dir / "raw.csv"
     with path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=RAW_COLUMNS)
+        writer = csv.DictWriter(f, fieldnames=columns)
         writer.writeheader()
         for row in rows:
-            writer.writerow({k: row.get(k) for k in RAW_COLUMNS})
+            writer.writerow({k: row.get(k) for k in columns})
 
 
 def _write_cells_resolved(exp: str, cells: list[Cell], seeds: list[int], out_dir: Path) -> None:
@@ -236,28 +294,33 @@ def main() -> None:
 
     args.out.mkdir(parents=True, exist_ok=True)
     base_database_url = get_settings().database_url
+    columns = RAW_COLUMNS_BY_EXP[args.exp]
 
     started = time.monotonic()
     rows: list[dict[str, Any]] = []
+    cell_rows: list[dict[str, Any]] = []  # one entry per (cell, seed) — for manifest wall_seconds
     for cell, seed in plan:
-        row = _run_cell_subprocess(base_database_url, args.exp, cell, seed, args.keep_db)
-        rows.append(row)
-        _write_raw_csv(rows, args.out)  # written after every cell, not just at the end
+        new_rows = _run_cell_subprocess(base_database_url, args.exp, cell, seed, args.keep_db)
+        rows.extend(new_rows)
+        cell_rows.append(new_rows[0])
+        _write_raw_csv(rows, args.out, columns)  # written after every cell, not just at the end
 
     total_wall_seconds = time.monotonic() - started
     _write_cells_resolved(args.exp, cells, seeds, args.out)
-    _write_manifest(args.exp, rows, total_wall_seconds, args.out)
+    _write_manifest(args.exp, cell_rows, total_wall_seconds, args.out)
 
-    failures = _identity_check(rows)
-    if failures:
-        print("IDENTITY CHECK FAILED (ADR-017's r=0 check):", file=sys.stderr)
-        for f in failures:
-            print(f"  {f}", file=sys.stderr)
-        raise SystemExit(1)
-    print(
-        "Identity check passed: escalation-on at r=0 matches escalation-off everywhere it applies.",
-        file=sys.stderr,
-    )
+    if args.exp == "E1":
+        failures = _identity_check(rows)
+        if failures:
+            print("IDENTITY CHECK FAILED (ADR-017's r=0 check):", file=sys.stderr)
+            for f in failures:
+                print(f"  {f}", file=sys.stderr)
+            raise SystemExit(1)
+        print(
+            "Identity check passed: escalation-on at r=0 matches escalation-off "
+            "everywhere it applies.",
+            file=sys.stderr,
+        )
     print(
         f"{len(rows)} rows written to {args.out / 'raw.csv'} in {total_wall_seconds:.1f}s",
         file=sys.stderr,

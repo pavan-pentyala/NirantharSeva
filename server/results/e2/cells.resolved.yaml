@@ -1,0 +1,87 @@
+exp: E2
+seeds:
+- 42
+- 7
+- 13
+sim_start: '2026-01-01T00:00:00+00:00'
+cells:
+- exp: E2
+  cell_id: sla24
+  escalation_on: true
+  dropout_pct: 25
+  response_rate: 0.5
+  sla_window_hours: 24
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.25
+- exp: E2
+  cell_id: sla48
+  escalation_on: true
+  dropout_pct: 25
+  response_rate: 0.5
+  sla_window_hours: 48
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.25
+- exp: E2
+  cell_id: sla72
+  escalation_on: true
+  dropout_pct: 25
+  response_rate: 0.5
+  sla_window_hours: 72
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.25
+- exp: E2
+  cell_id: sla120
+  escalation_on: true
+  dropout_pct: 25
+  response_rate: 0.5
+  sla_window_hours: 120
+  cohort_config:
+    n_patients: 20
+    n_villages: 2
+    n_ashas: 2
+    n_facilities: 1
+    name_variant_rate: 0.15
+    duplicate_rate: 0.1
+    connectivity_profile: intermittent
+    dropout_rate:
+      CREATED: 0.1
+      ARRIVED: 0.1
+      TREATED: 0.05
+      BACK_REFERRED: 0.05
+      IN_TRANSIT: 0.25

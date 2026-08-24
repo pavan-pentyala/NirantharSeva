@@ -1,0 +1,22 @@
+{
+  "alembic_head": "0008",
+  "cells_run": 12,
+  "exp": "E2",
+  "git_sha": "unknown",
+  "harness_version": 1,
+  "per_cell_wall_seconds": {
+    "sla120_s13": 1125.133,
+    "sla120_s42": 1045.465,
+    "sla120_s7": 1179.649,
+    "sla24_s13": 1114.349,
+    "sla24_s42": 1047.062,
+    "sla24_s7": 1178.772,
+    "sla48_s13": 1115.058,
+    "sla48_s42": 1044.981,
+    "sla48_s7": 1177.618,
+    "sla72_s13": 1117.737,
+    "sla72_s42": 1049.954,
+    "sla72_s7": 1173.744
+  },
+  "total_wall_seconds": 13386.3
+}
