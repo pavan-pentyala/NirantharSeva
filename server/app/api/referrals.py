@@ -13,6 +13,7 @@ creeping back").
 
 import base64
 import json
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -48,11 +49,18 @@ def _encode_cursor(state_entered_at, referral_id: UUID) -> str:
     return base64.urlsafe_b64encode(raw.encode()).decode()
 
 
-def _decode_cursor(cursor: str) -> tuple[str, str]:
+def _decode_cursor(cursor: str) -> tuple[datetime, str]:
+    """Returns a real datetime, not the raw ISO string — asyncpg's wire
+    protocol infers the bind parameter's type from the column it's
+    compared against (state_entered_at, TIMESTAMPTZ) and requires an
+    actual datetime.datetime for that type; a plain str raises
+    asyncpg.exceptions.DataError the moment a second page is ever
+    requested. Found in a pre-Phase-9 audit — no existing test requested a
+    real second page, so this was never exercised."""
     try:
         raw = base64.urlsafe_b64decode(cursor.encode()).decode()
         ts, rid = json.loads(raw)
-        return ts, rid
+        return datetime.fromisoformat(ts), rid
     except Exception as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid cursor") from exc
 

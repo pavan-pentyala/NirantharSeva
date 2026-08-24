@@ -1510,3 +1510,40 @@ rows — a scale this project's own generator/demo cohorts never reach
 something this session measured. Reported as-is in `docs/
 Observations_for_report.md`, the same discipline observation 57's
 flat E2 frontier was reported with.
+
+## Pre-Phase-9 audit fixes — an unrelated column drop flipped a sort order nothing had ever actually guaranteed
+
+**59. `app/api/dashboard.py`'s `_OVERDUE_QUERY` had `ORDER BY
+e.triggered_at ASC` and nothing else — and every referral escalated in
+the same sweep pass shares an identical `triggered_at`, because
+`app/domain/escalation.py`'s `sweep()` computes `now` once per call, not
+once per row.** `test_overdue_list_sorted_worst_first` had been green
+since P5.2 anyway, because the tie between two same-pass escalations
+happened to resolve in insertion order every time it ran — an accident
+of query-plan behavior on a tiny table, never a guarantee the SQL itself
+made. Migration `0009` (this session, dropping two unrelated dead
+columns — `referral.sla_profile_id`, `escalation.escalated_to_user_id`)
+changed nothing about `_OVERDUE_QUERY`, `_BREACH_QUERY`, or the
+escalation/dashboard code at all — and the test started failing
+*consistently* anyway, reproduced across multiple fresh databases both
+ways (fails on `0009`, passes on `0008`, same test, same fixtures).
+Column drops don't rewrite existing rows, but they do change a table's
+on-disk width and the planner's own cost estimates for a freshly-created
+table in a freshly-created test database — enough, here, to flip which
+plan the tie-break fell out of. The first fix attempted (`ORDER BY
+r.state_entered_at ASC` on `_BREACH_QUERY`, so sweep *processes*
+worst-first) did not fix it either — proof the assumed mechanism
+(physical insertion order surviving through to the dashboard query) was
+never the real one. The actual fix: `_OVERDUE_QUERY` now breaks
+`triggered_at` ties using `referral_event.seq` — the one column in this
+schema ADR-002's advisory lock actually guarantees is commit-ordered —
+joined back to the specific `ESCALATED` event each escalation row was
+written alongside, in the same transaction. Verified deterministic
+across 5 repeated fresh-database runs, not just "passed once." General
+lesson: an `ORDER BY` with no tiebreaker over a column that can
+legitimately tie is not sorted, it's *coincidentally* ordered — and
+"coincidentally ordered" survives right up until something entirely
+unrelated (a dropped column two tables away) perturbs the coincidence it
+was quietly resting on. The fix that actually holds is the one that
+names a column the schema *guarantees* is ordered, not the one that
+guesses at which accident produced the old result.

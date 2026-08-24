@@ -50,6 +50,22 @@ E3_THRESHOLDS = [80, 85, 88, 90, 92, 95]
 ROW_MARKER = "CELL_ROW "
 
 
+def _check_non_accepted(non_accepted: list[dict], cell: Cell, seed: int) -> None:
+    """Every cell used to discard load()'s own LoadReport, so a push
+    rejected during a cohort load produced no error at all — just a
+    cohort silently smaller than what the generator actually built, and
+    every metric derived from it quietly wrong with nothing to say why.
+    Found in a pre-Phase-9 audit. Checked once per cell, across every
+    load() call inside it (the stepped loop's own calls and the final
+    catch-up), not per call — one rejection anywhere in a cell
+    invalidates that cell's whole row."""
+    if non_accepted:
+        raise RuntimeError(
+            f"cell {cell.exp}/{cell.cell_id}/seed={seed}: {len(non_accepted)} op(s) "
+            f"were not accepted while loading the cohort — first: {non_accepted[0]}"
+        )
+
+
 def _run_migrations() -> None:
     """Shells out to the real alembic CLI, the same command every other
     entry point in this repo uses — not the Python API, and not run from
@@ -183,17 +199,19 @@ async def _run_cell(cell: Cell, seed: int) -> dict[str, Any]:
             resumed_count += outcome.resumed_count
             resumed_and_closed += outcome.resumed_and_closed_count
 
+        all_non_accepted: list[dict] = []
         transport = ASGITransport(app=fastapi_app)
         async with httpx.AsyncClient(transport=transport, base_url="http://cell") as client:
             elapsed_hours = 0
             while clock.now() <= horizon:
                 if elapsed_hours % LOAD_STEP_HOURS == 0:
-                    await load(
+                    report = await load(
                         cohort_dir,
                         upto_device_time=clock.now(),
                         client=client,
                         session_factory=async_session_factory,
                     )
+                    all_non_accepted.extend(report.non_accepted)
                 await maybe_sweep_and_resume(client)
                 clock.advance(hours=SWEEP_STEP_HOURS)
                 elapsed_hours += SWEEP_STEP_HOURS
@@ -203,12 +221,13 @@ async def _run_cell(cell: Cell, seed: int) -> dict[str, Any]:
             # `horizon`, which is built with a buffer past the latest
             # generated event, but the very last sweep still needs to run
             # *after* that final load.
-            await load(
+            report = await load(
                 cohort_dir,
                 upto_device_time=None,
                 client=client,
                 session_factory=async_session_factory,
             )
+            all_non_accepted.extend(report.non_accepted)
             await maybe_sweep_and_resume(client)
 
             # Escalation flags a referral; it does not stop the ASHA/MO
@@ -231,6 +250,8 @@ async def _run_cell(cell: Cell, seed: int) -> dict[str, Any]:
                 referral_by_id=referral_by_id,
                 district=cohort.district,
             )
+
+        _check_non_accepted(all_non_accepted, cell, seed)
 
         verify_report = await verify_all()
         if not verify_report.ok:
@@ -407,6 +428,7 @@ async def _run_e2_cell(cell: Cell, seed: int) -> list[dict[str, Any]]:
                 district=cohort.district,
             )
 
+        all_non_accepted: list[dict] = []
         transport = ASGITransport(app=fastapi_app)
         async with httpx.AsyncClient(transport=transport, base_url="http://cell") as client:
             elapsed_hours = 0
@@ -421,22 +443,24 @@ async def _run_e2_cell(cell: Cell, seed: int) -> list[dict[str, Any]]:
                 # narrowest swept window (24h) is required for this
                 # experiment's x-axis to mean anything.
                 if elapsed_hours % E2_LOAD_STEP_HOURS == 0:
-                    await load(
+                    report = await load(
                         cohort_dir,
                         upto_device_time=clock.now(),
                         client=client,
                         session_factory=async_session_factory,
                     )
+                    all_non_accepted.extend(report.non_accepted)
                 await maybe_sweep_and_resume(client)
                 clock.advance(hours=SWEEP_STEP_HOURS)
                 elapsed_hours += SWEEP_STEP_HOURS
 
-            await load(
+            report = await load(
                 cohort_dir,
                 upto_device_time=None,
                 client=client,
                 session_factory=async_session_factory,
             )
+            all_non_accepted.extend(report.non_accepted)
             await maybe_sweep_and_resume(client)
 
             # Same bug-fix as E1's own cell (see _run_cell's own comment) —
@@ -451,6 +475,8 @@ async def _run_e2_cell(cell: Cell, seed: int) -> list[dict[str, Any]]:
                 referral_by_id=referral_by_id,
                 district=cohort.district,
             )
+
+        _check_non_accepted(all_non_accepted, cell, seed)
 
         verify_report = await verify_all()
         if not verify_report.ok:
@@ -598,12 +624,14 @@ async def _run_e3_cell(cell: Cell, seed: int) -> list[dict[str, Any]]:
 
         transport = ASGITransport(app=fastapi_app)
         async with httpx.AsyncClient(transport=transport, base_url="http://cell") as client:
-            await load(
+            report = await load(
                 cohort_dir,
                 upto_device_time=None,
                 client=client,
                 session_factory=async_session_factory,
             )
+
+        _check_non_accepted(report.non_accepted, cell, seed)
 
         verify_report = await verify_all()
         if not verify_report.ok:
@@ -774,27 +802,30 @@ async def _run_e6_cell(cell: Cell, seed: int) -> list[dict[str, Any]]:
         latest_event_time = max((e.device_time for e in events), default=earliest)
         horizon = max(latest_event_time, earliest) + timedelta(hours=HORIZON_BUFFER_HOURS)
 
+        all_non_accepted: list[dict] = []
         transport = ASGITransport(app=fastapi_app)
         async with httpx.AsyncClient(transport=transport, base_url="http://cell") as client:
             elapsed_hours = 0
             while clock.now() <= horizon:
                 if elapsed_hours % LOAD_STEP_HOURS == 0:
-                    await load(
+                    report = await load(
                         cohort_dir,
                         upto_device_time=clock.now(),
                         client=client,
                         session_factory=async_session_factory,
                     )
+                    all_non_accepted.extend(report.non_accepted)
                 await sweep(async_session_factory, clock)
                 clock.advance(hours=SWEEP_STEP_HOURS)
                 elapsed_hours += SWEEP_STEP_HOURS
 
-            await load(
+            report = await load(
                 cohort_dir,
                 upto_device_time=None,
                 client=client,
                 session_factory=async_session_factory,
             )
+            all_non_accepted.extend(report.non_accepted)
             await sweep(async_session_factory, clock)
 
             await reconcile_natural_continuations(
@@ -807,6 +838,8 @@ async def _run_e6_cell(cell: Cell, seed: int) -> list[dict[str, Any]]:
                 referral_by_id=referral_by_id,
                 district=cohort.district,
             )
+
+        _check_non_accepted(all_non_accepted, cell, seed)
 
         verify_report = await verify_all()
         if not verify_report.ok:

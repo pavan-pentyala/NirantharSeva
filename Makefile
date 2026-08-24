@@ -34,5 +34,22 @@ demo:
 	@echo "  2. docker compose stop api — exercises the retry path (E4's fault injection)."
 	@echo "  3. Real phone, airplane mode, added to home screen — fallback of last resort."
 
+# Runs one experiment's grid, then regenerates its tables/figures/dashboard.
+# EXP is required, not defaulted — wall-clock cost ranges from ~30s (E3) to
+# ~3.7h (E2), all measured not estimated (docs/PHASE8_PLAN.md, PROGRESS.md),
+# so there is no safe default to run without saying which one you mean.
+#   make experiments EXP=E1
 experiments:
-	@echo "make experiments: not implemented until Phase 8."
+	@if [ -z "$(EXP)" ]; then \
+		echo "Usage: make experiments EXP=<E1|E2|E3|E6>"; \
+		echo ""; \
+		echo "Wall-clock budget (measured, not estimated — docs/PHASE8_PLAN.md):"; \
+		echo "  E1  ~65 min   (45 cells)"; \
+		echo "  E2  ~3.7 h    (12 cells, E2_LOAD_STEP_HOURS=12)"; \
+		echo "  E3  ~30 s     (18 rows, single-pass, no clock stepping)"; \
+		echo "  E6  ~56 min   (3 cells, full P7.1-scale cohort)"; \
+		exit 1; \
+	fi
+	@exp_dir=$$(echo "$(EXP)" | tr '[:upper:]' '[:lower:]'); \
+	MSYS_NO_PATHCONV=1 docker compose run --rm api python -m experiments.runner --exp $(EXP) --out /app/results/$$exp_dir/ && \
+	MSYS_NO_PATHCONV=1 docker compose run --rm api python -m experiments.analysis --exp $(EXP) --in /app/results/$$exp_dir/ --out /app/results/$$exp_dir/

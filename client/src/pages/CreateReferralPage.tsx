@@ -44,24 +44,30 @@ export default function CreateReferralPage() {
   const [urgency, setUrgency] = useState<Urgency>("urgent");
   const [targetOrgId, setTargetOrgId] = useState<string>("");
   const [saved, setSaved] = useState<{ patientName: string; savedOffline: boolean } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const defaultFacilityId = nearestPhcAncestor(session?.orgUnitId, orgById) ?? facilities[0]?.id ?? "";
   const effectiveTargetOrgId = targetOrgId || defaultFacilityId;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!patientName.trim()) return;
+    if (!patientName.trim() || submitting) return;
     const savedOffline = !navigator.onLine;
-    await createReferral({
-      patientName: patientName.trim(),
-      age: age ? Number(age) : undefined,
-      sex,
-      phone: phone.trim() || undefined,
-      reason: reason.trim() || undefined,
-      priority: urgency,
-      targetOrgId: effectiveTargetOrgId || undefined,
-    });
-    setSaved({ patientName: patientName.trim(), savedOffline });
+    setSubmitting(true);
+    try {
+      await createReferral({
+        patientName: patientName.trim(),
+        age: age ? Number(age) : undefined,
+        sex,
+        phone: phone.trim() || undefined,
+        reason: reason.trim() || undefined,
+        priority: urgency,
+        targetOrgId: effectiveTargetOrgId || undefined,
+      });
+      setSaved({ patientName: patientName.trim(), savedOffline });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function resetForm() {
@@ -223,7 +229,12 @@ export default function CreateReferralPage() {
         </div>
 
         <div className={styles.footer}>
-          <button className={styles.primaryButton} type="submit" data-testid="save-referral-button">
+          <button
+            className={styles.primaryButton}
+            type="submit"
+            disabled={submitting}
+            data-testid="save-referral-button"
+          >
             Save referral
           </button>
         </div>

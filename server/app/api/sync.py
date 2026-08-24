@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import CurrentUser, get_current_user
@@ -42,7 +42,12 @@ async def push(
 @router.get("/pull", response_model=PullResponse)
 async def pull(
     since: int = 0,
-    limit: int = 500,
+    # ge=1: limit=0 makes fetch_limit=1, so has_more can be True while the
+    # returned page (rows[:0]) is empty and the cursor never advances --
+    # a caller looping "while has_more: pull again" never terminates.
+    # Found in a pre-Phase-9 audit; no existing caller ever sent this, but
+    # nothing stopped one from doing so either.
+    limit: int = Query(500, ge=1),
     session: AsyncSession = Depends(get_session),
     user: CurrentUser = Depends(get_current_user),
 ) -> PullResponse:

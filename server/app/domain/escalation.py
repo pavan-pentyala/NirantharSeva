@@ -58,6 +58,22 @@ _NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, "nirantharseva.escalation")
 # app/domain/escalation.py's own test suite — see
 # docs/OBSERVATIONS.md for the fractional-scale test this bug
 # needed and the ones already there didn't cover.
+# ORDER BY state_entered_at ASC — deterministic, worst-first processing.
+# Without it, the loop below processes breach_rows in whatever order the
+# planner happens to return (typically physical/scan order, no SQL
+# guarantee), so when several referrals breach in the same sweep pass —
+# the ordinary case, not an edge case — the ORDER their escalation rows
+# get inserted in is an accident of storage, not a decision. That accident
+# is what app/api/dashboard.py's _OVERDUE_QUERY's own tie-break (necessary
+# since every referral escalated in one sweep pass shares the identical
+# `triggered_at = now`) was silently leaning on — confirmed by a
+# pre-Phase-9 audit's migration flipping a previously-passing sort-order
+# test purely by changing an unrelated table's column layout, with zero
+# change to this query or that one. Processing worst-first here is also
+# the more defensible product behavior on its own terms, independent of
+# the test: if anything downstream ever prioritizes handling escalations
+# (a notification queue, a rate limit), the most-overdue referral should
+# be first in line.
 _BREACH_QUERY = """
     SELECT r.id, r.current_state, s.escalate_to_role, s.version
     FROM referral r
@@ -66,6 +82,7 @@ _BREACH_QUERY = """
       AND r.state_entered_at
           + make_interval(secs => s.max_hours * CAST(:sla_scale AS double precision) * 3600)
           < :now
+    ORDER BY r.state_entered_at ASC
 """
 
 

@@ -9,8 +9,8 @@
 > those here just gives a future session more text to read for the same
 > information, at lower quality.
 
-**Last updated:** 2026-08-24 (later)
-**Last session model:** Sonnet (P8.3 implementation).
+**Last updated:** 2026-08-24 (even later)
+**Last session model:** Sonnet (pre-Phase-9 audit + fixes).
 
 ## Current phase
 
@@ -37,6 +37,74 @@ data, not the original P8.1 run. See observations 56–57
 (`docs/OBSERVATIONS.md`) and this session's section in
 `docs/Observations_for_report.md` before touching `experiments/resume.py`
 or `experiments/cell.py`'s E2 loop again.
+
+**A full pre-Phase-9 audit (2026-08-24, this session) found and fixed 15
+real issues** across the whole codebase, none of them touching Phase 8's
+own `server/results/` (confirmed with the user before starting — the
+harness runs an entirely separate code path from the endpoints/UI the
+audit fixed). Three background review agents each covered one subsystem
+(server sync/domain core, server API/identity, client) in parallel, plus
+a personal re-read of `experiments/`/`generator/`. Two findings were
+confirmed by writing and running real pytest tests (in a since-deleted
+scratch directory — never committed) before any fix was applied. Full
+detail: migration `0009`, and the diff itself. Headline items:
+
+- **`GET /referrals` crashed with a 500 on every second page** — the
+  pagination cursor was a bare string bound against a `TIMESTAMPTZ`
+  column; asyncpg requires a real `datetime`. Reproduced live (curl),
+  confirmed by an automated test, fixed in `app/api/referrals.py`.
+- **`GET /sync/pull?limit=0` could stall a client forever** — no lower
+  bound on `limit`. Fixed with `Query(500, ge=1)` in `app/api/sync.py`.
+  No current caller ever sent this; latent, not live.
+- **Client-side lamport race**: `nextLamport()` was a non-atomic
+  read-modify-write, and `CreateReferralPage`/`ReferralDetailPage` had no
+  busy-state guard on their submit buttons (unlike `LoginPage`/
+  `IdentityReviewPage`, which both already had one). Fixed: `nextLamport`
+  now runs inside a Dexie transaction; both pages now disable their
+  button while their own async call is in flight.
+- **`pullAndApply()`** had no re-entrancy guard (unlike `flush()`'s own
+  `flushing` flag), blindly overwrote the cursor instead of merging it,
+  and had no try/catch (an unhandled promise rejection on any transient
+  pull failure). All three fixed in `client/src/sync/engine.ts`.
+  `applyResults()`'s per-op outbox write is now individually try/caught
+  too, so one Dexie failure can't revert sibling ops flush() had already,
+  correctly, marked "synced".
+- **`experiments/cell.py` never checked `load()`'s own `non_accepted`
+  count**, in any of the four cell functions (E1 included) — a silently
+  smaller-than-generated cohort would have produced a clean exit and a
+  wrong number. Now asserted after every load() call.
+- **Two dead columns dropped** (`referral.sla_profile_id`,
+  `escalation.escalated_to_user_id` — confirmed via grep, never read
+  anywhere) **and a uniqueness constraint added**
+  (`uq_sla_profile_active_state`) — migration `0009`, both confirmed with
+  the user before writing it (schema changes are always ask-first).
+- `app/domain/errors.py` (dead exception hierarchy, zero imports)
+  deleted outright. `seed.py`'s `normalized_name` now calls the real
+  `normalize()` instead of a second, weaker `.lower()`. `identity.py`'s
+  merge now re-validates the candidate patient's own org scope
+  (defense in depth — was safe by construction via ADR-014, now safe by
+  assertion too). `make experiments EXP=<E1|E2|E3|E6>` actually runs the
+  runner+analysis pair instead of printing a stale "not implemented"
+  stub.
+- **One thing the audit didn't find, that fixing it caused**: dropping
+  the two dead columns changed physical table layout enough to flip an
+  implicit, previously-undocumented tie-break in
+  `app/api/dashboard.py`'s `_OVERDUE_QUERY` (two referrals escalated in
+  the same sweep pass share an identical `triggered_at`, so the query's
+  own `ORDER BY` was never actually deterministic — it just happened to
+  return a stable order before). Fixed properly: `_BREACH_QUERY` now
+  processes worst-first (`ORDER BY state_entered_at ASC`), and
+  `_OVERDUE_QUERY` now breaks `triggered_at` ties via
+  `referral_event.seq` — this project's own true commit-order marker
+  (ADR-002) — instead of an accidental scan order. Verified deterministic
+  across 5 repeated fresh-database runs before trusting it.
+
+Verified: full server suite **269 passed**, `ruff check`/
+`ruff format --check` clean, `python -m app.verify_replay` clean,
+`alembic heads` is `0009` (upgrade and downgrade both checked). Client
+`tsc --noEmit`, `npm run build`, and the full 11-spec Playwright suite
+all green. `alembic downgrade -1` then `upgrade head` round-tripped
+clean before trusting migration `0009`.
 
 ## Done
 
@@ -1118,6 +1186,14 @@ around changes what that spec exercises. Clean up by deleting from
   representative slice, not a stress test, chosen over a sync-path-only
   script because the dashboard/referrals reads are what the index
   question is actually about.
+- **Pre-Phase-9 audit's two schema decisions, both answered 2026-08-24
+  (even later), do not re-ask:** drop `referral.sla_profile_id` and
+  `escalation.escalated_to_user_id` (both confirmed dead by grep) via a
+  new migration rather than leaving them in the schema; add
+  `uq_sla_profile_active_state` (a partial unique index on
+  `sla_profile(state) WHERE active`) as a safety net in the same
+  migration, even though nothing currently violates it. Both landed as
+  migration `0009`.
 
 ## Known problems and workarounds
 

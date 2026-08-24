@@ -138,7 +138,30 @@ async def _apply_merge(
     score,
     method,
     decided_by: UUID,
+    org_unit_id: UUID,
 ) -> None:
+    # Defense in depth, not the primary gate: _DECIDE_UPDATE already
+    # confirmed new_patient_id is in the caller's subtree before this is
+    # ever called. candidate_patient_id is currently always in the same
+    # village by construction (ADR-014 — blocking never offers a
+    # cross-village candidate), so this should never actually fire; it
+    # exists so a future change to blocking's own rule can't silently
+    # let one org's decide() repoint another org's referrals. Found as a
+    # single-point-of-trust gap in a pre-Phase-9 audit.
+    in_scope = await session.execute(
+        text(
+            f"""{SUBTREE_CTE}
+                SELECT 1 FROM patient
+                WHERE id = :id AND village_org_id IN (SELECT id FROM subtree)"""
+        ),
+        {**subtree_params(org_unit_id), "id": candidate_patient_id},
+    )
+    if in_scope.first() is None:
+        raise RuntimeError(
+            f"identity merge: candidate patient {candidate_patient_id} is outside "
+            f"org {org_unit_id}'s subtree — blocking should never offer this"
+        )
+
     await session.execute(
         text("UPDATE referral SET patient_id = :candidate WHERE patient_id = :new_patient"),
         {"candidate": candidate_patient_id, "new_patient": new_patient_id},
@@ -215,6 +238,7 @@ async def decide(
                 score=row.score,
                 method=row.method,
                 decided_by=user.id,
+                org_unit_id=user.org_unit_id,
             )
 
     return IdentityReviewDecisionResponse(id=review_id, status=new_status)

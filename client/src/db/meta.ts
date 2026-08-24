@@ -27,10 +27,19 @@ export function mergeLamport(local: number, incoming: number[]): number {
   return Math.max(local, ...incoming);
 }
 
+/** Wrapped in a Dexie transaction — a plain "await getLamport(); await
+ * setLamport(...)" is two separate IndexedDB round trips, and two
+ * concurrent callers (e.g. a double-tapped submit button with no busy
+ * guard) can both read the same value before either writes the
+ * increment, handing out the same lamport twice. Dexie's "rw" transaction
+ * on sync_meta makes the read-modify-write atomic against any other
+ * caller of nextLamport(). Found in a pre-Phase-9 audit. */
 export async function nextLamport(): Promise<number> {
-  const next = (await getLamport()) + 1;
-  await setLamport(next);
-  return next;
+  return db.transaction("rw", db.sync_meta, async () => {
+    const next = (await getLamport()) + 1;
+    await setLamport(next);
+    return next;
+  });
 }
 
 export async function getCursor(): Promise<number> {

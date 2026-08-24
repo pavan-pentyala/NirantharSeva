@@ -424,10 +424,10 @@ async def _apply_create_referral(
             """INSERT INTO referral
                  (id, patient_id, origin_user_id, origin_org_id, target_org_id,
                   reason, priority, current_state, state_entered_at,
-                  sla_profile_id, created_device_time, created_server_time)
+                  created_device_time, created_server_time)
                VALUES
                  (:id, :patient_id, :origin_user_id, :origin_org_id, :target_org_id,
-                  :reason, :priority, 'CREATED', :now, NULL, :device_time, :now)"""
+                  :reason, :priority, 'CREATED', :now, :device_time, :now)"""
         ),
         {
             "id": op.entity_id,

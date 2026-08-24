@@ -52,6 +52,19 @@ _STATS_QUERY = f"""
     WHERE origin_org_id IN (SELECT id FROM subtree)
 """
 
+# Secondary ORDER BY term, not in the SELECT list (Postgres allows this
+# outside DISTINCT queries — no schema/response-shape change needed):
+# every referral escalated in the SAME sweep pass shares an identical
+# e.triggered_at (app/domain/escalation.py computes `now` once per sweep()
+# call, not once per row), so triggered_at ASC alone leaves ties in
+# whatever order the query planner happens to return them — no SQL
+# guarantee, and confirmed to actually flip (a pre-Phase-9 audit's
+# unrelated column-drop migration flipped a previously-passing sort-order
+# test with zero change to this query). referral_event.seq is this
+# project's own true commit-order marker (ADR-002's advisory lock makes
+# seq order == commit order); joining back to the specific ESCALATED
+# event this escalation row was created alongside (same transaction, same
+# server_time) gives a real secondary key instead of an accidental one.
 _OVERDUE_QUERY = f"""
     {SUBTREE_CTE}
     SELECT e.id AS escalation_id, e.referral_id, p.name AS patient_name,
@@ -64,7 +77,10 @@ _OVERDUE_QUERY = f"""
     LEFT JOIN org_unit target_org ON target_org.id = r.target_org_id
     LEFT JOIN app_user asha ON asha.id = r.origin_user_id
     WHERE e.resolved_at IS NULL AND r.origin_org_id IN (SELECT id FROM subtree)
-    ORDER BY e.triggered_at ASC
+    ORDER BY e.triggered_at ASC,
+             (SELECT MAX(re.seq) FROM referral_event re
+              WHERE re.referral_id = e.referral_id AND re.to_state = 'ESCALATED'
+                AND re.server_time = e.triggered_at) ASC
 """
 
 

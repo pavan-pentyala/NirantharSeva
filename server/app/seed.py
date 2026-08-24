@@ -46,6 +46,7 @@ from app.clock import Clock, get_clock
 from app.config import get_settings
 from app.db import async_session_factory
 from app.domain.states import Role, State
+from app.linkage.normalize import normalize
 
 _NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, "nirantharseva.seed")
 _hasher = PasswordHasher()
@@ -329,7 +330,7 @@ async def seed(
                 {
                     "id": patient_id,
                     "name": patient["name"],
-                    "normalized_name": patient["name"].lower(),
+                    "normalized_name": normalize(patient["name"]),
                     "phone": patient["phone"],
                     "village_org_id": org_ids[patient["org"]],
                     "age": patient["age"],
@@ -350,11 +351,11 @@ async def seed(
                     """INSERT INTO referral
                          (id, patient_id, origin_user_id, origin_org_id, target_org_id,
                           reason, priority, current_state, state_entered_at,
-                          sla_profile_id, created_device_time, created_server_time)
+                          created_device_time, created_server_time)
                        VALUES
                          (:id, :patient_id, :origin_user_id, :origin_org_id, :target_org_id,
                           :reason, :priority, :state, :now,
-                          NULL, :now, :now)
+                          :now, :now)
                        ON CONFLICT (id) DO NOTHING"""
                 ),
                 {

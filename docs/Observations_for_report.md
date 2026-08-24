@@ -418,3 +418,52 @@ actually have, not to reason abstractly from the fact that a partial
 index was designed for exactly this predicate. A report that only ever
 measured EXPLAIN plans at a convenient, larger, synthetic row count would
 have produced a more flattering number and a less true one.
+
+## 2026-08-24 (even later) — pre-Phase-9 codebase audit and fixes
+
+Before starting Phase 9, the whole codebase was audited for bugs, dead
+code, and missed features — three parallel review passes (server core,
+server API, client) plus a personal re-read of the experiment harness —
+and fifteen real findings were fixed, none touching Phase 8's own
+results (verified first: the harness runs an entirely separate code path
+from anything the audit changed). Two of the findings were confirmed by
+writing and running real tests before any fix was applied, not just by
+reading the code and reasoning about it — a live 500 error reproduced
+against the running stack (`GET /referrals`'s second page crashing on an
+asyncpg type mismatch) and a permanent-stall condition in the sync pull
+endpoint, both then fixed and re-verified.
+
+### A fix for one bug exposed a second, unrelated one — the dashboard's "worst first" sort was never actually guaranteed
+
+The most interesting moment of the session: dropping two long-dead
+database columns (an ordinary, low-risk cleanup, confirmed with the user
+first) made a previously-reliable test start failing consistently. The
+test asserts the supervisor dashboard's overdue list shows the
+longest-overdue referral first. Nothing about the dashboard query, the
+escalation sweep, or the test itself changed — only two unrelated columns
+were dropped from two different tables. Tracing it down: the dashboard's
+`ORDER BY` had no tiebreaker, and every referral escalated in the same
+sweep pass is timestamped identically (the sweep computes "now" once per
+pass, not once per referral) — so the sort had *never* been truly
+deterministic, only accidentally stable, resting on whatever order a
+tiny table's query plan happened to return ties in. The column drop
+changed the table's on-disk shape enough to flip that accident.
+
+The first attempted fix — making the sweep *process* referrals
+worst-first, on the theory that processing order would carry through to
+storage order — did not work, which is itself informative: it proves the
+old "stable" order was never actually insertion order in the first
+place, just a plan-dependent coincidence nobody had reason to question
+until it broke. The fix that actually held ties the dashboard's sort to
+`referral_event.seq`, the one column this schema's own advisory-lock
+discipline (ADR-002) genuinely guarantees is ordered by commit time —
+verified deterministic across five repeated fresh-database runs before
+being trusted.
+
+Worth a paragraph in Chapter 5's discussion of testing and validity: a
+test passing repeatedly is not evidence a sort order is guaranteed by the
+query that produces it — it may only be evidence that nothing has yet
+perturbed the coincidence the test was quietly resting on. The fix that
+survives contact with an unrelated change is the one that names something
+the schema actually promises, not the one that best explains why the old
+behavior happened to work.

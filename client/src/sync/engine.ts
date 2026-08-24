@@ -20,6 +20,7 @@ const BACKOFF_MAX_MS = 30_000;
 const SYNC_INTERVAL_MS = Number(import.meta.env.VITE_SYNC_INTERVAL_MS) || 15_000;
 
 let flushing = false;
+let pulling = false;
 
 export interface CreateReferralInput {
   patientName: string;
@@ -168,14 +169,29 @@ function toWireOp(o: OutboxOp): api.Op {
 async function applyResults(results: api.OpResult[]): Promise<void> {
   let needsRepull = false;
   for (const r of results) {
-    if (r.status === "accepted" || r.status === "accepted_stale") {
-      await db.outbox.update(r.op_id, { status: "synced" });
-    } else {
-      // conflict or rejected — re-pull and overwrite local cache. Never
-      // hand-write an inverse operation to undo the optimistic update;
-      // server truth plus overwrite is simpler and cannot drift.
-      await db.outbox.update(r.op_id, { status: r.status });
-      needsRepull = true;
+    // Each op's own outbox write is isolated in its own try/catch: this
+    // loop runs inside flush()'s try block, and flush()'s catch reverts
+    // the WHOLE original batch back to "inflight" on any thrown error —
+    // correct if the push itself failed, but wrong here, since an update
+    // failing partway through an already-accepted response would revert
+    // ops this same loop had already, correctly, marked "synced" moments
+    // earlier. A push response is never retried (the server already
+    // applied it — that's what accepted/conflict/rejected mean), so a
+    // failed local write here is a Dexie-level problem, not a sync one;
+    // it's logged and skipped rather than allowed to corrupt siblings.
+    // Found in a pre-Phase-9 audit.
+    try {
+      if (r.status === "accepted" || r.status === "accepted_stale") {
+        await db.outbox.update(r.op_id, { status: "synced" });
+      } else {
+        // conflict or rejected — re-pull and overwrite local cache. Never
+        // hand-write an inverse operation to undo the optimistic update;
+        // server truth plus overwrite is simpler and cannot drift.
+        await db.outbox.update(r.op_id, { status: r.status });
+        needsRepull = true;
+      }
+    } catch (err) {
+      console.error("failed to record push result locally", r.op_id, err);
     }
   }
   if (needsRepull) {
@@ -195,23 +211,47 @@ async function scheduleBackoff(batch: OutboxOp[]): Promise<void> {
   );
 }
 
+// Single-flight, same reason flush() has `flushing`: this function is
+// reachable concurrently from four places (the 15s timer, `online`,
+// `visibilitychange`, and every post-write syncNow()) plus a nested call
+// from applyResults() below when a push comes back with a conflict. Two
+// overlapping runs would each start from the cursor's value at their own
+// call time and could then race writing setCursor(), one clobbering the
+// other's further-advanced value. Found in a pre-Phase-9 audit.
 export async function pullAndApply(): Promise<void> {
-  if (!navigator.onLine) return;
-  for (;;) {
-    const since = await getCursor();
-    const res = await api.pull(since);
+  if (pulling || !navigator.onLine) return;
+  pulling = true;
+  try {
+    for (;;) {
+      const since = await getCursor();
+      const res = await api.pull(since);
 
-    if (res.events.length) {
-      await applyPulledEvents(res.events);
-      const local = await getLamport();
-      const maxIncoming = Math.max(...res.events.map((e) => e.lamport));
-      await setLamport(mergeLamport(local, [maxIncoming]));
+      if (res.events.length) {
+        await applyPulledEvents(res.events);
+        const local = await getLamport();
+        const maxIncoming = Math.max(...res.events.map((e) => e.lamport));
+        await setLamport(mergeLamport(local, [maxIncoming]));
+      }
+
+      // Monotonic merge, not a blind overwrite — the `pulling` guard above
+      // already makes a second concurrent run impossible, but merging
+      // keeps this correct on its own terms rather than relying entirely
+      // on that guard (the same defense-in-depth reasoning as the lamport
+      // merge just above).
+      const current = await getCursor();
+      await setCursor(Math.max(current, res.cursor));
+      await markSyncedNow();
+
+      if (!res.has_more) break;
     }
-
-    await setCursor(res.cursor);
-    await markSyncedNow();
-
-    if (!res.has_more) break;
+  } catch {
+    // A transient pull failure used to propagate as an unhandled promise
+    // rejection to every caller (none of them await this — void syncNow()).
+    // Swallow it here, the same way flush() contains its own failures —
+    // the next periodic trigger (15s timer, online, visibilitychange)
+    // retries from wherever the cursor actually got to.
+  } finally {
+    pulling = false;
   }
 }
 

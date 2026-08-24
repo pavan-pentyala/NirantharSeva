@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { DemoMarker } from "../components/DemoMarker";
 import { StatePill } from "../components/StatePill";
@@ -14,6 +15,7 @@ import styles from "./ReferralDetailPage.module.css";
 export default function ReferralDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
 
   const referral = useLiveQuery(() => (id ? db.referral_cache.get(id) : undefined), [id]);
   const events =
@@ -35,8 +37,13 @@ export default function ReferralDetailPage() {
   const waitingCopy = ashaWaitingCopyFor(displayState);
 
   async function handleAction() {
-    if (!action || !referral) return;
-    await transitionReferral(referral.id, referral.current_state, action.toState);
+    if (!action || !referral || busy) return;
+    setBusy(true);
+    try {
+      await transitionReferral(referral.id, referral.current_state, action.toState);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -110,7 +117,12 @@ export default function ReferralDetailPage() {
 
       <div className={styles.footer}>
         {action ? (
-          <button className={styles.primaryButton} onClick={() => void handleAction()} data-testid="referral-action-button">
+          <button
+            className={styles.primaryButton}
+            onClick={() => void handleAction()}
+            disabled={busy}
+            data-testid="referral-action-button"
+          >
             {action.buttonLabel}
           </button>
         ) : (
