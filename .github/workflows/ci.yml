@@ -157,10 +157,24 @@ jobs:
           echo "::error::vite preview never became reachable on :4173"
           docker compose logs client
           exit 1
+      # dashboard.spec.ts's two live-breach tests wait on a real SLA
+      # window at whatever SLA_SCALE the stack is running — .env.example's
+      # SLA_SCALE=1.0 means real hours, which never breaches inside a
+      # Playwright timeout. A second, demo-scale scheduler (PROGRESS.md's
+      # own proven recipe, already required for local verification) makes
+      # a 24h/48h SLA breach in tens of seconds instead. Found the hard
+      # way: this workflow apparently never ran to completion since Phase
+      # 5 introduced these two tests, because clock-discipline was itself
+      # broken the whole time (see the docstring-reword commit before
+      # this one) — so this gap was never actually exercised until now.
+      - name: Start a demo-scale scheduler (two dashboard tests need a fast SLA breach)
+        run: docker compose run --rm -d --name demo-scheduler -e SLA_SCALE=0.0004 -e SWEEP_INTERVAL_SECONDS=5 scheduler
       - working-directory: client
         run: npx playwright test
       - name: Kill-API fault test (plan §5.6)
         run: bash server/tests/fault/kill_api.sh
+      - if: always()
+        run: docker stop demo-scheduler || true
       - if: always()
         run: docker compose logs
       - if: always()
