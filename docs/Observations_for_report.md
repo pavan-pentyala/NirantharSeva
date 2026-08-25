@@ -619,3 +619,36 @@ session alone"). This is the cleanest instance in the whole project of
 the handoff's own instruction to never claim something is done that
 isn't: the honest state is "ready to record," not "recorded," and both
 documents and the checklist say exactly that rather than rounding up.
+
+## 2026-08-25 (final) — post-Phase-9: CI checked directly for the first time in weeks
+
+**Pushing all of Phase 7-9 and asking to check CI surfaced that the
+pipeline had not actually completed since Phase 5** — two independent
+bugs, each hiding behind the other. First, a grep-based CI check (the
+ADR-001 "no direct clock calls" rule) matched its own explanatory
+comments in six files across two phases (one already fixed once before,
+in `seed.py`; this session found five more instances of the identical
+mistake). Second, and only visible once the first was fixed: the `e2e`
+job's two live-dashboard Playwright tests had never actually run to
+completion in CI, because they need a demo-scale scheduler that the
+workflow never started — a fix `PROGRESS.md` has documented for *local*
+verification for a long time, just never carried into the CI config
+itself. Both fixed, both verified by watching the actual GitHub Actions
+run rather than trusting the diff.
+
+Worth a clear paragraph in the report's discussion of process and
+validity, not just a footnote: **this project's own tests were correct
+and passing the entire time — the gap was entirely in a verification
+layer nobody was looking at.** Every phase's own local verification
+(`docker compose run` + `pytest`/`ruff`/`playwright`) was real and
+thorough, and none of it would have caught either bug, because neither
+bug was in the application — both were in the CI configuration meant to
+independently confirm what local verification already showed. This is a
+distinct and useful methodological point for a report chapter on testing
+strategy: a project can have a rigorous local verification discipline and
+still ship a broken CI pipeline, if nobody separately audits the thing
+that's supposed to be the independent check. The fix wasn't "test more,"
+it was "actually look at the CI runs" — a cheap, five-minute action
+(`gh run list`) that this session only took because it was asked to,
+which is itself worth naming honestly in a limitations discussion: this
+gap could have been caught much earlier with the same low-cost habit.

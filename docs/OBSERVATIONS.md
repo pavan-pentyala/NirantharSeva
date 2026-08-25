@@ -1682,3 +1682,50 @@ icons plus `sw.js` all resolve with 200 from `:4173`. The phone-side half
 exercised by this session — no physical device — and is documented from
 established practice in `docs/RECORDING_PHONE_CLIP.md`, flagged there as
 unverified rather than assumed correct.
+
+## Post-Phase-9 — CI had not actually run to completion since Phase 5, and two independent bugs were hiding behind that fact
+
+**65. The exact "grep matches its own explanatory comment" bug (observation
+already fixed once in `seed.py`, commit `03fdbcf`, 2026-08-18) recurred in
+five more files and had been silently failing CI since at least
+2026-08-21 — `escalation.py` (Phase 5), and `generator/cli.py`,
+`cohort.py`, `gold_set.py`, `timeline.py` (Phase 7) all wrote their own
+"this file never calls `datetime.now()`" docstring using the literal
+banned substring.** Nobody had reason to notice: every session's own
+local verification ran the actual tests/`ruff`/`verify_replay` against
+`docker compose`, never the CI workflow's own grep commands specifically,
+and nobody had checked GitHub Actions directly between 2026-08-19 and
+this session. Fixed the same way the precedent commit did — describe the
+constraint without writing the literal call syntax — across all five
+files at once, then re-ran both of CI's exact grep commands locally
+before pushing again, rather than trusting the rewrite by eye.
+
+**66. CI's `e2e` job had never actually run to completion since Phase 5
+introduced `dashboard.spec.ts`'s two live-breach tests, because the
+`clock-discipline` job (observation 65) has gated it the whole time —
+so a second, independent, unrelated gap in the same workflow was never
+exercised until this session fixed the first one.** `dashboard.spec.ts`'s
+"a new breach appears..." and "an IN_TRANSIT breach still shows..." tests
+both wait on a real SLA window at whatever `SLA_SCALE` the stack runs
+under. CI's `e2e` job brings the stack up from `.env.example`, whose
+`SLA_SCALE=1.0` means real hours — never breaching inside either test's
+100–120s Playwright timeout. `PROGRESS.md` has documented the fix for
+*local* verification for a long time (start a second, demo-scale
+scheduler container before running the suite) — it had just never been
+applied to the CI workflow itself, because CI had never gotten far enough
+to expose the gap. Fixed by adding the same `docker compose run --rm -d
+--name demo-scheduler -e SLA_SCALE=0.0004 -e SWEEP_INTERVAL_SECONDS=5
+scheduler` step to `.github/workflows/ci.yml`'s `e2e` job, stopped in an
+`if: always()` cleanup step alongside the existing `docker compose down
+-v`. All four CI jobs (`clock-discipline`, `client`, `server`, `e2e`)
+passed together for the first time this session, verified by watching
+the actual run rather than assuming the fix worked from reading the diff.
+
+General lesson behind both: **a CI workflow that isn't checked directly
+can be broken for a long time without anyone noticing**, because local
+verification (however thorough) is not the same check as the one that
+actually gates merges/pushes — this project's own "grep-based exit
+criteria" caution (PROGRESS.md's "Known problems") applies to CI's own
+greps too, not just ad hoc local ones, and "the tests pass locally" is
+not evidence the CI workflow that runs those same tests is itself
+correctly configured.

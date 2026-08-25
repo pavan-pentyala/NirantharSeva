@@ -9,8 +9,8 @@
 > those here just gives a future session more text to read for the same
 > information, at lower quality.
 
-**Last updated:** 2026-08-25 (later still — Phase 9, P9.3)
-**Last session model:** Sonnet (P9.3 implementation).
+**Last updated:** 2026-08-25 (final — post-Phase-9, CI verified green)
+**Last session model:** Sonnet (P9.3 implementation, then a CI audit).
 
 ## Current phase
 
@@ -789,6 +789,32 @@ clean before trusting migration `0009`.
   (nothing it covers changed); the `:4173` build/preview check above is
   its own real verification of the one thing that did need checking.
 
+- **Post-Phase-9 CI audit** (2026-08-25 final, Sonnet — user asked to
+  push and check CI/CD after P9.3): pushed all 14 accumulated commits
+  (Phase 7 through P9.3) to `origin/main`, then checked GitHub Actions
+  directly for the first time since 2026-08-19 rather than assuming a
+  push was enough. **Found the whole `CI` workflow had not actually run
+  to completion since Phase 5** — two independent, unrelated bugs, each
+  hiding behind the other. (1) `clock-discipline`'s ADR-001 grep matched
+  its own explanatory comments in `server/app/domain/escalation.py`
+  (Phase 5) and four `generator/` files (Phase 7) — the exact mistake
+  already fixed once before in `seed.py` (commit `03fdbcf`,
+  2026-08-18), recurred five more times, never caught because no session
+  had checked Actions directly since. Fixed the same way — describe the
+  constraint without the literal call syntax — then re-ran both of CI's
+  exact grep commands locally before pushing again. (2) Fixing (1)
+  let `e2e` run for the first time since Phase 5 introduced
+  `dashboard.spec.ts`'s two live-breach tests — and they failed on a real
+  gap this session had never seen exercised: CI's `e2e` job brings the
+  stack up with `.env.example`'s real-scale `SLA_SCALE=1.0`, so a 24h/48h
+  SLA never breaches inside a 100–120s Playwright timeout. Fixed by
+  adding the same demo-scale-scheduler step this file has documented for
+  *local* verification for a long time to `.github/workflows/ci.yml`
+  itself. **All four jobs (`clock-discipline`, `client`, `server`, `e2e`)
+  passed together on the next push** — confirmed by watching the actual
+  run (`gh run watch`), not by reading the diff and assuming. See
+  observations 65–66.
+
 ## Not done / in progress
 
 - **Phase 9 is complete. Nothing further is scoped or planned** — the
@@ -1179,10 +1205,14 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Phase 9 is complete — P9.1, P9.2, and P9.3 are all done and verified.**
-The ten-week phase map (`docs/IMPLEMENTATION_PLAN.md` §4) ends here.
-Nothing further is planned or scoped for a session to pick up on its own
-initiative. What remains is entirely the user's:
+**Phase 9 is complete — P9.1, P9.2, and P9.3 are all done and verified,
+and all 14 accumulated commits are pushed to `origin/main` with a fully
+green CI run** (`clock-discipline`, `client`, `server`, `e2e` all
+passing together — the first time since Phase 5, see the "Post-Phase-9
+CI audit" entry above). The ten-week phase map
+(`docs/IMPLEMENTATION_PLAN.md` §4) ends here. Nothing further is planned
+or scoped for a session to pick up on its own initiative. What remains
+is entirely the user's:
 
 1. Record the two clips (`docs/RECORDING_DEMO_CLIP.md`,
    `docs/RECORDING_PHONE_CLIP.md` — the second needs a physical phone).
@@ -1635,6 +1665,17 @@ around changes what that spec exercises. Clean up by deleting from
 
 ## Known problems and workarounds
 
+- **A CI workflow nobody checks directly can be broken for weeks without
+  anyone noticing, even with thorough local verification.** GitHub
+  Actions hadn't run to completion since 2026-08-19 (Phase 3 era) —
+  `clock-discipline`'s own grep tripped on explanatory comments in six
+  files across Phases 5 and 7 (fixed 2026-08-25), which in turn had
+  masked `e2e` never actually exercising `dashboard.spec.ts`'s two
+  live-breach tests against CI's real-scale `SLA_SCALE=1.0` (also fixed
+  2026-08-25 — a demo-scale scheduler step added to the workflow). Run
+  `gh run list --limit 5` occasionally, not just `git push` — a green
+  local suite is not evidence CI's own separate config is correct. See
+  observations 65–66.
 - **`docker compose -f docker-compose.prod.yml` with no `-p` flag shares
   the dev stack's default project name (both files live in this
   directory) and will recreate the dev containers under identical names.**
