@@ -843,7 +843,20 @@ clean before trusting migration `0009`.
   infrastructure flake on GitHub's own runner — a symlink race entirely
   unrelated to any of this session's changes, resolved by simply
   re-running). Four real, independent findings from one "push and check
-  CI" request. See observations 65–68.
+  CI" request — and (5) that fix's own next two CI attempts failed
+  identically again, on a genuine infrastructure race this time, not an
+  application or test bug: `api` and `scheduler` share the `server_venv`
+  named volume, and on a clean runner where that volume starts empty,
+  Docker's own populate-from-image step (recreating the base image's
+  `lib64 -> lib` symlink) can run concurrently for both containers'
+  first mount, one failing with "file exists." Fixed by sequencing —
+  `docker compose up -d --build api` first, then the rest — so
+  `scheduler` only ever mounts an already-populated volume. **Confirmed
+  green three times in a row** after this fix, on a workflow that had
+  failed the exact same way twice before it. Unlike the first four
+  findings, this one could never have been caught by reading the diff or
+  running locally — it only exists on a machine whose volumes start
+  genuinely empty, which is CI and only CI. See observations 65–69.
 
 ## Not done / in progress
 
@@ -1712,7 +1725,11 @@ around changes what that spec exercises. Clean up by deleting from
   occasionally, not just `git push` — a green local suite is not evidence
   CI's own separate config is correct, and a single green CI run isn't
   proof either (this exact workflow failed on the push immediately after
-  its own first "fix", twice). See observations 65–68.
+  its own first "fix", twice) — and a fifth fix (sequencing `api` before
+  `scheduler` in CI, a genuine `server_venv` volume-populate race on
+  clean runners, unreachable from any local machine whose volumes are
+  never actually empty) needed three green runs in a row before trusting
+  it, not two. See observations 65–69.
 - **`docker compose -f docker-compose.prod.yml` with no `-p` flag shares
   the dev stack's default project name (both files live in this
   directory) and will recreate the dev containers under identical names.**
