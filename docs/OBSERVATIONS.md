@@ -1579,3 +1579,75 @@ number — the same shape of mistake as observation 57 (a harness constant
 tuned for one experiment silently affecting another), here surfacing in
 a live walkthrough instead of a data table because nobody had reason to
 watch the dashboard *before* the deliberately-late referral was created.
+
+## Phase 9, P9.2 — two compose files in one directory share a project name by default, and a variable in proxy_pass changes nginx's own semantics
+
+**61. `docker compose -f docker-compose.prod.yml up` with no `-p` flag
+recreated the DEV stack's own containers under the same names, because
+Compose derives its project name from the current directory by default —
+not from the compose file — and both files live at the repo root.** The
+first attempt to bring up the production config did exactly this:
+`nirantharseva-api-1`, `nirantharseva-db-1`, `nirantharseva-scheduler-1`
+and `nirantharseva-client-1` were all silently replaced by their
+production-config counterparts, under identical names, on the same
+default project. No data was lost — the named `pgdata` volume is
+addressed by name, not by the container that mounts it, and the
+production config points at a *different* named volume (`pgdata_prod`)
+entirely — but every dev container had to be recreated with a plain
+`docker compose up -d` afterward, and the dev `api` container needed a
+second, explicit restart later after being stopped by hand to free port
+8000 for verification. Fixed going forward by always passing
+`-p nirantharseva-prod` (or any name other than the directory default)
+whenever both compose files might be relevant in the same session — see
+`docs/PHASE9_PLAN.md`'s "Deploy it" section, now in `README.md` too.
+
+**62. A variable in nginx's `proxy_pass` silently changes two things at
+once, not just one, and both bit `client/nginx.conf` on the first
+attempt.** First: a bare `proxy_pass http://api:8000` resolves the
+hostname once, at config-load time, and refuses to start nginx at all if
+it can't resolve — which happened for real, once, when the `client`
+container came up fractionally before `api` was reachable and nginx
+crash-looped instead of retrying. Deferring resolution to request time
+needs the upstream in a variable (`set $upstream_api http://api:8000;
+proxy_pass $upstream_api;`) plus an explicit `resolver` directive
+pointing at Docker's embedded DNS (`127.0.0.11`). Second, and not
+mentioned in nginx's own quick-reference docs as prominently as the
+first: **a variable in `proxy_pass` also disables nginx's automatic
+location-prefix stripping** — `location /api/ { proxy_pass
+$upstream_api; }` forwards the full original path (`/api/health`)
+to the upstream, not `/health` as a literal `proxy_pass
+http://api:8000/;` would, producing a clean 404 instead of an error
+message that names the actual cause. Fixed with an explicit `rewrite
+^/api/(.*)$ /$1 break;`. Third, ordering matters within the same
+location block: `rewrite ... break` halts the rest of the rewrite
+module's own directive set for that request — `set` is implemented by
+the same module — so a `set` written *after* `break` never runs,
+producing "uninitialized upstream_api" and a 500. `set` has to come
+first. All three were found by testing the actual running config against
+a real request, not by reading nginx's documentation and reasoning
+about it — worth remembering before writing proxy config from memory
+again.
+
+**63. Removing a Pydantic field's default value breaks every process that
+constructs `Settings()`, not just the ones that read that field.**
+Making `jwt_secret` required (P9.2, ADR-018 — no development default for
+secrets) crashed `app/scheduler/run.py` immediately on startup with a
+`ValidationError: jwt_secret Field required`, even though the scheduler
+never authenticates anything and never reads `settings.jwt_secret`
+anywhere in its own code. `app/config.py`'s `Settings` is one shared
+model for the whole codebase (`app/config.py`'s own docstring: "the only
+place that reads `os.environ`"), so every field's presence is required at
+construction time for *every* caller, regardless of which fields that
+particular caller actually uses. This broke the **dev** scheduler
+service too, silently — `docker-compose.yml`'s `scheduler` block never
+set `JWT_SECRET` (it never needed to, before this change), and the
+already-running dev scheduler container only kept working because it had
+started before the code changed; the next `docker compose up` or
+container restart would have crash-looped it. Fixed by adding
+`JWT_SECRET: ${JWT_SECRET}` to the scheduler's environment block in both
+`docker-compose.yml` and `docker-compose.prod.yml`, with a comment
+explaining it's unused, not a real dependency. General lesson: tightening
+one field's validation in a shared settings object needs to be checked
+against every process that constructs it, not just the ones that appear
+to need the field being tightened — `grep -rn "get_settings\(\)"` across
+`app/` and `server/scripts/` is the fast way to enumerate them next time.

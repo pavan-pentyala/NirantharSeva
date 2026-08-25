@@ -518,3 +518,65 @@ discussion of process: a project's own README is not self-maintaining, and
 "the code is the source of truth" only holds if something periodically
 re-derives the README from the code rather than trusting the last time
 someone remembered to update it.
+
+## 2026-08-25 (later) — Phase 9, P9.2 (lock measurement, production config)
+
+**§3's promised sentence, finally measured with a real number.** The
+original E5 (P8.3) never isolated the sequencing lock's own cost because
+its profile — 10 VUs, `sleep(1)`, three reads per write — barely
+contends: concurrent `/sync/push` calls almost never overlap under it.
+This session built a deliberately different profile (`experiments/
+k6/lock.js`: 25 write-only VUs, 5 read-only VUs, no `sleep()`, 30
+seconds) specifically to make the lock's own serialisation visible, and
+it worked cleanly: `POST /sync/push` moved by ~72ms at p50 and ~94ms at
+p95 between the lock-on and lock-off runs, while two read endpoints that
+structurally cannot touch the lock (`GET /dashboard`, `GET /referrals`)
+moved by only 9–12ms — and in the *opposite* direction, slower with the
+lock off, not faster. That's the report's real evidence that the write-
+path number is attributable to the lock and not to ordinary run-to-run
+noise: the control moved a fraction as far, and the wrong way. Worth a
+paragraph in Chapter 4 methodologically, not just as a result — the first
+E5 profile would have reported "no measurable cost" and that would have
+been a real methodological error (measuring under too little contention),
+not an honest null the way the index question's own null was.
+
+**A production-shaped configuration surfaced three real infrastructure
+bugs that no unit or integration test in this project could have caught,
+because none of them run against a second, differently-built stack.**
+(1) `docker compose -f docker-compose.prod.yml up` with no explicit
+project name recreated the dev stack's own containers under identical
+names — Compose derives its project name from the directory, not the
+file, and both compose files share a directory. (2) `client/nginx.conf`'s
+first draft crash-looped on startup if the `api` container wasn't
+already resolvable, because a literal `proxy_pass http://api:8000`
+resolves once at config-load time. (3) The fix for (2) — a variable in
+`proxy_pass` — silently disabled nginx's own automatic prefix-stripping,
+so `/api/health` reached the upstream as `/api/health`, not `/health`,
+and needed an explicit `rewrite`. All three are exactly the kind of gap
+ADR-018's own "Consequences" section predicted in the abstract ("a config
+that starts locally has not proven anything about a specific host's
+proxy behaviour") — this session is the concrete instance of that
+warning actually firing, worth citing directly in the report's discussion
+of what "deployment-ready" was and wasn't verified to mean.
+
+**A fourth bug was self-inflicted by this same session's own earlier
+change, not pre-existing.** Removing `jwt_secret`'s development default
+from `app/config.py`'s `Settings` (the change ADR-018/D43 asked for)
+broke the scheduler process, which never reads that field at all — a
+single shared settings model means every field's presence is required
+for every process that constructs it, not just the ones using the field
+being tightened. Caught by testing the actual running containers, not by
+reading the diff. Worth a sentence in the report's discussion of
+methodology: hardening one setting's validation needs to be checked
+against *every* consumer of the shared object, not just the consumer the
+change was written for.
+
+**The temporary lock-disabling edit was reverted and verified clean
+immediately after each use, exactly as planned** — `git status`/`git
+diff` on `server/app/db.py` checked explicitly twice (once per k6 run
+that needed it), both times empty before proceeding to the next step.
+Worth a sentence on process discipline: the plan named this "the one
+genuinely dangerous action in this phase" in advance, and treating it
+that way in practice (dedicated verification step, not just an assumption)
+is itself worth reporting as evidence of engineering discipline, not only
+the resulting number.

@@ -133,6 +133,65 @@ the one canonical location. Wall-clock cost, measured not estimated:
 | E5 | Endpoint latency, with and without an index | ~10 min, not a grid |
 | E6 | Unresolvable-referral rate at full cohort scale | ~56 min (3 cells) |
 
+## Deploy it
+
+`docker-compose.prod.yml` is a deployment-**ready** configuration, not a
+deployed instance (D43, `docs/decisions/ADR-018.md`) — local Compose above
+stays the primary way to run and demo this project. It differs from
+`docker-compose.yml` in every way a real deployment needs: no source bind
+mounts (each image is a self-contained artifact), no `--reload` and no
+Vite dev server (the client is a built bundle served by nginx, which also
+reverse-proxies `/api/*` to the API — `client/nginx.conf`), the database
+port is never published to the host, CORS is a required real origin
+instead of `*`, and every secret has no development default — a missing
+one fails `docker compose up` outright rather than silently falling back
+to a published dev value.
+
+```bash
+cp .env.prod.example .env.prod   # fill in POSTGRES_PASSWORD, DATABASE_URL,
+                                  # JWT_SECRET, CORS_ORIGINS — see the file
+docker compose -p nirantharseva-prod -f docker-compose.prod.yml --env-file .env.prod up -d --build
+curl http://localhost:8000/health          # the API directly
+curl http://localhost:8080/api/health      # through the client's own reverse proxy
+```
+
+**Always pass `-p nirantharseva-prod`** (or any name other than the
+directory's default) if the dev stack might also be running — Compose
+derives its project name from the current directory by default, and both
+files live in this one; without a distinct `-p`, bringing the prod
+config up **recreates the dev stack's own containers under the same
+names**, discarding them (a real mistake made and recovered from while
+building this — the named `pgdata` volume survived, since it's addressed
+by name, but every dev container had to be brought back with a plain
+`docker compose up -d` afterward). Tear down with the same flags plus
+`-v`, so the scratch `pgdata_prod` volume doesn't linger:
+
+```bash
+docker compose -p nirantharseva-prod -f docker-compose.prod.yml --env-file .env.prod down -v
+```
+
+**What "deployment-ready" means here, precisely** (ADR-018's own
+standard): the config has been brought up and verified to actually serve
+— not just written. It has not been checked under load, over a real
+network, behind a real TLS-terminating proxy, or against a managed
+Postgres. No hosting account or live URL exists for this project, and none
+of its other deliverables depend on one.
+
+## The advisory lock's write-latency cost
+
+`docs/IMPLEMENTATION_PLAN.md` §3 asks for one measured sentence:
+`server/results/e5_lock/summary.md` has it. Under a write-heavy, no-sleep
+k6 profile built specifically to contend (`experiments/k6/lock.js`, 25
+write VUs + 5 read VUs, 30s, run twice against a scratch database — once
+with the sequencing lock active, once temporarily neutralised), the lock
+adds roughly 70ms to `POST /sync/push`'s median latency and roughly 94ms
+at p95, while two read endpoints that never touch the lock moved by only
+9–12ms, in the *opposite* direction — the control that makes the write-path
+number trustworthy rather than noise. Accepted in exchange for
+`referral_event.seq` order always matching commit order, which is what
+keeps `/sync/pull`'s cursor from silently skipping events under concurrent
+writers (ADR-002).
+
 ## How it works
 
 Every write is an operation with a client-generated `op_id`, queued in an
@@ -181,7 +240,7 @@ The decisions most worth reading, in `docs/decisions/`:
 | `docs/DEMO_SCRIPT.md` | The click path for the live demo, and what to fall back to |
 | `docs/UI_DESIGN_BRIEF.md` + `docs/design_handoff_ui_screens/` | The design brief and its seven screen references |
 | `docs/screenshots/` | What each screen actually renders |
-| `server/results/` | Every experiment's raw data, tables, figures and dashboard (E1–E6) |
+| `server/results/` | Every experiment's raw data, tables, figures and dashboard (E1–E6), plus `e5_lock/`'s advisory-lock measurement |
 
 The written report itself is deliberately not in this repository — it is
 being built separately, after Phase 9.

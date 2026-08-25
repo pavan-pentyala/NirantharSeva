@@ -1,0 +1,86 @@
+# P9.2 (D43, ADR-018) — deployment-ready configuration, not a deployed
+# instance. Differs from docker-compose.yml in every way ADR-018 names:
+# no source bind-mounts (the image is the artifact), no --reload and no
+# Vite dev server (client/Dockerfile.prod builds the real bundle and
+# serves it from nginx), the database port is not published to the host,
+# CORS is a required, non-wildcard origin list, and every secret has no
+# development default — a missing one fails `docker compose up` outright
+# (Compose's own ${VAR:?message} syntax) rather than silently falling
+# back to a published dev value.
+#
+# Local Compose (docker-compose.yml) stays the primary demo path per §14
+# and ADR-018 — this file exists to answer "could this be deployed?" with
+# a verified artifact, not to replace it. See README.md's "Deploy it" for
+# the required env vars and the exact verification steps.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set — no development default in production}
+      POSTGRES_DB: ${POSTGRES_DB:-nirantharseva}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    # No "ports:" — ADR-018: the database is reachable only from other
+    # services on this Compose network, never from the host.
+
+  api:
+    build: ./server
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set — no development default in production}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set — no development default in production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-480}
+      CLOCK_MODE: real
+      RUN_ID: ${RUN_ID:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SLA_SCALE: ${SLA_SCALE:-1.0}
+      IDENTITY_AUTO_ACCEPT: ${IDENTITY_AUTO_ACCEPT:-92.0}
+      IDENTITY_REVIEW_FLOOR: ${IDENTITY_REVIEW_FLOOR:-80.0}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS must be set to the real deployed origin(s), comma-separated — no wildcard in production}
+    ports:
+      - "8000:8000"
+    # No "volumes:" — the image built from ./server IS the artifact; no
+    # bind mount. Same migrate-then-serve command docker-compose.yml uses,
+    # minus --reload (server/Dockerfile's own bare CMD has neither the
+    # migration step nor --reload, so this still has to be spelled out).
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  scheduler:
+    build: ./server
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set — no development default in production}
+      # Never used by the scheduler itself — required only because
+      # app/config.py's single shared Settings model has no default for
+      # it; see docker-compose.yml's identical comment on this line.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set — no development default in production}
+      CLOCK_MODE: real
+      RUN_ID: ${RUN_ID:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SLA_SCALE: ${SLA_SCALE:-1.0}
+      SWEEP_INTERVAL_SECONDS: ${SWEEP_INTERVAL_SECONDS:-300}
+    command: python -m app.scheduler.run
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.prod
+    depends_on:
+      - api
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata_prod: {}

@@ -9,8 +9,8 @@
 > those here just gives a future session more text to read for the same
 > information, at lower quality.
 
-**Last updated:** 2026-08-25 (Phase 9, P9.1)
-**Last session model:** Sonnet (P9.1 implementation).
+**Last updated:** 2026-08-25 (later — Phase 9, P9.2)
+**Last session model:** Sonnet (P9.2 implementation).
 
 ## Current phase
 
@@ -24,15 +24,15 @@ matrix is filled from real recorded runs, and E5's k6 load test (a
 genuinely new tool in this repo) produced real per-endpoint latency
 numbers and an honest index finding.
 
-**Phase 9 is in progress. P9.1 is done and verified.** `docs/PHASE9_PLAN.md`
-and **ADR-018** (deployment-ready config, not a deployed instance) were
-written 2026-08-24 (Opus, plan-only — no code). D42–D45 answered by the
-user; D46–D49 taken alone, flagged in the plan for override, and now built
-exactly as flagged (no override requested). **The split is P9.1 / P9.2 /
-P9.3 (D45) and each needs its own explicit go-ahead** (handoff R1/R5) —
-P9.2 (the advisory-lock measurement, D44; the production Compose config,
-D43/ADR-018) and P9.3 (recording scripts, submission checklist) are both
-still unstarted, waiting for that go-ahead.
+**Phase 9 is in progress. P9.1 and P9.2 are done and verified.**
+`docs/PHASE9_PLAN.md` and **ADR-018** (deployment-ready config, not a
+deployed instance) were written 2026-08-24 (Opus, plan-only — no code).
+D42–D45 answered by the user; D46–D49 taken alone, flagged in the plan for
+override, and now built exactly as flagged (no override requested). **The
+split is P9.1 / P9.2 / P9.3 (D45) and each needs its own explicit
+go-ahead** (handoff R1/R5) — P9.3 (recording scripts, submission
+checklist) is the only sub-phase still unstarted, waiting for that
+go-ahead.
 
 **The written report is OUT of Phase 9 scope (D42).** Nothing
 report-shaped exists in this repository and none will be created here —
@@ -657,12 +657,97 @@ clean before trusting migration `0009`.
   afterward. `git status` clean of anything but the intended changes
   (checked specifically for screenshot churn — none).
 
+- **P9.2** (`docs/PHASE9_PLAN.md` build order, 2026-08-25 later, Sonnet):
+  **D44, the advisory-lock measurement** — `experiments/k6/lock.js` (new,
+  deliberately different from P8.3's `load.js`: 25 write-only VUs, 5
+  read-only VUs, no `sleep()`, 30s — built to actually contend, unlike
+  E5's own light profile, which would have measured ≈0ms regardless of
+  the lock); `server/scripts/measure_lock.sh`/`teardown_lock.sh` (a
+  one-off `lock-test-api` container against a scratch database,
+  `nirantharseva_lock_scratch`, never the dev one); a NEW `k6-lock`
+  Compose service (`docker-compose.yml`), kept separate from P8.3's own
+  `k6` service so nothing about E5's already-verified setup was touched.
+  The lock-disabling edit (`app/db.py`, one line, `return` before the
+  `pg_advisory_xact_lock` call) was applied only between the two runs,
+  reverted immediately after, and `git status`/`git diff` on that file
+  checked explicitly clean **twice** before proceeding — the plan's own
+  "one genuinely dangerous action in this phase," treated that way.
+  **Result: the lock adds ~72ms to `POST /sync/push`'s p50 and ~94ms at
+  p95** (locked: 201.7/299.4ms, n=3108; unlocked: 130.1/205.9ms, n=4390),
+  while the read-endpoint control (`GET /dashboard`, `GET /referrals` —
+  neither calls the lock) moved only 9-12ms, in the *opposite* direction
+  — the control that makes the write-path number trustworthy. Committed:
+  `server/results/e5_lock/{summary.md,table_e5_lock_latency.csv,
+  k6_lock_{on,off}_summary.json}`.
+  **D43/ADR-018, the production configuration** — `docker-compose.prod.yml`
+  (no bind mounts, no `--reload`, database port unpublished, every secret
+  `${VAR:?message}`-required); `client/Dockerfile.prod` + `client/
+  nginx.conf` (multi-stage build, nginx serves the real `dist/` bundle and
+  reverse-proxies `/api/*` to the API — mirrors `vite.config.ts`'s own dev
+  proxy exactly, including a dedicated unbuffered location for
+  `/api/dashboard/stream` so the SSE headline feature isn't the thing a
+  production proxy quietly breaks); `.env.prod.example`; a new
+  `cors_origins` setting (`app/config.py`, `"*"` in dev, required in prod,
+  wired into `app/main.py`'s `CORSMiddleware`); `jwt_secret` lost its
+  insecure Python-level default (was `dev-secret-change-for-anything-
+  real`, now required — every dev/CI path already supplies it via `.env`
+  or an explicit CI env var, so nothing that previously worked needed to
+  change *except* — see below).
+  **Brought up and verified serving, for real, not just written**: `curl
+  http://localhost:8000/health` returns 200 directly, and `curl
+  http://localhost:8080/api/health` returns 200 through the client's own
+  nginx reverse proxy, both against a freshly built
+  `docker-compose.prod.yml` stack.
+  **Three real infrastructure bugs found and fixed while getting the prod
+  config to actually serve, not just written and trusted** — see
+  observations 61-63, `docs/OBSERVATIONS.md`, and this session's section
+  in `docs/Observations_for_report.md`: (1) bringing the prod stack up
+  with no `-p` flag recreated the **dev stack's own containers** under
+  identical names (Compose derives its project name from the directory,
+  not the file, and both compose files share one) — no data lost (the
+  named `pgdata` volume is addressed by name, and prod uses a separate
+  `pgdata_prod`), but every dev container had to be brought back with
+  `docker compose up -d`, and `api` needed a second manual restart later
+  after being stopped by hand to free port 8000 for verification; fixed
+  going forward by always passing `-p nirantharseva-prod`. (2)
+  `client/nginx.conf`'s first draft crash-looped on startup because a
+  bare `proxy_pass http://api:8000` resolves once at config-load time and
+  refuses to start if it can't — fixed with a variable plus an explicit
+  `resolver 127.0.0.11` (Docker's embedded DNS), deferring resolution to
+  request time. (3) That same variable silently disabled nginx's own
+  automatic location-prefix stripping, so `/api/health` reached the
+  upstream as literally `/api/health` (404) until an explicit `rewrite
+  ^/api/(.*)$ /$1 break;` was added — and that rewrite had to be ordered
+  *after* a `set $upstream_api ...` line, not before, since `break` halts
+  the rest of the rewrite module's own directives (including `set`) for
+  that request. **A fourth bug, self-inflicted by this same session's own
+  jwt_secret change**: making `jwt_secret` required broke the scheduler
+  process (which never reads that field) in **both** the dev and prod
+  compose files, since `Settings` is one shared model and every field's
+  presence is required at construction regardless of whether a given
+  caller uses it — fixed by adding `JWT_SECRET: ${JWT_SECRET}` to both
+  scheduler service blocks, with a comment explaining it's unused.
+
+  Verified: full server suite **269 passed** (unchanged — no new server
+  tests), `ruff check`/`ruff format --check` clean, `python -m
+  app.verify_replay` clean, `alembic heads` still `0009` (P9.2 adds no
+  migration). Client `tsc --noEmit` and `npm run build` clean (full
+  Playwright suite deliberately not run — same screenshot-churn trap as
+  P9.1). No orphaned container or scratch volume survived — the one
+  leftover from the first (colliding, wrong-project-name) prod attempt,
+  `nirantharseva_pgdata_prod`, was found and removed by hand; a stray
+  `server/nul` (a `/dev/null`-mangling artifact from a host-side `curl -o
+  /dev/null` call, the same family of Windows/Git-Bash path quirk as
+  `MSYS_NO_PATHCONV`'s but a new manifestation of it) was found and
+  deleted before committing. Dev stack (`db`/`api`/`scheduler`/`client`)
+  confirmed fully restored and healthy at the end, `git status` clean of
+  anything but the intended P9.2 changes.
+
 ## Not done / in progress
 
-- **Phase 9's P9.2 and P9.3 are not started.** P9.1 is done (see above).
-  P9.2 (the advisory-lock measurement, D44; the production Compose config,
-  D43/ADR-018) and P9.3 (recording scripts, submission checklist) each
-  need their own go-ahead (handoff R1/R5) before starting.
+- **Phase 9's P9.3 is not started.** P9.1 and P9.2 are done (see above).
+  P9.3 (recording scripts, submission checklist) needs its own go-ahead
+  (handoff R1/R5) before starting.
 - **The written report is deferred until after Phase 9 (D42)** — not
   started, not scaffolded, and deliberately not in Phase 9's scope. The
   user will share his own plan for it once Phase 9 is done.
@@ -714,6 +799,37 @@ rather than promising something the settings don't actually produce: at
 seeded to already be overdue) breaches within about a minute, so a
 presenter who takes their time between running `demo.sh` and opening the
 dashboard will see several overdue rows, not one. See observation 60.
+
+P9.2: every criterion in `docs/PHASE9_PLAN.md`'s D45 table met and checked
+against real commands —
+
+- **"`server/results/e5_lock/` holds p50/p95 for `POST /sync/push` in
+  both lock states from a write-concurrent profile, with the read
+  endpoints as a noise control."** `table_e5_lock_latency.csv` has both
+  (25 write VUs / 5 read VUs / no `sleep()` / 30s, run against a scratch
+  database via `server/scripts/measure_lock.sh`) — write path moved
+  ~72ms/~94ms (p50/p95), read control moved only 9-12ms and in the
+  opposite direction. `summary.md` states the measured sentence and what
+  it does/doesn't support.
+- **"The production Compose file has been brought up and served a
+  request."** Done twice, not once — the first attempt (no `-p` flag)
+  collided with the dev stack's own container names (observation 61) and
+  had to be redone properly; the corrected run (`-p nirantharseva-prod`)
+  was verified serving both directly (`curl localhost:8000/health` → 200)
+  and through the client's own nginx reverse proxy (`curl
+  localhost:8080/api/health` → 200).
+- **"`git status` is clean and `git diff` empty afterward."** Checked on
+  `server/app/db.py` specifically, twice — once after each k6 run that
+  needed the lock-disabling edit — both times clean before proceeding.
+
+Three real infrastructure bugs (project-name collision, nginx's
+config-load-time DNS resolution, a variable in `proxy_pass` disabling
+prefix-stripping) and one self-inflicted one (the `jwt_secret` change
+breaking the scheduler's own `Settings()` construction) were found and
+fixed while getting the production config to actually serve — see
+observations 61-63 and the P9.2 "Done" entry above for the full detail.
+None of them were assumed away; each was reproduced, diagnosed from a
+real error message, and fixed before moving on.
 
 Phase 4: every criterion in `docs/PHASE4_PLAN.md` met and checked against
 real commands, **except** the real-phone recording. Two needed judgement:
@@ -990,19 +1106,18 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**P9.1 is done and verified.** Next is **P9.2** — the advisory-lock
-write-latency measurement (D44: a write-heavy, no-sleep k6 profile against
-a scratch database, `acquire_seq_lock` on vs. temporarily neutralised,
-never committed, into `server/results/e5_lock/`) and the production-ready
-Compose configuration (D43/ADR-018: no bind mounts, no `--reload`, built
-static client, unpublished DB port, restricted CORS, no development secret
-defaults — brought up and verified to actually serve, not just written).
-`docs/PHASE9_PLAN.md`'s "Contracts fixed now" and "Traps" sections cover
-both in detail — the lock-disabling edit escaping into a commit is flagged
-there as the one genuinely dangerous action in this phase.
+**P9.1 and P9.2 are done and verified.** Next is **P9.3** — recording
+scripts and submission readiness: the two-minute demo clip's shot list,
+the real-phone airplane-mode clip (§8.5, still owed — see "Open item for
+the user" above), and a submission checklist naming every Review-III
+deliverable and its current state. `docs/PHASE9_PLAN.md`'s P9.3 row is
+the source of truth for what "done" means here — every recorded path has
+to be verified working *before* it's recorded, per the plan's own framing
+("a session can't do the recording, but it can make sure recording isn't
+also a debugging session").
 
-Wait for an explicit go-ahead before starting P9.2, and do not roll from
-P9.2 into P9.3 without a second one (R1/R5).
+Wait for an explicit go-ahead before starting P9.3 (R1/R5). This is the
+last sub-phase of Phase 9.
 
 **Two things a P9 session must not do:** touch the written report in any
 form (D42 — deferred until after Phase 9, the user has his own plan), and
@@ -1025,6 +1140,34 @@ tabs of the same profile). The referral you create in step 2 should flip
 to "overdue" in the still-open, never-reloaded supervisor tab within about
 35–90 seconds. `docker stop demo-scheduler` when done (started with
 `--rm`, so this also removes it).
+
+To verify P9.2 yourself:
+
+```bash
+cat server/results/e5_lock/summary.md
+cat server/results/e5_lock/table_e5_lock_latency.csv
+git status   # must be clean
+```
+Expect the write path (`POST /sync/push`) to show a real gap between
+`e5_lock_on` and `e5_lock_off` rows, and the read endpoints
+(`GET /dashboard`, `GET /referrals`) to show a much smaller one. The
+measurement itself is not worth re-running casually (~2 minutes of real
+k6 traffic per condition, plus a manually-supervised code edit in
+between) — if you do, re-read `server/scripts/measure_lock.sh`'s own
+header comment first, and see observations 61-63 before touching
+`app/db.py`, `docker-compose.yml`'s `scheduler` service, or
+`client/nginx.conf` again.
+
+```bash
+cp .env.prod.example .env.prod   # fill in the four required values
+docker compose -p nirantharseva-prod -f docker-compose.prod.yml --env-file .env.prod up -d --build
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8000/health          # expect 200
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/api/health      # expect 200, through nginx
+docker compose -p nirantharseva-prod -f docker-compose.prod.yml --env-file .env.prod down -v
+```
+**Always pass `-p nirantharseva-prod`** if the dev stack might also be up
+— see observation 61 for what happens without it (the dev containers get
+silently replaced, not just refused).
 
 To verify P8.3 yourself:
 
@@ -1394,6 +1537,23 @@ around changes what that spec exercises. Clean up by deleting from
 
 ## Known problems and workarounds
 
+- **`docker compose -f docker-compose.prod.yml` with no `-p` flag shares
+  the dev stack's default project name (both files live in this
+  directory) and will recreate the dev containers under identical names.**
+  Always pass `-p nirantharseva-prod` for the production config. See
+  observation 61, `docs/OBSERVATIONS.md`, and README.md's "Deploy it".
+- **A variable in nginx's `proxy_pass` disables its automatic
+  location-prefix stripping, and `rewrite ... break` halts any `set` that
+  comes after it in the same block.** Both bit `client/nginx.conf`'s first
+  draft. See observation 62 before touching that file again.
+- **`app/config.py`'s `Settings` is one shared model — tightening one
+  field's validation (removing a default) breaks every process that
+  constructs `Settings()`, not just the ones using that field.** Making
+  `jwt_secret` required broke the scheduler (which never reads it) until
+  `JWT_SECRET` was added to its environment block in both compose files.
+  Before removing any other field's default, grep for
+  `get_settings()` across `app/` and `server/scripts/` first. See
+  observation 63.
 - **At demo-scale SLA settings, every open referral breaches within about
   a minute, not just the one a script deliberately seeded to demonstrate
   it.** `SLA_SCALE=0.0004` makes a 24h SLA breach in ~35s and a 48h one in

@@ -35,7 +35,7 @@ app = FastAPI(title="NirantharSeva API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"] if settings.cors_origins == "*" else settings.cors_origins.split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )

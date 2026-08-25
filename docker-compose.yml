@@ -32,6 +32,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       IDENTITY_AUTO_ACCEPT: ${IDENTITY_AUTO_ACCEPT:-92.0}
       IDENTITY_REVIEW_FLOOR: ${IDENTITY_REVIEW_FLOOR:-80.0}
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
     ports:
       - "8000:8000"
     volumes:
@@ -52,6 +53,11 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      # Never used by the scheduler itself — required only because
+      # app/config.py's single shared Settings model has no default for it
+      # (P9.2, ADR-018), and any process constructing Settings() needs a
+      # value present, whether or not that process reads the field.
+      JWT_SECRET: ${JWT_SECRET}
       CLOCK_MODE: ${CLOCK_MODE:-real}
       SIM_START: ${SIM_START:-}
       RUN_ID: ${RUN_ID:-}
@@ -75,6 +81,20 @@ services:
       - ./server/results/e5:/results
     environment:
       BASE_URL: http://api:8000
+
+  # P9.2 (D44) — the advisory-lock write-latency measurement. A separate
+  # service, not a reuse of `k6` above, so P8.3's own already-verified
+  # e5/ mount is never touched by this phase (docs/PHASE9_PLAN.md's own
+  # "do not re-run any Phase 8 experiment"). Same "load" profile gate.
+  #   docker compose --profile load run --rm k6-lock run /scripts/lock.js
+  k6-lock:
+    image: grafana/k6:latest
+    profiles: ["load"]
+    volumes:
+      - ./experiments/k6:/scripts
+      - ./server/results/e5_lock:/results
+    environment:
+      BASE_URL: http://lock-test-api:8000
 
   client:
     build: ./client

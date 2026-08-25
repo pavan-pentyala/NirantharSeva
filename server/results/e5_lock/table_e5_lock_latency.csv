@@ -1,0 +1,11 @@
+run_id,endpoint,method,n,p50_ms,p95_ms
+e5_lock_on,/auth/login,POST,2,60.72,62.80
+e5_lock_off,/auth/login,POST,2,57.75,61.23
+e5_lock_on,/dashboard,GET,747,63.86,111.78
+e5_lock_off,/dashboard,GET,649,75.75,136.34
+e5_lock_on,/health,GET,1,33.34,33.34
+e5_lock_off,/health,GET,1,30.58,30.58
+e5_lock_on,/referrals,GET,747,63.74,109.18
+e5_lock_off,/referrals,GET,649,72.89,132.78
+e5_lock_on,/sync/push,POST,3108,201.73,299.41
+e5_lock_off,/sync/push,POST,4390,130.05,205.88

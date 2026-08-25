@@ -10,9 +10,19 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://postgres:dev@db:5432/nirantharseva"
 
-    jwt_secret: str = "dev-secret-change-for-anything-real"
+    # No default (P9.2, ADR-018) — every dev/CI/experiment path already sets
+    # this via .env or an explicit env var (docker-compose.yml's api service
+    # passes ${JWT_SECRET} with no compose-level fallback either), so a
+    # missing value now fails loudly at Settings() construction instead of
+    # silently signing tokens with a published, guessable string.
+    jwt_secret: str
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480
+
+    # "*" in dev (matches every environment before P9.2) — production sets
+    # this to a real, comma-separated origin list (docker-compose.prod.yml,
+    # ADR-018). See app/main.py for how "*" vs. a real list is handled.
+    cors_origins: str = "*"
 
     # See docs/decisions/ADR-001.md — real|simulated
     clock_mode: str = "real"
