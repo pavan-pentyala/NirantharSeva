@@ -123,6 +123,15 @@ test("a new breach appears on the supervisor dashboard without a page refresh", 
   // have had anyway ("Mark as sent" for CREATED), not "no action at all".
   await ashaRow.click();
   await expect(page).toHaveURL(/\/referrals\/[0-9a-f-]+$/);
+  // The list page's own row (Lakshmi Devi's seeded fixture is also
+  // CREATED, so it shows this same "Not travelled yet" label regardless
+  // of escalation) can still be transiently attached for a moment after
+  // the URL changes, before React Router finishes swapping to the detail
+  // route — a real strict-mode race, not a demo-scale-scheduler artifact,
+  // caught only once CI actually reached this test for the first time.
+  // Waiting for the old row to detach closes the race at its cause,
+  // rather than narrowing the locator to paper over it.
+  await expect(ashaRow).toBeHidden();
   await expect(page.getByText("Not travelled yet")).toBeVisible();
   await expect(page.getByText("This referral is overdue. The supervisor has been told.")).toBeVisible();
   await expect(page.getByTestId("referral-action-button")).toHaveText("Mark as sent");
