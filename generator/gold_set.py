@@ -10,8 +10,9 @@ index, not the injected Clock's "now" — nothing here simulates elapsed
 time, these timestamps only exist to satisfy the column and to give
 exact_match's ORDER BY created_at a stable tie-break, and the real
 wall clock would break byte-for-byte reproducibility. This module never
-calls datetime.now() or time.time() (the grep-based exit criterion covers
-this file too, even though it is outside app/linkage/).
+calls the real-time clock, directly or via the wall-clock timer (the
+grep-based exit criterion covers this file too, even though it is outside
+app/linkage/).
 
 Each duplicate "person" becomes ONE row in `patient` (the "existing"
 record, as if registered on an earlier referral) plus ONE query — a name/

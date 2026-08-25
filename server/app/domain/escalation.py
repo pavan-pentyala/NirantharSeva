@@ -22,8 +22,9 @@ the API (plan §2.3, so E4's fault injection can kill it independently) — so
 every event append here takes acquire_seq_lock first, same as push.py, or
 the pull cursor can silently skip events (docs/decisions/ADR-002.md).
 
-Never calls datetime.now(). Takes the injected Clock, same as everything
-else (docs/decisions/ADR-001.md) — CI greps for this.
+Never calls the real-time clock directly. Takes the injected Clock, same
+as everything else (docs/decisions/ADR-001.md) — CI enforces this with a
+grep.
 """
 
 import uuid

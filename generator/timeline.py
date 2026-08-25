@@ -10,8 +10,8 @@ ordinary path CREATED -> IN_TRANSIT -> ARRIVED -> TREATED -> BACK_REFERRED
 no further rows — not a LOST event either, since LOST is also
 Role.SYSTEM-only (app/domain/states.py GUARDS).
 
-No datetime.now() — device_time is the referral's own created_device_time
-plus generated dwell offsets, all seeded from `seed`.
+No real-time clock call — device_time is the referral's own
+created_device_time plus generated dwell offsets, all seeded from `seed`.
 """
 
 import uuid

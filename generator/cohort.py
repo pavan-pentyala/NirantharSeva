@@ -6,8 +6,8 @@ for the bulk of genuinely distinct people who need no controlled variant
 relationship at all.
 
 Pure and deterministic: every function here takes `seed` and a resolved
-config and returns plain dataclasses, with no I/O and no datetime.now() —
-device times are the config's own simulated start plus generated offsets
+config and returns plain dataclasses, with no I/O and no real-time clock
+call — device times are the config's own simulated start plus generated offsets
 (_BASE_TIME below). generator/cli.py is what checks "same seed twice ->
 byte-identical", by running the whole CLI twice and diffing, not by
 reasoning that purity implies it.

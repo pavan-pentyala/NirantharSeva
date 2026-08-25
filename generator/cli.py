@@ -7,9 +7,9 @@ patients.csv, district.csv, users.csv, referrals.csv, events.csv,
 ground_truth_identity.json, config.resolved.yaml (I7 — the run is
 reproducible from --out alone).
 
-No datetime.now() anywhere in this module or the ones it calls
-(generator/cohort.py, generator/timeline.py) — CI's clock-discipline grep
-now covers this directory (build order #8).
+No call to the real-time clock anywhere in this module or the ones it
+calls (generator/cohort.py, generator/timeline.py) — CI's
+clock-discipline grep now covers this directory (build order #8).
 """
 
 import argparse
