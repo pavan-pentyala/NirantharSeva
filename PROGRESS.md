@@ -810,10 +810,23 @@ clean before trusting migration `0009`.
   SLA never breaches inside a 100–120s Playwright timeout. Fixed by
   adding the same demo-scale-scheduler step this file has documented for
   *local* verification for a long time to `.github/workflows/ci.yml`
-  itself. **All four jobs (`clock-discipline`, `client`, `server`, `e2e`)
-  passed together on the next push** — confirmed by watching the actual
-  run (`gh run watch`), not by reading the diff and assuming. See
-  observations 65–66.
+  itself. All four jobs passed — but (3) **the very next push (docs-only,
+  no code change) failed again**, on a side effect of fix (2): running
+  the demo-scale scheduler for the *whole* `npx playwright test`
+  invocation escalated every other spec file's own fixture referrals too,
+  not just the two tests that needed it, and a loosely-scoped
+  `getByText("Not travelled yet")` locator in `dashboard.spec.ts` matched
+  stray overdue pills from unrelated concurrently-running tests — the
+  exact same "a fast-escalation setting isn't scoped to the row you
+  meant" finding as observation 60 (P9.1), recurring in CI within the
+  same session. Fixed by splitting into two invocations — `--grep breach`
+  (the two dependent tests, scheduler on, running first before anything
+  else has a fixture to accidentally escalate) then `--grep-invert
+  breach` (the other nine, scheduler stopped, real scale) — verified
+  locally with `--list` first (2 + 9 = 11, no gaps, no overlap), then
+  **confirmed green twice in a row in CI**, not once, given this session
+  had already been burned by trusting a single green run minutes earlier.
+  See observations 65–67.
 
 ## Not done / in progress
 
@@ -1672,10 +1685,14 @@ around changes what that spec exercises. Clean up by deleting from
   files across Phases 5 and 7 (fixed 2026-08-25), which in turn had
   masked `e2e` never actually exercising `dashboard.spec.ts`'s two
   live-breach tests against CI's real-scale `SLA_SCALE=1.0` (also fixed
-  2026-08-25 — a demo-scale scheduler step added to the workflow). Run
-  `gh run list --limit 5` occasionally, not just `git push` — a green
-  local suite is not evidence CI's own separate config is correct. See
-  observations 65–66.
+  2026-08-25 — a demo-scale scheduler step added to the workflow, then
+  split into two `--grep`-scoped Playwright invocations one push later
+  when running the scheduler for the whole suite turned out to escalate
+  every other spec file's own fixtures too). Run `gh run list --limit 5`
+  occasionally, not just `git push` — a green local suite is not evidence
+  CI's own separate config is correct, and a single green CI run isn't
+  proof either (this exact workflow failed on the push immediately after
+  its own first "fix"). See observations 65–67.
 - **`docker compose -f docker-compose.prod.yml` with no `-p` flag shares
   the dev stack's default project name (both files live in this
   directory) and will recreate the dev containers under identical names.**
