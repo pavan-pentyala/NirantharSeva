@@ -9,8 +9,8 @@
 > those here just gives a future session more text to read for the same
 > information, at lower quality.
 
-**Last updated:** 2026-08-25 (later — Phase 9, P9.2)
-**Last session model:** Sonnet (P9.2 implementation).
+**Last updated:** 2026-08-25 (later still — Phase 9, P9.3)
+**Last session model:** Sonnet (P9.3 implementation).
 
 ## Current phase
 
@@ -24,15 +24,19 @@ matrix is filled from real recorded runs, and E5's k6 load test (a
 genuinely new tool in this repo) produced real per-endpoint latency
 numbers and an honest index finding.
 
-**Phase 9 is in progress. P9.1 and P9.2 are done and verified.**
+**Phase 9 is complete — P9.1, P9.2, and P9.3 are all done and verified.**
 `docs/PHASE9_PLAN.md` and **ADR-018** (deployment-ready config, not a
 deployed instance) were written 2026-08-24 (Opus, plan-only — no code).
 D42–D45 answered by the user; D46–D49 taken alone, flagged in the plan for
 override, and now built exactly as flagged (no override requested). **The
-split is P9.1 / P9.2 / P9.3 (D45) and each needs its own explicit
-go-ahead** (handoff R1/R5) — P9.3 (recording scripts, submission
-checklist) is the only sub-phase still unstarted, waiting for that
-go-ahead.
+split is P9.1 / P9.2 / P9.3 (D45)**, each with its own explicit go-ahead
+(handoff R1/R5), and every sub-phase's own exit criteria are met — with
+one honest exception that was never a session's to close: **the two
+Review-III recordings (the two-minute clip, the real-phone clip) are
+scripted and their mechanisms verified, but not recorded** — P9.3's own
+framing in the plan says this plainly from the start ("needs the user's
+own hands... cannot be completed by a session alone"). See
+`docs/SUBMISSION_CHECKLIST.md` for the exact state of every deliverable.
 
 **The written report is OUT of Phase 9 scope (D42).** Nothing
 report-shaped exists in this repository and none will be created here —
@@ -743,17 +747,64 @@ clean before trusting migration `0009`.
   confirmed fully restored and healthy at the end, `git status` clean of
   anything but the intended P9.2 changes.
 
+- **P9.3** (`docs/PHASE9_PLAN.md` build order, 2026-08-25 later still,
+  Sonnet): **`docs/RECORDING_DEMO_CLIP.md`** — a shot list for the
+  two-minute demo clip (§14's third fallback), budgeted second-by-second
+  to fit 120s, built entirely from mechanisms P9.1's own real-browser
+  rehearsal already proved work (the offline save, the live escalation
+  flip at 35s, the MO advance, the identity-review merge) — no new click
+  path invented, only re-sequenced and re-timed for video.
+  **`docs/RECORDING_PHONE_CLIP.md`** — the §8.5 real-phone airplane-mode
+  clip. Found and documented a real technical requirement beyond what the
+  plan names: a real mobile browser won't treat a bare LAN IP as a secure
+  context, so even the correct build (`:4173`, the one with a real
+  service-worker precache — P4.3's own already-known constraint) needs
+  the phone to reach it as `localhost`, via USB debugging + `adb reverse`
+  on Android (an HTTPS tunnel as the iPhone fallback). Verified this
+  session, server-side only: `docker compose exec client npm run build &&
+  docker compose exec -d client npm run preview` produces a real 7-entry,
+  341 KiB precache; `curl` confirmed `:4173`, the manifest
+  (`display: standalone`, correct `start_url`), both icon sizes, and
+  `sw.js` all serve correctly (200). The phone-side half — `adb reverse`,
+  the actual install, airplane mode — could not be exercised by this
+  session (no physical device) and is documented from established
+  practice, flagged as such rather than assumed. See observation 64.
+  **`docs/SUBMISSION_CHECKLIST.md`** — every Review-III deliverable and
+  its actual state, in four groups: ready now, owed (the two recordings,
+  the weekly MoM bundle — the user's own), deferred on purpose (the
+  report itself, D42; Appendix B, pending the guide's own answer), and
+  small-optional-not-done (the OpenAPI export, outside this sub-phase's
+  stated scope). States the deployed-URL gap as a *decision* (ADR-018),
+  not an omission — §14 asks for "all three" fallbacks and this project
+  ships two of three, on record, on purpose.
+  `README.md`'s Status line updated to "Phases 0-9 complete, except two
+  recordings," pointing at the checklist for the exact state rather than
+  a hand-wave.
+
+  Verified: `docker ps -a` clean (only the four real dev services, no
+  orphans) before and after; `git status` clean of anything but the three
+  new docs and the README status-line edit. No server/client code
+  touched this sub-phase — P9.3 was documentation plus the `:4173`
+  verification above, so the full pytest/ruff/tsc suite wasn't re-run
+  (nothing it covers changed); the `:4173` build/preview check above is
+  its own real verification of the one thing that did need checking.
+
 ## Not done / in progress
 
-- **Phase 9's P9.3 is not started.** P9.1 and P9.2 are done (see above).
-  P9.3 (recording scripts, submission checklist) needs its own go-ahead
-  (handoff R1/R5) before starting.
+- **Phase 9 is complete. Nothing further is scoped or planned** — the
+  phase map (`docs/IMPLEMENTATION_PLAN.md` §4/§14) ends at P9. Whatever
+  comes next (recording the two clips, the report itself, submission) is
+  the user's own, not a session's — see `docs/SUBMISSION_CHECKLIST.md`.
 - **The written report is deferred until after Phase 9 (D42)** — not
   started, not scaffolded, and deliberately not in Phase 9's scope. The
-  user will share his own plan for it once Phase 9 is done.
-- **The real-phone airplane-mode recording is not done.** User has said
-  keep it — do not drop it, do not re-propose dropping it. It is a P9.3
-  deliverable (§8.5's Review-III fallback) and needs a physical phone.
+  user will share his own plan for it now that Phase 9 is done.
+- **Both Review-III recordings are scripted and their mechanisms
+  verified, but not recorded.** The two-minute demo clip
+  (`docs/RECORDING_DEMO_CLIP.md`) and the real-phone airplane-mode clip
+  (`docs/RECORDING_PHONE_CLIP.md`, §8.5 — user has said keep it, do not
+  drop it, do not re-propose dropping it) both need a screen recorder,
+  and the phone clip needs a physical phone. Neither is something a
+  session can do — flagged as "ready to record," not "recorded."
 - **`docs/mom/` is empty** — §2.2 asks for weekly minutes of meeting, and
   there are none for ten weeks. These are records of real meetings with
   the guide, so they belong to the user, not to a session; flagged here
@@ -830,6 +881,28 @@ fixed while getting the production config to actually serve — see
 observations 61-63 and the P9.2 "Done" entry above for the full detail.
 None of them were assumed away; each was reproduced, diagnosed from a
 real error message, and fixed before moving on.
+
+P9.3: every criterion in `docs/PHASE9_PLAN.md`'s D45 table met, with the
+one exception the plan itself named as out of a session's reach —
+
+- **"Both recording scripts exist with every click path verified working
+  beforehand."** Both exist (`docs/RECORDING_DEMO_CLIP.md`,
+  `docs/RECORDING_PHONE_CLIP.md`). The demo clip's click paths are the
+  exact ones P9.1's real-browser rehearsal already proved. The phone
+  clip's server-side setup (`:4173`'s real precache, manifest, icons,
+  service worker) was independently `curl`-verified this session; its
+  phone-side half (`adb reverse`, the actual install, airplane mode)
+  could not be — no physical device — and is labelled as such in the
+  document rather than asserted.
+- **"The checklist names every Review-III deliverable and its current
+  state."** `docs/SUBMISSION_CHECKLIST.md` — four groups (ready,
+  owed-by-the-user, deferred-on-purpose, small-optional-not-done),
+  naming the deployed-URL gap as ADR-018's own decision, not an omission.
+
+**What P9.3 could not finish, because the plan never asked a session to:**
+the two recordings themselves. `docs/PHASE9_PLAN.md`'s own words: "P9.3
+needs the user's own hands (a phone, a screen recorder) and cannot be
+completed by a session alone." Nothing here is claimed done that isn't.
 
 Phase 4: every criterion in `docs/PHASE4_PLAN.md` met and checked against
 real commands, **except** the real-phone recording. Two needed judgement:
@@ -1106,24 +1179,29 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**P9.1 and P9.2 are done and verified.** Next is **P9.3** — recording
-scripts and submission readiness: the two-minute demo clip's shot list,
-the real-phone airplane-mode clip (§8.5, still owed — see "Open item for
-the user" above), and a submission checklist naming every Review-III
-deliverable and its current state. `docs/PHASE9_PLAN.md`'s P9.3 row is
-the source of truth for what "done" means here — every recorded path has
-to be verified working *before* it's recorded, per the plan's own framing
-("a session can't do the recording, but it can make sure recording isn't
-also a debugging session").
+**Phase 9 is complete — P9.1, P9.2, and P9.3 are all done and verified.**
+The ten-week phase map (`docs/IMPLEMENTATION_PLAN.md` §4) ends here.
+Nothing further is planned or scoped for a session to pick up on its own
+initiative. What remains is entirely the user's:
 
-Wait for an explicit go-ahead before starting P9.3 (R1/R5). This is the
-last sub-phase of Phase 9.
+1. Record the two clips (`docs/RECORDING_DEMO_CLIP.md`,
+   `docs/RECORDING_PHONE_CLIP.md` — the second needs a physical phone).
+2. Write the ten weeks of `docs/mom/` minutes, if not already kept
+   elsewhere.
+3. Ask his guide whether Appendix B (paper submission) is mandatory.
+4. Write the report itself, on his own plan, now that Phase 9's
+   artifacts exist for it to draw on (D42).
 
-**Two things a P9 session must not do:** touch the written report in any
-form (D42 — deferred until after Phase 9, the user has his own plan), and
-re-run any Phase 8 experiment (nothing in Phase 9 touches the code path
-`experiments/` exercises; the lock measurement writes a *new*
-`server/results/e5_lock/`, it does not modify `e5/`).
+If a future session is asked to help with any of the above, read
+`docs/SUBMISSION_CHECKLIST.md` first — it is the up-to-date index of what
+still needs doing and why each item is in the state it's in.
+
+**Historical note, no longer active guidance:** while Phase 9 was open,
+sessions were told not to touch the written report (D42) and not to
+re-run any Phase 8 experiment. The report restriction lifts once the user
+shares his own plan for it; `server/results/e1`–`e6` should still never
+be regenerated casually (see each experiment's own "not worth re-running
+casually" note further down this file) regardless of phase.
 
 To verify P9.1 yourself:
 
@@ -1168,6 +1246,26 @@ docker compose -p nirantharseva-prod -f docker-compose.prod.yml --env-file .env.
 **Always pass `-p nirantharseva-prod`** if the dev stack might also be up
 — see observation 61 for what happens without it (the dev containers get
 silently replaced, not just refused).
+
+To verify P9.3 yourself: read `docs/SUBMISSION_CHECKLIST.md` against the
+actual repository state (every file it points at either exists or is
+explicitly marked not-yet-done); read `docs/RECORDING_DEMO_CLIP.md`'s
+shot list against `docs/DEMO_SCRIPT.md` and confirm every action it
+names is one P9.1's rehearsal already proved. For the phone clip's
+server-side half specifically:
+```bash
+docker compose exec client npm run build
+docker compose exec -d client npm run preview
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4173/
+curl -s http://localhost:4173/manifest.webmanifest
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4173/icon-192.png
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4173/icon-512.png
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:4173/sw.js
+```
+Expect all four `curl`s to return 200 and the manifest to show
+`"display":"standalone"` and both icon entries. The phone-side half
+(`adb reverse`, an actual device) genuinely needs a phone — nothing here
+substitutes for that.
 
 To verify P8.3 yourself:
 

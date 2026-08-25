@@ -1651,3 +1651,34 @@ one field's validation in a shared settings object needs to be checked
 against every process that constructs it, not just the ones that appear
 to need the field being tightened — `grep -rn "get_settings\(\)"` across
 `app/` and `server/scripts/` is the fast way to enumerate them next time.
+
+## Phase 9, P9.3 — a LAN IP is not a secure context, and neither is the dev server's own precache
+
+**64. A real-phone PWA demo needs the built app on `:4173`, not the dev
+server on `:5173`, and needs the phone to reach it as `localhost`, not as
+a LAN IP — two separate, easy-to-miss requirements, both already partly
+on record before this session found the second one.** The first half was
+already known: observation from P4.3 (`docs/OBSERVATIONS.md`'s own
+earlier note, restated in `PROGRESS.md`) established that
+`vite-plugin-pwa`'s `injectManifest` mode only produces a real
+service-worker precache in a production build — `npm run dev`'s precache
+is empty, so `offline-sync.spec.ts` has always run against `:4173`
+(`npm run preview`), never `:5173`. This session extended that same
+constraint to the real-phone recording script and found a second,
+previously unrecorded one on top of it: most mobile browsers (Chrome
+specifically) refuse to register a service worker, and often refuse a
+clean "Add to Home Screen" prompt, over plain `http://` to anything other
+than `localhost`/`127.0.0.1` — a LAN IP like `http://192.168.x.x:4173`
+is not a "secure context" even though it serves the exact same, real,
+already-verified build. The standard fix for testing a local dev server
+on a real Android device is `adb reverse tcp:4173 tcp:4173` (USB
+debugging), which makes the phone's own browser treat the tunnel as
+`localhost`. Verified this session, server-side only: `docker compose
+exec client npm run build && docker compose exec -d client npm run
+preview` produces a real 7-entry, 341 KiB precache, a valid manifest
+(`display: standalone`, correct `start_url`, both icon sizes), and both
+icons plus `sw.js` all resolve with 200 from `:4173`. The phone-side half
+(`adb reverse`, the actual install prompt, airplane mode) could not be
+exercised by this session — no physical device — and is documented from
+established practice in `docs/RECORDING_PHONE_CLIP.md`, flagged there as
+unverified rather than assumed correct.

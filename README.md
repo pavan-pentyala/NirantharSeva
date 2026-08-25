@@ -16,9 +16,10 @@ change is recoverable from an append-only event log.
 
 ## Status
 
-**Phases 0–8 complete.** Phase 9 (deployment-ready configuration, the demo
-path, submission readiness) is in progress — see `PROGRESS.md` for the
-current sub-phase, which is the file kept honest session to session.
+**Phases 0–9 complete**, except two recordings only a physical device and
+a human hand can produce — see `docs/SUBMISSION_CHECKLIST.md` for the
+exact state of every Review-III deliverable, and `PROGRESS.md` for the
+file kept honest session to session.
 
 All seven screens are real and working: offline referral creation and
 listing, referral detail with a full timeline, MO incoming-referrals queue,
@@ -238,6 +239,8 @@ The decisions most worth reading, in `docs/decisions/`:
 | `docs/OBSERVATIONS.md` | Hard-won lessons, append-only, one section per phase |
 | `docs/Observations_for_report.md` | Raw material for the written report — results, framing, limitations |
 | `docs/DEMO_SCRIPT.md` | The click path for the live demo, and what to fall back to |
+| `docs/RECORDING_DEMO_CLIP.md`, `docs/RECORDING_PHONE_CLIP.md` | Shot lists for the two Review-III recordings still owed |
+| `docs/SUBMISSION_CHECKLIST.md` | Every Review-III deliverable and its actual state |
 | `docs/UI_DESIGN_BRIEF.md` + `docs/design_handoff_ui_screens/` | The design brief and its seven screen references |
 | `docs/screenshots/` | What each screen actually renders |
 | `server/results/` | Every experiment's raw data, tables, figures and dashboard (E1–E6), plus `e5_lock/`'s advisory-lock measurement |

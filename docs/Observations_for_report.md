@@ -580,3 +580,42 @@ genuinely dangerous action in this phase" in advance, and treating it
 that way in practice (dedicated verification step, not just an assumption)
 is itself worth reporting as evidence of engineering discipline, not only
 the resulting number.
+
+## 2026-08-25 (later still) — Phase 9, P9.3 (recording scripts, submission checklist)
+
+**The project's own already-recorded observation about `:4173` vs.
+`:5173` (P4.3) turned out to be one instance of a broader rule, not a
+one-off Playwright quirk.** `offline-sync.spec.ts` has always needed the
+built app because the dev server's PWA precache is empty. Preparing the
+real-phone recording script surfaced the same constraint again, plus a
+second one layered on top: a real mobile browser also won't treat a bare
+LAN IP as a secure context, so even the correct build, served correctly,
+still needs a `localhost`-equivalent connection (USB debugging + `adb
+reverse` on Android) to install as a PWA on a real device. Worth a
+sentence in the report's discussion of PWA constraints generally —
+"offline-first" as an architecture claim and "installable on a real
+phone" as a demonstrated fact turned out to have more infrastructure
+between them than either sounds like it should, on its own.
+
+**The deployed-URL gap (ADR-018/D43) is now a checklist line, not a
+silent omission.** `docs/IMPLEMENTATION_PLAN.md` §14 asks for "all
+three" fallbacks — local, deployed, recorded. This project ships two of
+three, on purpose, with a written decision record (ADR-018) explaining
+why a deployed instance was assessed and explicitly rejected rather than
+never attempted. `docs/SUBMISSION_CHECKLIST.md` states this directly next
+to the two genuinely-still-owed items (the two recordings) specifically
+so the gap doesn't read the same way to a panel as an unfinished task —
+worth a paragraph in the report's own limitations section, in the same
+words: *deliberately not done, and why*, not *missing*.
+
+**What P9.3 could and couldn't finish, stated plainly rather than
+implied.** Both recording *scripts* are done and their underlying
+mechanisms verified (the demo clip's shots all trace back to P9.1's own
+rehearsal; the phone clip's server-side setup was independently
+curl-verified this session). Neither recording itself is done — that was
+never something a session could do, per the plan's own framing of P9.3
+from the start ("needs the user's own hands... cannot be completed by a
+session alone"). This is the cleanest instance in the whole project of
+the handoff's own instruction to never claim something is done that
+isn't: the honest state is "ready to record," not "recorded," and both
+documents and the checklist say exactly that rather than rounding up.
