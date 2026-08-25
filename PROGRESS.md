@@ -823,10 +823,27 @@ clean before trusting migration `0009`.
   (the two dependent tests, scheduler on, running first before anything
   else has a fixture to accidentally escalate) then `--grep-invert
   breach` (the other nine, scheduler stopped, real scale) — verified
-  locally with `--list` first (2 + 9 = 11, no gaps, no overlap), then
-  **confirmed green twice in a row in CI**, not once, given this session
-  had already been burned by trusting a single green run minutes earlier.
-  See observations 65–67.
+  locally with `--list` first (2 + 9 = 11, no gaps, no overlap). That
+  push's CI run was green — but (4) **isolating the test only made the
+  next run fail differently**, on a real, genuinely pre-existing bug that
+  had nothing to do with any of this session's own changes: a client-side
+  route change leaves the OLD page's DOM transiently attached for a
+  moment before React unmounts it, and `dashboard.spec.ts`'s own
+  unscoped `page.getByText("Not travelled yet")` (right after a
+  navigation, unlike the identical, correctly-scoped check four lines
+  earlier) can catch that moment — the seeded fixture patient Lakshmi
+  Devi's own referral is also `CREATED`, so it always shows the same
+  label regardless of escalation. Reproduced locally, deterministically,
+  on the first attempt, by matching CI's exact conditions. Fixed at the
+  cause — `await expect(ashaRow).toBeHidden()` before checking the new
+  page — not by narrowing the locator. Verified with a fresh database
+  twice locally (standalone) and once as the full 11-test suite split
+  exactly as CI runs it, **then confirmed green in CI itself twice more**
+  (one of the intervening failures was an unrelated Docker-daemon
+  infrastructure flake on GitHub's own runner — a symlink race entirely
+  unrelated to any of this session's changes, resolved by simply
+  re-running). Four real, independent findings from one "push and check
+  CI" request. See observations 65–68.
 
 ## Not done / in progress
 
@@ -1688,11 +1705,14 @@ around changes what that spec exercises. Clean up by deleting from
   2026-08-25 — a demo-scale scheduler step added to the workflow, then
   split into two `--grep`-scoped Playwright invocations one push later
   when running the scheduler for the whole suite turned out to escalate
-  every other spec file's own fixtures too). Run `gh run list --limit 5`
+  every other spec file's own fixtures too — and even that fix's own
+  first CI run exposed a fourth, genuinely pre-existing bug, a React
+  Router navigation race in `dashboard.spec.ts` itself that had simply
+  never been reached by CI before). Run `gh run list --limit 5`
   occasionally, not just `git push` — a green local suite is not evidence
   CI's own separate config is correct, and a single green CI run isn't
   proof either (this exact workflow failed on the push immediately after
-  its own first "fix"). See observations 65–67.
+  its own first "fix", twice). See observations 65–68.
 - **`docker compose -f docker-compose.prod.yml` with no `-p` flag shares
   the dev stack's default project name (both files live in this
   directory) and will recreate the dev containers under identical names.**
