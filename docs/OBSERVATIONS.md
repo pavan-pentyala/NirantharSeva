@@ -1547,3 +1547,35 @@ unrelated (a dropped column two tables away) perturbs the coincidence it
 was quietly resting on. The fix that actually holds is the one that
 names a column the schema *guarantees* is ordered, not the one that
 guesses at which accident produced the old result.
+
+## Phase 9, P9.1 — a demo-scale scheduler doesn't wait for the referral you meant it for
+
+**60. At `SLA_SCALE=0.0004`/`SWEEP_INTERVAL_SECONDS=5`, *every* open
+referral breaches within about a minute of its state starting — not just
+the one a script deliberately seeded to demonstrate the live escalation.**
+`server/scripts/demo.sh` seeds one referral (Suresh Yadav) meant to be
+"already overdue on arrival" and one (Ramesh Kumar, IN_TRANSIT) meant to
+still be "on the way" when the MO gets to Screen 5. A real browser
+rehearsal (Playwright driven directly, not the test suite — see
+`docs/DEMO_SCRIPT.md`) opened the supervisor dashboard about two minutes
+after `demo.sh` finished and found **five** referrals already overdue, not
+one: the two fixture referrals from `app.seed` (Lakshmi Devi, Fatima
+Begum) and Ramesh Kumar himself had all also crossed their own scaled SLA
+windows in the gap between seeding and opening a browser. Nothing is
+wrong — a 24h SLA at this scale breaches in ~35s, a 48h one in ~70s, and
+the scheduler sweeps every 5s regardless of which referral a script
+"meant." The fix wasn't code, it was honesty: `demo.sh`'s printed summary
+and `docs/DEMO_SCRIPT.md` both now say plainly that most or all open
+referrals will show overdue within about a minute of the stack being
+ready, rather than promising a single, specific row. The same rehearsal
+also confirmed the actual headline moment works as designed: a referral
+created live in the browser flipped to overdue in an already-open,
+never-reloaded dashboard tab at exactly 35 seconds, with no reload.
+
+Worth carrying forward: a demo-scale timing constant tuned for one
+moment ("make this breach live") applies to *every* row that shares its
+state, not just the one you were thinking about when you picked the
+number — the same shape of mistake as observation 57 (a harness constant
+tuned for one experiment silently affecting another), here surfacing in
+a live walkthrough instead of a data table because nobody had reason to
+watch the dashboard *before* the deliberately-late referral was created.

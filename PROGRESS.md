@@ -9,8 +9,8 @@
 > those here just gives a future session more text to read for the same
 > information, at lower quality.
 
-**Last updated:** 2026-08-24 (Phase 9 planning)
-**Last session model:** Opus (Phase 9 planning, no code).
+**Last updated:** 2026-08-25 (Phase 9, P9.1)
+**Last session model:** Sonnet (P9.1 implementation).
 
 ## Current phase
 
@@ -24,12 +24,15 @@ matrix is filled from real recorded runs, and E5's k6 load test (a
 genuinely new tool in this repo) produced real per-endpoint latency
 numbers and an honest index finding.
 
-**Phase 9 is planned but not started.** `docs/PHASE9_PLAN.md` and
-**ADR-018** (deployment-ready config, not a deployed instance) were
+**Phase 9 is in progress. P9.1 is done and verified.** `docs/PHASE9_PLAN.md`
+and **ADR-018** (deployment-ready config, not a deployed instance) were
 written 2026-08-24 (Opus, plan-only — no code). D42–D45 answered by the
-user; D46–D49 taken alone and flagged in the plan for override. **The
-split is P9.1 / P9.2 / P9.3 (D45) and each needs its own explicit
-go-ahead** (handoff R1/R5).
+user; D46–D49 taken alone, flagged in the plan for override, and now built
+exactly as flagged (no override requested). **The split is P9.1 / P9.2 /
+P9.3 (D45) and each needs its own explicit go-ahead** (handoff R1/R5) —
+P9.2 (the advisory-lock measurement, D44; the production Compose config,
+D43/ADR-018) and P9.3 (recording scripts, submission checklist) are both
+still unstarted, waiting for that go-ahead.
 
 **The written report is OUT of Phase 9 scope (D42).** Nothing
 report-shaped exists in this repository and none will be created here —
@@ -579,17 +582,87 @@ clean before trusting migration `0009`.
   `docs/mom/` empty, root `results/` a stray `.gitkeep` while real results
   live in `server/results/`, `temp.txt` stray at the root.
 
+- **P9.1** (`docs/PHASE9_PLAN.md` build order, 2026-08-25, Sonnet):
+  **README.md rewritten line by line against the running system**, not
+  edited around — status (Phases 0–8 complete, Phase 9 in progress), the
+  full user/role table (`asha_a`/`asha_b`/`anm1`/`mo1`/`supervisor1`, all
+  five real routes, no placeholders), test counts (269 server, 11
+  Playwright, `alembic heads` 0009), `make experiments EXP=<E1|E2|E3|E6>`
+  with its measured wall-clock table, the full ADR-001–018 index, and a
+  documentation map that now includes `docs/DEMO_SCRIPT.md` and
+  `server/results/`. **Stray files cleared**: `temp.txt` deleted (an
+  untracked leftover, never committed); the root `results/.gitkeep`
+  removed — `server/results/` is the one canonical location, documented as
+  such in the new README, since every real E1–E6 result already lives
+  there (D36).
+  **`server/scripts/demo.sh`** (D46: real logic in a script, `make demo`
+  now a one-line wrapper) — brings the stack up if not already running,
+  resets the application database by drop/recreate rather than `docker
+  compose down -v` (D47, so the client/preview never gets stopped),
+  restarts only `api` (its dashboard-stream LISTEN connection goes stale
+  across a DB recreate, `scheduler` doesn't hold one), migrates and seeds
+  the fixture district, starts a **separate, named** demo-scale scheduler
+  (`SLA_SCALE=0.0004`/`SWEEP_INTERVAL_SECONDS=5`, PROGRESS.md's own proven
+  recipe) alongside whatever real-scale `scheduler` service is already
+  running, then seeds three referrals *through the real `/sync/push`*
+  (ADR-015's discipline, `demo_walk.py`'s own precedent — no hand-INSERTed
+  rows): one already-overdue (Suresh Yadav, polled via psql until
+  `ESCALATED` before proceeding — up to 2 minutes, asserted, not assumed),
+  one MO-advanceable (Ramesh Kumar, IN_TRANSIT), one pending
+  identity-review pair (`Lakshmy Devi` against the seeded `Lakshmi Devi`,
+  same recipe as the one already documented earlier in this file). Per
+  D48, the fifth state — "breaches live while you watch" — is
+  **deliberately not pre-seeded**: `docs/DEMO_SCRIPT.md` has the presenter
+  create it live on Screen 2 instead, which only needs this script to
+  guarantee the demo-scale scheduler is already running when they do (it
+  is, by construction — started before any referral is seeded). Per D49,
+  the script prints the dashboard URL rather than attempting to launch a
+  browser from inside a container.
+  **`docs/DEMO_SCRIPT.md`** written: the six-step click path, one browser
+  window per role (session tokens live in `localStorage`, shared across
+  tabs of the same profile — a real trap this session found while
+  designing the script, not from a prior observation), what to say, rough
+  timing per step, and P7.3(C5)'s three ranked offline-demo fallbacks
+  reused verbatim, not reinvented.
+
+  **Rehearsed cold, in a real browser** (a short standalone Playwright
+  driver, not the test suite — the flow needs several simultaneously
+  logged-in sessions, which a single-flow spec doesn't) — see observation
+  60 (`docs/OBSERVATIONS.md`) for the full finding. The headline moment
+  worked exactly as designed: a referral created live flipped from "on the
+  way" to "overdue" in an already-open, never-reloaded dashboard tab at
+  **exactly 35 seconds**, matching the SLA-scale arithmetic precisely. The
+  rehearsal also caught a real gap in the first draft: by the time the
+  dashboard was opened (about two minutes after `demo.sh` finished), five
+  referrals were already overdue, not the one deliberately seeded to be —
+  every open referral crosses its own scaled SLA within about a minute at
+  this setting, including the two fixture referrals from `app.seed` and
+  Ramesh Kumar's own IN_TRANSIT window. Not a bug; fixed by making
+  `demo.sh`'s printed summary and `docs/DEMO_SCRIPT.md` say this plainly
+  instead of promising a single specific overdue row. Also caught and
+  fixed before it shipped: the script's own `cd "$(dirname "$0")/../../.."`
+  (copied from `kill_api.sh`, which lives three directories deep) needed
+  to be `../..` — `demo.sh` lives one level shallower
+  (`server/scripts/`, not `server/tests/fault/`).
+
+  Verified: full server suite **269 passed**, `ruff check`/
+  `ruff format --check` clean, `python -m app.verify_replay` clean,
+  `alembic heads` still `0009` (P9.1 adds no migration). Client
+  `tsc --noEmit` and `npm run build` clean — the full Playwright suite was
+  deliberately **not** run this session (it rewrites 14 screenshots with
+  no source change, a known trap; the rehearsal used a separate
+  throwaway driver instead, deleted before committing). No orphaned
+  container survived — `demo-scheduler` was started with `--rm` and
+  explicitly stopped after the rehearsal; `docker ps -a` checked clean
+  afterward. `git status` clean of anything but the intended changes
+  (checked specifically for screenshot churn — none).
+
 ## Not done / in progress
 
-- **Phase 9 is planned, not started.** `docs/PHASE9_PLAN.md` + ADR-018
-  exist; no Phase 9 code has been written. P9.1, P9.2 and P9.3 each need
-  their own go-ahead (handoff R1/R5). P9.1 (deliverable hygiene + the
-  demo path) is the intended first sub-phase.
-- **`README.md` is five phases stale and is a P9.1 deliverable** — it
-  claims "Phases 0–4 complete", "Phase 5 … planned but not built", and
-  that `anm1`/`supervisor1` see placeholder screens. All seven screens
-  are real (`PlaceholderPage` was deleted in P6.2). Do not trust it as a
-  description of the system until P9.1 rewrites it.
+- **Phase 9's P9.2 and P9.3 are not started.** P9.1 is done (see above).
+  P9.2 (the advisory-lock measurement, D44; the production Compose config,
+  D43/ADR-018) and P9.3 (recording scripts, submission checklist) each
+  need their own go-ahead (handoff R1/R5) before starting.
 - **The written report is deferred until after Phase 9 (D42)** — not
   started, not scaffolded, and deliberately not in Phase 9's scope. The
   user will share his own plan for it once Phase 9 is done.
@@ -607,6 +680,40 @@ clean before trusting migration `0009`.
   for or something these changes caused; see observation 53.
 
 ## Exit criteria status
+
+P9.1: every criterion in `docs/PHASE9_PLAN.md`'s D45 table met and checked
+against real commands and a real browser —
+
+- **"A clean machine runs one documented command and reaches a seeded,
+  demo-ready stack with the scenario printed, no manual step the presenter
+  has to remember."** `bash server/scripts/demo.sh` (`make demo`) does
+  this: brings the stack up if needed, resets the app database, migrates,
+  seeds the fixture district plus three demo-state referrals through the
+  real API, confirms the pre-escalated one actually reached `ESCALATED`
+  (polled, not assumed), starts the demo-scale scheduler, and prints the
+  dashboard URL, every login, and the numbered scenario. Ran end to end
+  against the actual (not simulated-clean) machine state this session.
+- **"The scripted click path has been walked end to end, cold, at least
+  once."** Done with a real headless-Chromium session (four separate
+  logged-in contexts, matching `docs/DEMO_SCRIPT.md`'s "one browser window
+  per role" instruction) — every step in `docs/DEMO_SCRIPT.md` executed:
+  referral list, referral creation, referral detail/timeline, MO advance,
+  identity-review merge, and the live escalation watched in an
+  already-open, never-reloaded dashboard tab. The live flip happened at
+  exactly 35 seconds, confirming the headline mechanism works, not just
+  that the code compiles.
+- **"README.md contains no false statement, verified line by line."**
+  Rewritten from the actual routes (`client/src/App.tsx`), actual seeded
+  users (`server/app/seed.py`), actual test counts (269 server, 11
+  Playwright, `alembic heads` 0009), and the actual ADR list (001–018) —
+  not edited incrementally from the five-phases-stale version.
+
+One real gap the rehearsal found and the script/doc now both say plainly,
+rather than promising something the settings don't actually produce: at
+`SLA_SCALE=0.0004`, every open referral (not only the one deliberately
+seeded to already be overdue) breaches within about a minute, so a
+presenter who takes their time between running `demo.sh` and opening the
+dashboard will see several overdue rows, not one. See observation 60.
 
 Phase 4: every criterion in `docs/PHASE4_PLAN.md` met and checked against
 real commands, **except** the real-phone recording. Two needed judgement:
@@ -883,23 +990,41 @@ lands here once recorded — it is deliberately not committed (large binary).
 
 ## Next concrete step
 
-**Phase 8 is done, the pre-Phase-9 audit is done, and Phase 9 is planned.**
-Next is **P9.1** — deliverable hygiene and the demo path: rewrite
-`README.md` to reality, clear the stray files, rebuild the demo runner to
-§14's specification as a script (`make` isn't installed here — D46), write
-`docs/DEMO_SCRIPT.md`, and rehearse the click path cold end to end.
-`docs/PHASE9_PLAN.md` has the full build order, contracts and traps;
-**ADR-018** has the deployment decision. This is implementation work —
-**Sonnet, not Opus** (handoff R2).
+**P9.1 is done and verified.** Next is **P9.2** — the advisory-lock
+write-latency measurement (D44: a write-heavy, no-sleep k6 profile against
+a scratch database, `acquire_seq_lock` on vs. temporarily neutralised,
+never committed, into `server/results/e5_lock/`) and the production-ready
+Compose configuration (D43/ADR-018: no bind mounts, no `--reload`, built
+static client, unpublished DB port, restricted CORS, no development secret
+defaults — brought up and verified to actually serve, not just written).
+`docs/PHASE9_PLAN.md`'s "Contracts fixed now" and "Traps" sections cover
+both in detail — the lock-disabling edit escaping into a commit is flagged
+there as the one genuinely dangerous action in this phase.
 
-Wait for an explicit go-ahead before starting P9.1, and do not roll from
-P9.1 into P9.2 without a second one (R1/R5).
+Wait for an explicit go-ahead before starting P9.2, and do not roll from
+P9.2 into P9.3 without a second one (R1/R5).
 
 **Two things a P9 session must not do:** touch the written report in any
 form (D42 — deferred until after Phase 9, the user has his own plan), and
 re-run any Phase 8 experiment (nothing in Phase 9 touches the code path
 `experiments/` exercises; the lock measurement writes a *new*
 `server/results/e5_lock/`, it does not modify `e5/`).
+
+To verify P9.1 yourself:
+
+```bash
+bash server/scripts/demo.sh
+```
+Expect it to bring the stack up (if not already), reset the database,
+migrate, seed, confirm one referral actually reached `ESCALATED` (up to
+~2 minutes), start `demo-scheduler`, and print the dashboard URL, every
+login, and the six-step scenario. Then open `http://localhost:5173/login`
+yourself and walk `docs/DEMO_SCRIPT.md`'s six steps in a real browser —
+one window per role (session tokens live in `localStorage`, shared across
+tabs of the same profile). The referral you create in step 2 should flip
+to "overdue" in the still-open, never-reloaded supervisor tab within about
+35–90 seconds. `docker stop demo-scheduler` when done (started with
+`--rm`, so this also removes it).
 
 To verify P8.3 yourself:
 
@@ -1269,6 +1394,16 @@ around changes what that spec exercises. Clean up by deleting from
 
 ## Known problems and workarounds
 
+- **At demo-scale SLA settings, every open referral breaches within about
+  a minute, not just the one a script deliberately seeded to demonstrate
+  it.** `SLA_SCALE=0.0004` makes a 24h SLA breach in ~35s and a 48h one in
+  ~70s — a real browser rehearsal opened the dashboard about two minutes
+  after `demo.sh` finished and found five referrals already overdue, not
+  the one referral the script specifically seeded to be. Not a bug; see
+  observation 60. Before tuning a demo-scale or experiment-scale timing
+  constant for one intended effect, check what else shares its
+  precondition and will be affected the same way (same shape of mistake
+  as observation 57's `LOAD_STEP_HOURS` confound).
 - **A `Random(seed_string)` built fresh inside a function that gets
   called many times per cell gives every call the same first draw, not
   an independent one per referral.** `experiments/resume.py`'s

@@ -22,17 +22,13 @@ test:
 		-e DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-dev}@db:5432/${POSTGRES_DB:-nirantharseva}_test \
 		api sh -c "alembic upgrade head && pytest"
 
-# Seeds the D4 fixture district (docs/PHASE2_PLAN.md) — idempotent.
-# P7.3 C5: prints the three offline-demo paths, ranked, so the sequence is
-# not improvised while being watched. docs/IMPLEMENTATION_PLAN.md §14 ranks
-# them; docs/Observations_for_report.md has the write-up for the report.
+# Thin wrapper (D46, docs/PHASE9_PLAN.md P9.1) — the real logic lives in
+# server/scripts/demo.sh because `make` is not installed on the reference
+# machine, so the script must work invoked directly too. Resets the app
+# database, seeds demo states, starts a demo-scale scheduler, prints the
+# click path. docs/DEMO_SCRIPT.md is the full walkthrough.
 demo:
-	docker compose run --rm api sh -c "alembic upgrade head && python -m app.seed"
-	@echo ""
-	@echo "Offline demo paths, ranked:"
-	@echo "  1. Browser DevTools 'offline' checkbox — primary path, instant, reliable."
-	@echo "  2. docker compose stop api — exercises the retry path (E4's fault injection)."
-	@echo "  3. Real phone, airplane mode, added to home screen — fallback of last resort."
+	bash server/scripts/demo.sh
 
 # Runs one experiment's grid, then regenerates its tables/figures/dashboard.
 # EXP is required, not defaulted — wall-clock cost ranges from ~30s (E3) to

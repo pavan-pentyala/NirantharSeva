@@ -467,3 +467,54 @@ perturbed the coincidence the test was quietly resting on. The fix that
 survives contact with an unrelated change is the one that names something
 the schema actually promises, not the one that best explains why the old
 behavior happened to work.
+
+## 2026-08-25 — Phase 9, P9.1 (demo path, README rewrite)
+
+**A demo built to prove one specific moment ended up proving something
+broader about the mechanism, almost by accident.** `server/scripts/demo.sh`
+deliberately seeds a single referral to be "already overdue on arrival" and
+deliberately leaves one uncreated, so the presenter creates it live and
+watches it breach on an open dashboard tab — the project's own headline
+demo moment (`docs/IMPLEMENTATION_PLAN.md` §8, the "twenty seconds a panel
+will remember"). A real-browser rehearsal (not the Playwright suite — a
+short standalone driver, since this needed multiple simultaneous logged-in
+sessions rather than a single test flow) confirmed the mechanism works
+exactly as designed: the live-created referral flipped from "on the way" to
+"overdue" in an already-open, never-reloaded browser tab at **exactly 35
+seconds**, matching the SLA-scale arithmetic (`24h × 0.0004 × 3600s`)
+precisely. That number is worth keeping for the report as a concrete,
+measured instance of the live-update path working, not just asserted by a
+Playwright test — a human watching a browser is a different, and for a
+panel, more persuasive kind of evidence than a green CI check.
+
+The same rehearsal surfaced something the first draft of the demo script
+got wrong, worth a sentence in the report's discussion of demo design: at
+demo-scale settings, the escalation window is short enough (~35s for a 24h
+SLA, ~70s for a 48h one) that **every** open referral crosses it within
+about a minute of the stack being ready — not only the one referral a
+script author had in mind when picking the scale. By the time the
+rehearsal opened the dashboard (about two minutes after seeding), five
+referrals were overdue, not the one deliberately seeded to be. This isn't
+a defect in the system; it's a property of choosing a demo-scale constant
+without separately reasoning about every row it will apply to — the same
+shape of mistake E2's `LOAD_STEP_HOURS` confound was (P8.2, observation
+57), here surfacing as a live-walkthrough surprise instead of a flat
+experimental curve. The fix was documentation, not code: the script and
+`docs/DEMO_SCRIPT.md` now say plainly that most open referrals will be
+overdue within a minute, rather than promising a single specific row stays
+alone. A useful general point for the report's methodology/limitations
+discussion: demo scripts and experiment harnesses fail the same way when a
+timing constant is tuned for one intended effect and silently governs
+every other row that shares its precondition.
+
+**The README had drifted five phases behind the running system** —
+claiming Phases 0–4 complete and two of the seven screens as placeholders,
+when every phase through P8.3 was built and no placeholder page had existed
+since P6.2. Rewritten line by line against the actual routes
+(`client/src/App.tsx`), the actual seeded users (`server/app/seed.py`), and
+the actual test counts (269 server, 11 Playwright), rather than edited
+incrementally from the stale version. Worth a sentence in the report's
+discussion of process: a project's own README is not self-maintaining, and
+"the code is the source of truth" only holds if something periodically
+re-derives the README from the code rather than trusting the last time
+someone remembered to update it.
