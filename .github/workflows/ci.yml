@@ -125,6 +125,18 @@ jobs:
           NEEDRESTART_MODE: a
         run: npx playwright install --with-deps chromium
       - run: cp .env.example .env
+      # api and scheduler share the server_venv named volume (same image,
+      # same dependencies — docker-compose.yml's own comment on why). On a
+      # clean runner that volume is empty, and Docker populates it from
+      # the image on first mount — if both containers first-mount it in
+      # the same `docker compose up`, that populate-from-image step can
+      # race: two concurrent attempts to create the same lib64 symlink,
+      # one failing with "file exists" and the whole `up` aborting. Hit
+      # twice in a row this session, byte-for-byte identical error both
+      # times — not flakiness, a real race. Starting api alone first
+      # populates the volume before scheduler ever mounts it, so the
+      # second `up` (bringing up everything else) never races at all.
+      - run: docker compose up -d --build api
       - run: docker compose up -d --build
       - name: Wait for API health
         run: |
