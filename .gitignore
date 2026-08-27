@@ -47,3 +47,7 @@ data/
 # Personal learning aids — not a deliverable, not for the panel.
 docs/LEARNING_PLAN.md
 docs/PROJECT_REFERENCE.md
+
+# Panel-prep deliverables generated for demo/review rehearsal — working
+# material for the student's own use, not part of the graded repository.
+case_study_demo_reviews/

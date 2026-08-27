@@ -16,10 +16,21 @@ change is recoverable from an append-only event log.
 
 ## Status
 
-**Phases 0–9 complete**, except two recordings only a physical device and
-a human hand can produce — see `docs/SUBMISSION_CHECKLIST.md` for the
-exact state of every Review-III deliverable, and `PROGRESS.md` for the
-file kept honest session to session.
+**All ten phases of the implementation plan (P0–P9) are complete.** The
+full CI pipeline (`.github/workflows/ci.yml`) is green — clock-discipline
+checks, the server suite, and the full Playwright end-to-end suite all
+pass on GitHub Actions, not only on a local machine.
+
+What is genuinely still outstanding, and why it isn't done here: the two
+Review-III recordings (a two-minute demo clip and a real-phone
+airplane-mode clip) need a screen recorder and a physical phone — a
+session cannot produce either, only script and verify the mechanism behind
+them, which is done (`docs/RECORDING_DEMO_CLIP.md`,
+`docs/RECORDING_PHONE_CLIP.md`). The written report is deliberately out of
+this repository's scope (ADR-018's sibling decision, D42) and is being
+built separately. See `docs/SUBMISSION_CHECKLIST.md` for the exact state
+of every Review-III deliverable, and `PROGRESS.md` for the file kept
+honest session to session.
 
 All seven screens are real and working: offline referral creation and
 listing, referral detail with a full timeline, MO incoming-referrals queue,
