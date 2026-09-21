@@ -9,7 +9,7 @@ not replace it — it records the decisions §6 leaves open, the order of work,
 **and the places where a later decision supersedes §6. Every such override is
 marked "supersedes §6.x" and carries an ADR.** There is exactly one in Phase 2:
 D7.
-**Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
+**Source of truth for *how you work*:** `docs/HANDOFF.md`.
 
 ---
 
@@ -41,7 +41,7 @@ three are domain correctness (P2.1), the fourth is visibility (P2.2).
 **D1–D4 were settled before P2.1; D5–D8 before P2.2 (2026-08-17).** All eight
 resolve genuine gaps or contradictions in plan §6. All were put to the user with
 options and a recommendation; all took the recommended answer. **None of these
-were taken unilaterally** — several touch items CLAUDE.md and handoff §2 require
+were taken unilaterally** — several touch items AGENTS.md and handoff §2 require
 asking about (schema, auth and roles, API endpoint paths, scope).
 
 ### D1 — The toy model survives until Phase 4

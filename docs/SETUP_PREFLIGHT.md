@@ -2,11 +2,11 @@
 
 **Destination:** `docs/SETUP_PREFLIGHT.md`
 
-**For Claude Code:** run this before any code is written, at the very first
+**For Codex:** run this before any code is written, at the very first
 session. Do not assume any tool exists. Do not install anything without asking.
 Report the full result first, in one message, then wait.
 
-**Why this exists:** Claude Code does not inspect the machine on its own. It
+**Why this exists:** Codex does not inspect the machine on its own. It
 finds a missing tool when a command fails, and by then it may have gone some way
 down a wrong path. Ten minutes here saves an evening later.
 
@@ -111,9 +111,8 @@ now. Flag it at Phase 7 so the user has time.
 
 ## 5. Optional, but worth ten minutes
 
-Run `claude doctor` once. It checks Claude Code's own installation — Node
-version, network access, authentication, config integrity — and flags what is
-broken. It does **not** check Docker, Python, or anything in this document. It is
+Run `codex --version` once to verify the Codex CLI is installed and authenticated.
+It does **not** check Docker, Python, or anything in this document. It is
 worth running once so that install problems and project problems do not get mixed
 together later.
 

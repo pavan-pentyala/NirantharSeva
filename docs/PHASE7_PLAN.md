@@ -5,7 +5,7 @@
 **Source of truth for *what*:** `docs/IMPLEMENTATION_PLAN.md` §11. Thirty
 lines, one CLI contract, one test-layer table — this file supplies the rest,
 the way `docs/PHASE6_PLAN.md` did for §10.
-**Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
+**Source of truth for *how you work*:** `docs/HANDOFF.md`.
 **Read before starting P7.1:** `docs/OBSERVATIONS.md` (all six phase
 sections — observations 44–46 are the ones this phase can most easily
 repeat), `docs/DOMAIN_PRIMER.md` ("Names in test and demo data"), ADR-001

@@ -72,10 +72,10 @@ Seven screens, designed and built as `.dc.html` files in
 **All roles:**
 - Login — phone number, PIN, role picker (`Screen 7 - Login.dc.html`)
 
-Anything beyond these seven, Claude Code proposes and the user approves.
+Anything beyond these seven, Codex proposes and the user approves.
 All seven are HTML design references, not production code — recreate them in
 the project's actual stack (React 18 + TypeScript + Vite, reading from
-Dexie.js, per `CLAUDE.md`), don't embed the HTML.
+Dexie.js, per `AGENTS.md`), don't embed the HTML.
 
 ## 6. The offline indicator
 
@@ -112,7 +112,7 @@ with a ✓/✕. Confirmed to hold up in greyscale (see §7 of the design system)
 
 ## 8. Hard constraints — these are not negotiable
 
-Claude Code follows these even if the rest of this file is empty.
+Codex follows these even if the rest of this file is empty.
 
 - Mobile-first. The ASHA is on a cheap Android phone in a village.
 - Big touch targets. Creating a referral is the most frequent action and must be

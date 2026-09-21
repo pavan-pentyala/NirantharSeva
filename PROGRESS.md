@@ -9,6 +9,12 @@
 > those here just gives a future session more text to read for the same
 > information, at lower quality.
 
+> **Model history note:** Phases 0–9 were built using Claude Code (Anthropic).
+> "Sonnet" in session records refers to Claude's code-writing model; "Opus"
+> refers to Claude's planning model. The project now uses OpenAI Codex /
+> ChatGPT with **GPT-5.6 Terra** (code) and **GPT-5.6 Sol** (planning).
+> Historical model names below are preserved as-is.
+
 **Last updated:** 2026-08-25 (final — post-Phase-9, CI verified green)
 **Last session model:** Sonnet (P9.3 implementation, then a CI audit).
 
@@ -1659,7 +1665,7 @@ around changes what that spec exercises. Clean up by deleting from
   results/framing/discussion material for the final written report, one
   dated section per session. Update it at the end of every session
   alongside `PROGRESS.md`, whenever the session produced anything
-  report-worthy — this is now in `CLAUDE.md`'s "End of every session"
+  report-worthy — this is now in `AGENTS.md`'s "End of every session"
   section too.
 - **P8.2's three decisions, all answered 2026-08-24, do not re-ask:**
   E2's fixed `escalation_response_rate=0.5` (grid.py's `E2_RESPONSE_RATE`

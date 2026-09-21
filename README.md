@@ -244,7 +244,7 @@ The decisions most worth reading, in `docs/decisions/`:
 |---|---|
 | `PROGRESS.md` | Where the project actually is. Read first. |
 | `docs/IMPLEMENTATION_PLAN.md` | The full ten-week build spec |
-| `docs/HANDOFF_CLAUDE_CODE.md` | Operating rules for AI-assisted sessions on this repo |
+| `docs/HANDOFF.md` | Operating rules for AI-assisted sessions on this repo |
 | `docs/PHASE*_PLAN.md` | Per-phase build order, decisions, exit criteria |
 | `docs/decisions/` | Architecture decision records, ADR-001 through ADR-018 |
 | `docs/OBSERVATIONS.md` | Hard-won lessons, append-only, one section per phase |

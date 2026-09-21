@@ -7,7 +7,7 @@ ADR-008 written 2026-08-18.
 eight lines long, has no subsections, and — alone among the build phases — **no
 exit criteria**. This file supplies what it leaves out, and marks every override
 "supersedes §7". There is exactly one: D9.
-**Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
+**Source of truth for *how you work*:** `docs/HANDOFF.md`.
 **Read before starting:** `docs/OBSERVATIONS.md`, then ADR-007 and
 ADR-008.
 

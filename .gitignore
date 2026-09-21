@@ -51,3 +51,13 @@ docs/PROJECT_REFERENCE.md
 # Panel-prep deliverables generated for demo/review rehearsal — working
 # material for the student's own use, not part of the graded repository.
 case_study_demo_reviews/
+
+# Codex CLI project config — developer-local, not a deliverable.
+# Run `codex trust` to activate it; mark the project trusted first.
+.codex/
+
+# Sub-agent instructions — developer configuration, not tracked.
+SUB-AGENTS.md
+
+# Old Claude Code config directory (legacy, now empty).
+.claude/

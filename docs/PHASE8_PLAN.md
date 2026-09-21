@@ -5,7 +5,7 @@ session — no code, no dependency installed, no config file created).
 **Source of truth for *what*:** `docs/IMPLEMENTATION_PLAN.md` §13, plus §12
 for the instrumentation it assumes. Forty-five lines, two tables — this
 file supplies the rest, as `docs/PHASE7_PLAN.md` did for §11.
-**Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
+**Source of truth for *how you work*:** `docs/HANDOFF.md`.
 **Read before starting P8.1:** ADR-001 (the clock — this is the phase it was
 built for), ADR-015 (a cohort loads by replay), **ADR-016** and **ADR-017**
 (this phase's own), `docs/PHASE7_PLAN.md`'s "Traps", and
@@ -365,7 +365,7 @@ reproducibility checks.
   path — `--out /app/results/e1/` is exactly the shape observation 41
   describes, and a `--rm` container erases the evidence when it mangles.
 - **k6 is genuinely new** (P8.3). Nothing in the repository references it
-  today, though `CLAUDE.md`'s stack list names it. It needs a Compose
+  today, though `AGENTS.md`'s stack list names it. It needs a Compose
   service, and it is the one piece of Phase 8 that could surprise on setup
   cost.
 

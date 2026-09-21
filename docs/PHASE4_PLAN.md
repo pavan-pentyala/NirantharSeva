@@ -6,7 +6,7 @@ session).
 **Source of truth for *what*:** `docs/IMPLEMENTATION_PLAN.md` §8. Forty lines,
 one Dexie schema, one Lamport snippet, three exit criteria — this file
 supplies the rest, the way `docs/PHASE3_PLAN.md` did for §7.
-**Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
+**Source of truth for *how you work*:** `docs/HANDOFF.md`.
 **Read before starting P4.1:** `docs/OBSERVATIONS.md`, ADR-006 (actor
 identity), ADR-008 (the replay fold), ADR-009, ADR-010.
 **Design bundle:** `docs/design_handoff_ui_screens/`, tracked in git. Governs
@@ -77,7 +77,7 @@ Flagged here rather than left implicit.
 Each sub-phase ends committed, CI-green, and independently verifiable. No
 sub-phase starts without the user's go-ahead, same as any phase (R1).
 
-### Screen scope for P4.2 — decided by Claude Code, stated so it can be overruled
+### Screen scope for P4.2 — decided by Codex, stated so it can be overruled
 
 P4.2 builds Screens 1, 2, 3, 5, 7 (ASHA list, ASHA create, referral detail,
 MO incoming, login). Screen 4 (supervisor dashboard) is Phase 5's — its whole

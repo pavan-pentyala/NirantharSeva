@@ -618,7 +618,7 @@ reaches zero cleanly. `client/src` cannot, for two independent reasons:
    Dexie replays every declared version in order to upgrade an existing
    browser's IndexedDB. Editing v1 retroactively is the same mistake as
    editing a shipped Alembic migration — a rule this project states in
-   `CLAUDE.md` and enforces server-side.
+   `AGENTS.md` and enforces server-side.
 2. **`version(4).stores({ toy_cache: null })` *is* the drop.** Dexie's
    "remove this table" syntax is naming it with a `null` schema. Omitting
    the table — the way v2 and v3 omit tables they don't change — leaves it

@@ -13,7 +13,7 @@ and reads like it.
 
 **Status:** Proposed | Accepted | Superseded by ADR-NNN
 **Date:** YYYY-MM-DD
-**Decided by:** user | Claude Code (small technical choice)
+**Decided by:** user | Codex (small technical choice)
 
 ## Context
 

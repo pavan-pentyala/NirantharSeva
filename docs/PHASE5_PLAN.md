@@ -5,7 +5,7 @@
 **Source of truth for *what*:** `docs/IMPLEMENTATION_PLAN.md` §9. Fifty
 lines, one sweep snippet, one SSE snippet, one exit criterion — this file
 supplies the rest, the way `docs/PHASE4_PLAN.md` did for §8.
-**Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
+**Source of truth for *how you work*:** `docs/HANDOFF.md`.
 **Read before starting P5.1:** `docs/OBSERVATIONS.md` (all four
 phase sections), ADR-001 (clock), ADR-002 (advisory lock), ADR-005 (org
 scoping), ADR-011, ADR-012.
@@ -93,7 +93,7 @@ mirrored server-side by `escalation.breached_state`. So:
   button at all and quietly becomes unworkable in the UI — the opposite of
   what escalation is for.
 
-Decided by Claude Code, not the user, because it changes no contract, no
+Decided by Codex, not the user, because it changes no contract, no
 schema and no invariant — only how an existing field is rendered. Stated
 here so it can be overruled.
 

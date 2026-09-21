@@ -3,7 +3,7 @@
 **Destination:** `docs/DOMAIN_PRIMER.md`
 
 **Why this exists:** the implementation plan is precise about the engine but does
-not explain the health system it models. Claude Code will write screen labels,
+not explain the health system it models. The AI agent will write screen labels,
 role names, error messages, and seed data, and a panel of examiners will read
 them. Wrong vocabulary looks careless even when the code is correct.
 

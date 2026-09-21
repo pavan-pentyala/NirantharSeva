@@ -1,3 +1,14 @@
+> **Agent migration note:** This project was originally built using Claude Code
+> (Anthropic). In those sessions, "Sonnet" was the code-writing model and "Opus"
+> was the planning model. The equivalents in the current Codex / ChatGPT setup
+> are **GPT-5.6 Terra** (code) and **GPT-5.6 Sol** (planning). Historical
+> references to Sonnet/Opus in `PROGRESS.md` and other documents refer to the
+> Claude models that were actually used at the time — they are preserved as-is
+> and should be read as such.
+
+> **Sub-agent instructions:** Additional context for sub-agents is in
+> `SUB-AGENTS.md` at the project root.
+
 # NirantharSeva
 
 Offline-first referral continuity system for community health workflows.
@@ -6,7 +17,7 @@ working demo, experiment results, and a written report.
 
 ## Read before doing anything
 
-1. `docs/HANDOFF_CLAUDE_CODE.md` — the operating rules. Read it in full.
+1. `docs/HANDOFF.md` — the operating rules. Read it in full.
 2. `PROGRESS.md` — where the last session stopped.
 3. The current phase section of `docs/IMPLEMENTATION_PLAN.md`, and the one after
    it. Not the whole plan.
@@ -17,7 +28,7 @@ Do not write code before doing this.
 
 - **One phase at a time**, only when the user explicitly says to start it. When
   the phase is done, stop and report. Do not continue into the next phase.
-- **Sonnet writes code. Opus does design and planning.** If the wrong model is
+- **Terra writes code. Sol does design and planning.** If the wrong model is
   active for the work being asked, say so and ask the user to switch.
 - **Small technical choices: decide yourself.** Names, tests, refactoring, CSS
   details, helper functions.
@@ -96,6 +107,6 @@ every choice you made on your own — he has to defend this repository to a pane
 
 ## Commits
 
-- Do not add "Co-Authored-By: Claude" or any Claude/Anthropic attribution line
+- Do not add "Co-Authored-By: Codex" or any Codex/OpenAI attribution line
   to commit messages.
-- No "Generated with Claude Code" footer either.
+- No "Generated with Codex" footer either.

@@ -5,7 +5,7 @@
 **Source of truth for *what*:** `docs/IMPLEMENTATION_PLAN.md` §10. Forty-five
 lines, one pipeline snippet, four exit criteria — this file supplies the
 rest, the way `docs/PHASE5_PLAN.md` did for §9.
-**Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
+**Source of truth for *how you work*:** `docs/HANDOFF.md`.
 **Read before starting P6.1:** `docs/OBSERVATIONS.md` (all five phase
 sections), `docs/DOMAIN_PRIMER.md` ("Names in test and demo data"), ADR-001
 (clock), ADR-005 (org scoping), ADR-009 (why this phase owns exactly one
@@ -108,7 +108,7 @@ is asked to weigh.
 
 | # | Item | Notes |
 |---|---|---|
-| 1 | `rapidfuzz` dependency | Named in `CLAUDE.md`'s stack list but **not in `server/pyproject.toml`** — `uv lock`, then rebuild. Expect the stale-`server_venv` dance from PROGRESS.md's "Known problems"; `-V` alone did not do it for apscheduler. |
+| 1 | `rapidfuzz` dependency | Named in `AGENTS.md`'s stack list but **not in `server/pyproject.toml`** — `uv lock`, then rebuild. Expect the stale-`server_venv` dance from PROGRESS.md's "Known problems"; `-V` alone did not do it for apscheduler. |
 | 2 | `IDENTITY_AUTO_ACCEPT` / `IDENTITY_REVIEW_FLOOR` in `app/config.py` + `.env.example` | Floats, defaults `92` / `80` (§10.1). Env vars, not constants, because E3 sweeps them — same reasoning as D17's `SLA_SCALE`. |
 | 3 | `app/linkage/normalize.py` | NFKD, strip diacritics, lowercase, collapse whitespace. **No database imports** — same discipline `app/domain/states.py` promises. |
 | 4 | `app/linkage/scoring.py` | `max(fuzz.token_set_ratio, fuzz.WRatio)` over two already-normalised strings. **No database imports** — the sweep re-scores a fixed candidate set six times and must not need six round trips. |

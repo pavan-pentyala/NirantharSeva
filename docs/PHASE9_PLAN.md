@@ -5,7 +5,7 @@ session — no code, no dependency installed, no config file created).
 **Source of truth for *what*:** `docs/IMPLEMENTATION_PLAN.md` §14, plus
 §8.5 (the recorded clip), §3 (the advisory-lock sentence this phase finally
 measures), and §2.2 (the repository layout this phase reconciles).
-**Source of truth for *how you work*:** `docs/HANDOFF_CLAUDE_CODE.md`.
+**Source of truth for *how you work*:** `docs/HANDOFF.md`.
 **Read before starting P9.1:** `PROGRESS.md` in full, **ADR-018** (this
 phase's own), and this file. `docs/OBSERVATIONS.md` observations 54–59 if
 you touch `experiments/` or the escalation/dashboard sort.

@@ -1,4 +1,4 @@
-# NirantharSeva — Technical Handoff for Claude Code
+# NirantharSeva — Technical Handoff for AI-Assisted Development
 
 **Read this file first, every session, before touching any code.**
 
@@ -16,13 +16,13 @@ results, screenshots, and a working live demo.
 
 | File | Role |
 |---|---|
-| `CLAUDE.md` (repo root) | Loaded automatically every session. Short summary of the hard rules; points here. |
+| `AGENTS.md` (repo root) | Loaded automatically every session. Short summary of the hard rules; points here. |
 | `docs/IMPLEMENTATION_PLAN.md` | The build spec. Source of truth for **what** to build, in what order, and what "done" means. |
-| `docs/HANDOFF_CLAUDE_CODE.md` | This file. The rules of engagement. Source of truth for **how you work**. |
+| `docs/HANDOFF.md` | This file. The rules of engagement. Source of truth for **how you work**. |
 | `PROGRESS.md` | Session state. Read it at the start of every session, rewrite it at the end. |
 | `docs/SETUP_PREFLIGHT.md` | Environment check. Run it before Phase 0. Do not assume any tool exists. |
 | `docs/DOMAIN_PRIMER.md` | Who ASHAs, ANMs and MOs are, and the words to use in the interface. Read before writing any user-facing text. |
-| `docs/UI_DESIGN_BRIEF.md` | The user's design instructions. If filled in, follow it. If it says "Claude decides", see §8. |
+| `docs/UI_DESIGN_BRIEF.md` | The user's design instructions. If filled in, follow it. If it says "AI agent decides", see §8. |
 | `docs/decisions/ADR-TEMPLATE.md` | Format for architecture decision records. ADR-001 and ADR-002 are due in Phase 0. |
 
 If this handoff and the implementation plan ever disagree, **this handoff wins on
@@ -52,17 +52,17 @@ At the start of a phase, before writing code:
 
 | Work | Model |
 |---|---|
-| Writing, editing, refactoring, testing, debugging code | **Sonnet** |
-| Architecture, phase planning, schema design, trade-off analysis, ADR writing, code review, experiment design, report structure | **Opus** |
+| Writing, editing, refactoring, testing, debugging code | **Terra** (GPT-5.6 Terra) |
+| Architecture, phase planning, schema design, trade-off analysis, ADR writing, code review, experiment design, report structure | **Sol** (GPT-5.6 Sol) |
 
 Enforce this yourself:
 
-- If the session is on **Opus** and the user asks you to write code, say so and
-  ask them to switch to Sonnet before you begin.
-- If the session is on **Sonnet** and the user asks for design, planning, or a
-  hard architectural judgement, say so and suggest switching to Opus.
+- If the session is on **Sol** and the user asks you to write code, say so and
+  ask them to switch to Terra before you begin.
+- If the session is on **Terra** and the user asks for design, planning, or a
+  hard architectural judgement, say so and suggest switching to Sol.
 - A short design discussion inside a coding session is fine. A full phase plan is
-  not — that is Opus work.
+  not — that is Sol work.
 
 Never silently ignore this rule to save the user a step.
 
@@ -305,7 +305,7 @@ a native English speaker. So:
 
 ## 8. UI guidance
 
-**If a Claude Design handoff bundle is provided, follow it** for layout, colour,
+**If a design handoff bundle is provided, follow it** for layout, colour,
 spacing, type, and component appearance. Prefer the bundle over your own taste,
 and do not restyle it.
 
@@ -361,21 +361,21 @@ Then get answers to these from the user (ask them all at once):
 
 ---
 
-## 10. `CLAUDE.md`
+## 10. `AGENTS.md`
 
-`CLAUDE.md` at the repository root is loaded automatically at the start of every
+`AGENTS.md` at the repository root is loaded automatically at the start of every
 session and is re-read after compaction. It already exists and holds a short form
 of these rules. Keep it short — long instruction files consume context and are
 followed less consistently. If a rule keeps being missed, make it shorter and
-more concrete in `CLAUDE.md` rather than longer here.
+more concrete in `AGENTS.md` rather than longer here.
 
-Do not copy this handoff into `CLAUDE.md`.
+Do not copy this handoff into `AGENTS.md`.
 
 ---
 
 ## 11. First message of the first session
 
-> Read `docs/HANDOFF_CLAUDE_CODE.md` in full, then `PROGRESS.md`, then
+> Read `docs/HANDOFF.md` in full, then `PROGRESS.md`, then
 > `docs/SETUP_PREFLIGHT.md`.
 >
 > Do not write any code and do not install anything. Run the preflight checks,

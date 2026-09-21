@@ -11,7 +11,7 @@ The `.dc.html` files in this bundle are **design references built in HTML** —
 static prototypes showing intended look, layout, copy, and (for the
 dashboard) one animated state, not production code to copy directly. Open any
 file directly in a browser to view it. The task is to **recreate these
-designs in the target codebase's stack** (per the project's `CLAUDE.md`:
+designs in the target codebase's stack** (per the project's `AGENTS.md`:
 React 18 + TypeScript + Vite, reading from Dexie.js/IndexedDB, syncing via the
 FastAPI backend) using that stack's own component patterns — not to embed or
 ship this HTML as-is.
