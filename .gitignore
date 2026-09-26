@@ -61,3 +61,4 @@ SUB-AGENTS.md
 
 # Old Claude Code config directory (legacy, now empty).
 .claude/
+.codex-temp
